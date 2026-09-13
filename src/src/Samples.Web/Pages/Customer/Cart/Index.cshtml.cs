@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Purview.EventSourcing.Samples.Domain;
 using Purview.EventSourcing.Samples.Services;
-using Purview.EventSourcing.Samples.Web.Infrastructure;
 
 namespace Purview.EventSourcing.Samples.Web.Pages.Customer.Cart;
 

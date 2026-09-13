@@ -1,9 +1,6 @@
 <Project>
 	<PropertyGroup>
 		<NamespacePrefix>Purview.EventSourcing</NamespacePrefix>
-		<IsPackable>false</IsPackable>
-		<UsePackageJsonVersion>Strict</UsePackageJsonVersion>
-		<LangVersion>Preview</LangVersion>
 	</PropertyGroup>
 
 	<Import Sdk="Purview.DotNetProjectSdk" Project="Sdk.props" />
@@ -59,7 +56,7 @@
 		     Sdk/*.md rule); the shared LICENSE and logo are linked into Sdk/ so IncludeLinkedSdkFiles maps them to the
 		     package root. -->
 		<None Include="$(MSBuildThisFileDirectory)../LICENSE.md" Link="Sdk\LICENSE.md" />
-		<None Include="$(MSBuildThisFileDirectory)../assets/images/purview-logo.jpg" Link="Sdk\purview-logo.jpg" />
+		<None Include="$(MSBuildThisFileDirectory)../assets/images/purview-logo.png" Link="Sdk\purview-logo.png" />
 	</ItemGroup>
 
 	<PropertyGroup Condition="'$(IsTestProject)' != 'true' AND '$(IsSharedTestingProject)' != 'true'">
