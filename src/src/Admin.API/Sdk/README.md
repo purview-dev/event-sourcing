@@ -1,17 +1,17 @@
-# Purview.EventSourcing.Admin.Api
+# Purview.EventSourcing.Admin.API
 
-`Purview.EventSourcing.Admin.Api` provides minimal-API endpoints for the Purview EventSourcing admin portal: aggregate search, aggregate details, event-history inspection, point-in-time projection, and event export.
+`Purview.EventSourcing.Admin.API` provides minimal-API endpoints for the Purview EventSourcing admin portal: aggregate search, aggregate details, event-history inspection, point-in-time projection, and event export.
 
 ## Install
 
 ```bash
-dotnet add package Purview.EventSourcing.Admin.Api
+dotnet add package Purview.EventSourcing.Admin.API
 ```
 
 ## Register and map the endpoints
 
 ```csharp
-builder.Services.AddPurviewEventSourcingAdminApi(options =>
+builder.Services.AddPurviewEventSourcingAdminAPI(options =>
 {
     options.Enabled = true;
     options.RoutePrefix = "/admin/api";
@@ -97,7 +97,7 @@ Request contracts (`AggregateSearchRequest`, `EventRangeRequest`) are validated 
 The Admin API exposes a dedicated OpenAPI document for typed-client generation:
 
 ```csharp
-builder.Services.AddPurviewEventSourcingAdminOpenApi();
+builder.Services.AddPurviewEventSourcingAdminOpenAPI();
 app.MapOpenApi(); // /openapi/admin.json
 ```
 

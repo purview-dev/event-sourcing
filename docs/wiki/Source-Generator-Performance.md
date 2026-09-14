@@ -10,7 +10,10 @@ just perf-source-generator              # quick run (1 warmup, 3 measurement ite
 just perf-source-generator --benchmark  # benchmark run (3 warmup, 12 measurement iterations)
 ```
 
-Equivalent: `dotnet run --project src/tests/SourceGenerator.PerformanceTests --configuration Release`.
+Equivalent: `dotnet run --project src/src/Benchmarks/Benchmarks.csproj --configuration Release -- source-generator`.
+
+The SQL Server harness (`just perf-sql-server` / `-- sql-server`) lives in the same `Benchmarks`
+console project and measures event-store and snapshot timings against a SQL Server Testcontainer.
 
 Each run writes a JSON snapshot to `artifacts/source-generator-performance/history/` and the latest
 to `artifacts/source-generator-performance/latest.json`, then prints a summary compared against the

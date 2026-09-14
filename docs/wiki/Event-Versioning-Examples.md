@@ -51,16 +51,14 @@ public sealed class CustomerRegistered : EventBase
 
 **Aggregate apply logic:**
 ```csharp
-protected override void ApplyEvent(IEvent @event)
+protected override void RegisterEvents()
 {
-    switch (@event)
+    Register<CustomerRegistered>(cr =>
     {
-        case CustomerRegistered cr:
-            CustomerId = cr.CustomerId;
-            Email = cr.Email;
-            PhoneNumber = cr.PhoneNumber ?? "N/A";
-            break;
-    }
+        CustomerId = cr.CustomerId;
+        Email = cr.Email;
+        PhoneNumber = cr.PhoneNumber ?? "N/A";
+    });
 }
 ```
 
@@ -204,26 +202,23 @@ public sealed class OrderAggregate : AggregateBase
     public decimal Amount { get; private set; }
     public string Currency { get; private set; } = default!;
 
-    public override string Id() => OrderId;
-
-    protected override void ApplyEvent(IEvent @event)
+    protected override void RegisterEvents()
     {
-        switch (@event)
+        // Old event type (will be upcast to OrderCreated)
+        Register<OrderCreatedV1>(v1 =>
         {
-            // Old event type (will be upcast to OrderCreated)
-            case OrderCreatedV1 v1:
-                OrderId = v1.OrderId;
-                Amount = v1.Amount;
-                Currency = "USD";
-                break;
+            OrderId = v1.OrderId;
+            Amount = v1.Amount;
+            Currency = "USD";
+        });
 
-            // New event type (v2)
-            case OrderCreated oc:
-                OrderId = oc.OrderId;
-                Amount = oc.Amount;
-                Currency = oc.Currency;
-                break;
-        }
+        // New event type (v2)
+        Register<OrderCreated>(oc =>
+        {
+            OrderId = oc.OrderId;
+            Amount = oc.Amount;
+            Currency = oc.Currency;
+        });
     }
 }
 ```
@@ -342,21 +337,17 @@ public sealed class OrderAggregate : AggregateBase
     public string Currency { get; private set; } = default!;
     public decimal TaxAmount { get; private set; }
 
-    public override string Id() => OrderId;
-
-    protected override void ApplyEvent(IEvent @event)
+    protected override void RegisterEvents()
     {
-        switch (@event)
+        // The upcaster chain is applied before the aggregate applies the event.
+        // Old v1 and v2 events arrive as OrderCreated (v3) after upcasting.
+        Register<OrderCreated>(oc =>
         {
-            // The upcaster chain is applied before ApplyEvent is called.
-            // Old v1 and v2 events arrive as OrderCreated (v3) after upcasting.
-            case OrderCreated oc:
-                OrderId = oc.OrderId;
-                Amount = oc.Amount;
-                Currency = oc.Currency;
-                TaxAmount = oc.TaxAmount;
-                break;
-        }
+            OrderId = oc.OrderId;
+            Amount = oc.Amount;
+            Currency = oc.Currency;
+            TaxAmount = oc.TaxAmount;
+        });
     }
 }
 ```
@@ -436,18 +427,20 @@ public sealed class UserRegisteredWithEmailVerification : EventBase
     public bool EmailVerified { get; set; }
 }
 
-// Use in aggregate:
-switch (@event)
+// Use in the aggregate:
+protected override void RegisterEvents()
 {
-    case UserRegistered ur:
+    Register<UserRegistered>(ur =>
+    {
         Email = ur.Email;
         EmailVerified = false;
-        break;
-    
-    case UserRegisteredWithEmailVerification urwv:
+    });
+
+    Register<UserRegisteredWithEmailVerification>(urwv =>
+    {
         Email = urwv.Email;
         EmailVerified = urwv.EmailVerified;
-        break;
+    });
 }
 ```
 
@@ -505,8 +498,8 @@ services.AddEventUpcaster<OrderCreatedV2, OrderCreatedV3, ...>();
 ### Unit Test: Single-Hop Upcasting
 
 ```csharp
-[Fact]
-public void Upcast_V1ToV2_PreservesDataAndDefaults()
+[Test]
+public async Task Upcast_V1ToV2_PreservesDataAndDefaults()
 {
     var upcaster = new OrderCreatedV1ToV2Upcaster();
     var v1Event = new OrderCreatedV1
@@ -518,51 +511,51 @@ public void Upcast_V1ToV2_PreservesDataAndDefaults()
 
     var v2Event = upcaster.Upcast(v1Event);
 
-    v2Event.OrderId.ShouldBe("123");
-    v2Event.Amount.ShouldBe(99.99m);
-    v2Event.Currency.ShouldBe("USD");
-    v2Event.Details.IdempotencyId.ShouldBe("idempotency-123");
+    await Assert.That(v2Event.OrderId).IsEqualTo("123");
+    await Assert.That(v2Event.Amount).IsEqualTo(99.99m);
+    await Assert.That(v2Event.Currency).IsEqualTo("USD");
+    await Assert.That(v2Event.Details.IdempotencyId).IsEqualTo("idempotency-123");
 }
 ```
 
 ### Integration Test: Replay with Upcasting
 
 ```csharp
-[Fact]
+[Test]
 public async Task Replay_WithV1Events_UpcastsToV2AndAppliesCorrectly()
 {
     // 1. Register upcaster
     services.AddEventUpcaster<OrderCreatedV1, OrderCreated, ...>();
-    
+
     // 2. Save a V1 event directly to storage
     var v1Event = new OrderCreatedV1 { OrderId = "123", Amount = 99.99m };
     await eventStore.SaveAsync(aggregateId, [v1Event], ...);
-    
+
     // 3. Load the aggregate (triggers replay with upcasting)
     var aggregate = await eventStore.GetAsync(aggregateId);
-    
+
     // 4. Verify the aggregate state matches the upcast event
-    aggregate.OrderId.ShouldBe("123");
-    aggregate.Amount.ShouldBe(99.99m);
-    aggregate.Currency.ShouldBe("USD");  // Upcast default
+    await Assert.That(aggregate.OrderId).IsEqualTo("123");
+    await Assert.That(aggregate.Amount).IsEqualTo(99.99m);
+    await Assert.That(aggregate.Currency).IsEqualTo("USD");  // Upcast default
 }
 ```
 
 ### Testing Unknown Events
 
 ```csharp
-[Fact]
-public async Task Replay_WithUnknownEventType_ReturnsEventUnknownAndContinues()
+[Test]
+public async Task Replay_WithUnknownEventType_ReturnsUnknownEventAndContinues()
 {
     // 1. Save an event with a type that doesn't exist
     var unknownEvent = new CustomEvent { ... };
-    
+
     // 2. Load the aggregate
     var aggregate = await eventStore.GetAsync(aggregateId);
-    
+
     // 3. Verify replay continues without throwing
-    aggregate.ShouldNotBeNull();
-    
+    await Assert.That(aggregate).IsNotNull();
+
     // 4. In a real test, you'd have a mixture of known and unknown events
     // to verify partial replay works correctly
 }

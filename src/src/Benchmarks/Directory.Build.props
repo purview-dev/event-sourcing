@@ -1,0 +1,15 @@
+<Project>
+	<!--
+		Deliberately empty: shadows src/Directory.Build.props for this subtree.
+
+		This console harness is self-contained and does not use the
+		Purview.DotNetProjectSdk. Keeping it out of the solution-wide SDK avoids
+		the repo's analyzers, warnings-as-errors, namespace inference, and
+		packaging defaults for benchmark code, and keeps the harness free to
+		reference test infrastructure (such as the shared Testcontainers
+		framework) without SDK interference.
+
+		This empty file (and the matching Directory.Build.targets) stops
+		src/Directory.Build.props from leaking into this project.
+	-->
+</Project>

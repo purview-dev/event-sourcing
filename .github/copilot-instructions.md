@@ -6,4 +6,4 @@ Prefer repository-local guidance from:
 
 - `.agents/skills/` (workflow/tooling skills)
 - `.agents/agents/`
-- `.agents/instructions/`
+- `.agents/prompts/`

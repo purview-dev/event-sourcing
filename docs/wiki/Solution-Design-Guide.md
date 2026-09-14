@@ -462,13 +462,13 @@ public partial InventoryAggregate ReserveStock(
     [Metadata] string? orderId);
 ```
 
-Use `[AggregateProperty(nameof(Property))]` when the parameter name does not match the aggregate property.
+Use `[Property(nameof(Property))]` when the parameter name does not match the aggregate property.
 
 ```csharp
 [Event]
 public partial InventoryAggregate Create(
     string productId,
-    [AggregateProperty(nameof(QuantityOnHand))] int initialQuantity = 0);
+    [Property(nameof(QuantityOnHand))] int initialQuantity = 0);
 ```
 
 ## Schema Evolution
@@ -479,7 +479,7 @@ Events are persisted facts. Changing them is a compatibility decision.
 - Avoid changing the meaning of an existing property.
 - Use `[Event(Version = N)]` for breaking schema versions.
 - Add upcasters when old events need to hydrate into newer event shapes.
-- Do not change `EventSuffixLength` or naming conventions after data exists unless you plan a migration.
+- Do not change generated event/aggregate naming conventions after data exists unless you plan a migration. (`EventSuffixLength` is a provider option that controls the zero-padded numeric suffix on event row IDs, not a naming convention.)
 - Treat aggregate type names and event names as persisted contracts.
 
 ## Operation Semantics

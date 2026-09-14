@@ -34,7 +34,7 @@ static class AggregateAttributeEmitter
 				body.XmlSummary(
 						"Overrides the generated event namespace for all event methods on this aggregate.",
 						"When not set, namespaces default to:",
-						"<c>{Aggregate-Type-Namespace}.{Aggregate-Name-Without-The-Aggregate-Suffix}</c>."
+						"<c>{Aggregate-Type-Namespace}.{Aggregate-Name-Without-The-Aggregate-Suffix}Events</c>."
 					)
 					.Property(
 						new("EventNamespace", PurviewTypeLibrary.System.String.MakeNullable(writer))

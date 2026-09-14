@@ -13,7 +13,6 @@ jobs:
     name: Build and test
     uses: purview-dev/build/.github/workflows/purview-build.yml@main
     with:
-      dotnet-version: "10.0.400"
       run-pack: true
       validate-pack: true
     secrets: inherit

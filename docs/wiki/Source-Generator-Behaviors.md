@@ -81,7 +81,9 @@ public partial class OrderAggregate : AggregateBase
 Typical generated types:
 
 - `Testing.OrderEvents.OrderCreatedEvent` (default namespace/name)
-- `Testing.Custom.Events.OrderRegisteredEvent` (explicit namespace/name)
+- `Testing.Custom.Events.OrderRegistered` (explicit namespace/name)
+
+> An explicit `EventName` is used verbatim: the generator does **not** append the `Event` suffix when a name is provided. Include the suffix in the explicit name (for example `EventName = "OrderRegisteredEvent"`) if you want the generated type to end in `Event`. The `Event` suffix is only appended to inferred names.
 
 ## Hook behavior semantics
 
