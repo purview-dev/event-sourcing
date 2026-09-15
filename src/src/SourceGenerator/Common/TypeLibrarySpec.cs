@@ -45,10 +45,10 @@ static partial class TypeLibrarySpec
 	static readonly TypeIdentity IAggregate = default;
 
 	[TypeRef("Purview.EventSourcing.Aggregates.Events")]
-	static readonly TypeIdentity EventBase = default;
+	static readonly TypeIdentity EventContractAttribute = default;
 
 	[TypeRef("Purview.EventSourcing.Aggregates.Events")]
-	static readonly TypeIdentity IEvent = default;
+	static readonly TypeIdentity EventMetadata = default;
 
 	[TypeRef("Purview.EventSourcing", arity: 1)]
 	static readonly TypeIdentity EventStoreList = default;
@@ -103,4 +103,7 @@ static partial class TypeLibrarySpec
 
 	[TypeRef("System.Text.Json.Serialization")]
 	static readonly TypeIdentity JsonConverterAttribute = default;
+
+	[TypeRef("System.Text.Json.Serialization")]
+	static readonly TypeIdentity JsonIgnoreAttribute = default;
 }

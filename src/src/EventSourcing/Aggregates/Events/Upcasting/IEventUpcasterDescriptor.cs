@@ -18,5 +18,5 @@ public interface IEventUpcasterDescriptor
 	Type TargetType { get; }
 
 	/// <summary>Executes the upcaster and returns the up-cast event.</summary>
-	IEvent Upcast(IEvent source);
+	object Upcast(object source);
 }

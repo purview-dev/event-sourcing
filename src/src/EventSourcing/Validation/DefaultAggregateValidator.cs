@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Reflection;
 using Purview.EventSourcing.Aggregates;
 
 namespace Purview.EventSourcing.Validation;
@@ -15,6 +17,41 @@ public sealed class DefaultAggregateValidator<TAggregate> : IAggregateValidator<
 	[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1000:Do not declare static members on generic types")]
 	public static IAggregateValidator<TAggregate> Instance { get; } = new DefaultAggregateValidator<TAggregate>();
 
+	static readonly ConcurrentDictionary<Type, bool> ValidationAttributeCache = new();
+
+	/// <summary>
+	/// True when the aggregate type or any of its properties carries a data-annotation
+	/// <see cref="System.ComponentModel.DataAnnotations.ValidationAttribute"/>, or the type implements
+	/// <see cref="System.ComponentModel.DataAnnotations.IValidatableObject"/>. When false, annotation
+	/// validation can never fail, so the reflection-based scan is skipped entirely.
+	/// </summary>
+	static bool HasValidationAttributes =>
+		ValidationAttributeCache.GetOrAdd(
+			typeof(TAggregate),
+			static type =>
+			{
+				if (
+					type.GetCustomAttributes<System.ComponentModel.DataAnnotations.ValidationAttribute>(inherit: true)
+						.Any()
+				)
+					return true;
+
+				foreach (var property in type.GetProperties())
+				{
+					if (
+						property
+							.GetCustomAttributes<System.ComponentModel.DataAnnotations.ValidationAttribute>(
+								inherit: true
+							)
+							.Any()
+					)
+						return true;
+				}
+
+				return typeof(System.ComponentModel.DataAnnotations.IValidatableObject).IsAssignableFrom(type);
+			}
+		);
+
 	/// <summary>
 	/// Validates the aggregate using standard data annotations.
 	/// </summary>
@@ -26,7 +63,7 @@ public sealed class DefaultAggregateValidator<TAggregate> : IAggregateValidator<
 		ArgumentNullException.ThrowIfNull(aggregate);
 
 		var failures = ValidateWithAnnotations(aggregate);
-		return new ValidationResult(failures);
+		return failures.Length == 0 ? ValidationResult.Success : new ValidationResult(failures);
 	}
 
 	/// <summary>
@@ -41,24 +78,31 @@ public sealed class DefaultAggregateValidator<TAggregate> : IAggregateValidator<
 		ArgumentNullException.ThrowIfNull(aggregate);
 
 		var failures = ValidateWithAnnotations(aggregate);
-		return Task.FromResult(new ValidationResult(failures));
+		return Task.FromResult(failures.Length == 0 ? ValidationResult.Success : new ValidationResult(failures));
 	}
 
-	static IEnumerable<ValidationFailure> ValidateWithAnnotations(TAggregate aggregate)
+	static ValidationFailure[] ValidateWithAnnotations(TAggregate aggregate)
 	{
+		if (!HasValidationAttributes)
+			return [];
+
 		System.ComponentModel.DataAnnotations.ValidationContext daContext = new(aggregate);
 		List<System.ComponentModel.DataAnnotations.ValidationResult> failures = [];
 
-		if (!System.ComponentModel.DataAnnotations.Validator.TryValidateObject(aggregate, daContext, failures, true))
+		if (System.ComponentModel.DataAnnotations.Validator.TryValidateObject(aggregate, daContext, failures, true))
+			return [];
+
+		List<ValidationFailure> validationFailures = new(failures.Count);
+		foreach (var failure in failures)
 		{
-			foreach (var failure in failures)
+			foreach (var memberName in failure.MemberNames)
 			{
-				foreach (var memberName in failure.MemberNames)
-					yield return new ValidationFailure(
-						memberName,
-						failure.ErrorMessage ?? "Validation failed (no error provided)"
-					);
+				validationFailures.Add(
+					new ValidationFailure(memberName, failure.ErrorMessage ?? "Validation failed (no error provided)")
+				);
 			}
 		}
+
+		return [.. validationFailures];
 	}
 }

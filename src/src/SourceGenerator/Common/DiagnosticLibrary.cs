@@ -372,4 +372,14 @@ static class DiagnosticLibrary
 		defaultSeverity: DiagnosticSeverity.Error,
 		isEnabledByDefault: true
 	);
+
+	/// <summary> EVENTSTORE037: Event type not marked with [EventContract] </summary>
+	public static readonly DiagnosticDescriptor EventTypeShouldBeMarkedWithEventContract = new(
+		id: "EVENTSTORE037",
+		title: "Event type must be marked with [EventContract]",
+		messageFormat: "Event type '{0}' must be marked with the [EventContract] attribute",
+		category: EventContractCategory,
+		defaultSeverity: DiagnosticSeverity.Warning,
+		isEnabledByDefault: true
+	);
 }

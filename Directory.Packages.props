@@ -8,6 +8,7 @@
 		<PurviewSGFrameworkVersion>1.0.0-prerelease.42</PurviewSGFrameworkVersion>
 		<PurviewZodSharpVersion>2.0.0-prerelease.6</PurviewZodSharpVersion>
 		<TestcontainersVersion>4.15.0</TestcontainersVersion>
+		<BenchmarkDotNetVersion>0.14.0</BenchmarkDotNetVersion>
 		<DotnetRuntimeVersion>10.0.12</DotnetRuntimeVersion>
 		<AspireVersion>13.5.3</AspireVersion>
 		<OTelVersion>1.18.0</OTelVersion>
@@ -67,6 +68,7 @@
 		<PackageVersion Include="TUnit.Mocks" Version="$(TUnitVersion)" />
 		<PackageVersion Include="Azure.Storage.Blobs" Version="12.29.2" />
 		<PackageVersion Include="Azure.Data.Tables" Version="12.12.0" />
+		<PackageVersion Include="BenchmarkDotNet" Version="$(BenchmarkDotNetVersion)" />
 		<PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.63.0" />
 		<PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
 		<PackageVersion Include="Microsoft.Data.SqlClient" Version="7.0.3" />

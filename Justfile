@@ -114,15 +114,25 @@ restore *args:
 current_version:
     echo "==> Current version: {{ GREEN }}{{ current_version }}{{ NORMAL }} (defined in package.json and automatically included in the build output through the Purview.DotNetProjectSdk package)"
 
-# Run the source-generator performance harness (pass --benchmark for larger runs)
+# Run the source-generator performance harness (pass --benchmark for larger runs; requires Release for meaningful numbers)
 [group('Performance Tests')]
 perf-source-generator *args:
-    dotnet run --project {{ benchmarks_project }} --configuration {{ build_configuration }} -- source-generator {{ args }}
+    dotnet run --project {{ benchmarks_project }} --configuration Release -- source-generator {{ args }}
+
+# Run the runtime (generated-code) performance harness (pass --benchmark for larger runs; requires Release for meaningful numbers)
+[group('Performance Tests')]
+perf-runtime *args:
+    dotnet run --project {{ benchmarks_project }} --configuration Release -- runtime {{ args }}
+
+# Run the in-memory store throughput harness (the allocation-free reference; pass --benchmark for larger runs)
+[group('Performance Tests')]
+perf-inmemory *args:
+    dotnet run --project {{ benchmarks_project }} --configuration Release -- inmemory {{ args }}
 
 # Run SQL Server event/snapshot performance harness (pass --benchmark for larger runs; requires Docker/Testcontainers)
 [group('Performance Tests')]
 perf-sql-server *args:
-    dotnet run --project {{ benchmarks_project }} --configuration {{ build_configuration }} -- sql-server {{ args }}
+    dotnet run --project {{ benchmarks_project }} --configuration Release -- sql-server {{ args }}
 
 # Run tests for a specific project with a filter (e.g., "/*/*/*/*", or "/*/*/*/*[Category=Unit]" to run just unit tests) and configuration (e.g., "Release")
 [group('Build and Test')]

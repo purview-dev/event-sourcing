@@ -4,7 +4,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Purview.EventSourcing.Aggregates;
-using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.Aggregates.Persistence;
 using Purview.EventSourcing.Services;
 
@@ -231,7 +230,7 @@ public sealed class AdminSnapshotEndpointsTests
 		public T FulfilRequirements<T>(T aggregate)
 			where T : class, IAggregate, new() => aggregate;
 
-		public IAsyncEnumerable<(IEvent @event, string eventType)> GetEventRangeAsync<T>(
+		public IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync<T>(
 			string aggregateId,
 			int versionFrom,
 			int? versionTo,

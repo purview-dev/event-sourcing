@@ -19,11 +19,13 @@
 		<ProjectReference Include="..\EventSourcing\EventSourcing.csproj" />
 		<ProjectReference Include="..\SourceGenerator\SourceGenerator.csproj" />
 		<ProjectReference Include="..\SqlServer\SqlServer.csproj" />
+		<ProjectReference Include="..\InMemory\InMemory.csproj" />
 		<ProjectReference Include="..\Samples\Samples.csproj" />
 		<ProjectReference Include="..\..\tests\SharedTestingFramework\SharedTestingFramework.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
+		<PackageReference Include="BenchmarkDotNet" />
 		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
 		<PackageReference Include="Purview.SourceGeneratorFramework" />
 	</ItemGroup>

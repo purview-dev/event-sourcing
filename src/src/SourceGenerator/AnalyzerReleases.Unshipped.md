@@ -9,3 +9,4 @@
 | EVENTSTORE034 | EventContracts | Error | Persisted event field became required or non-nullable relative to an approved baseline |
 | EVENTSTORE035 | EventContracts | Error | Event schema version regressed below an approved baseline version |
 | EVENTSTORE036 | EventContracts | Error | Event contract baseline manifest is malformed or uses an unsupported format version |
+| EVENTSTORE037 | EventContracts | Warning | Event type must be marked with [EventContract] |

@@ -31,7 +31,7 @@ public partial class InMemoryEventStore<T>(
 	where T : class, IAggregate, new()
 {
 	readonly ConcurrentDictionary<string, T> _aggregates = new(StringComparer.OrdinalIgnoreCase);
-	readonly ConcurrentDictionary<string, ConcurrentDictionary<int, IEvent>> _events = new();
+	readonly ConcurrentDictionary<string, ConcurrentDictionary<int, EventRecord>> _events = new();
 
 	readonly IAggregateValidator<T>? _validator = validator;
 
@@ -116,13 +116,19 @@ public partial class InMemoryEventStore<T>(
 			return true;
 		}
 
-		Deleted deleteAggregateEvent = new()
-		{
-			Details = { AggregateVersion = aggregate.Details.CurrentVersion + 1, When = DateTimeOffset.UtcNow },
-		};
-		aggregate.ApplyEvent(deleteAggregateEvent);
+		Deleted deleteAggregateEvent = new();
+		EventMetadata metadata = new(
+			aggregate.Details.CurrentVersion + 1,
+			DateTimeOffset.UtcNow,
+			SchemaVersion: 1,
+			IdempotencyId: null,
+			CorrelationId: null,
+			CausationId: null,
+			UserId: null
+		);
+		aggregate.ApplyEvent(deleteAggregateEvent, metadata);
 
-		await AddToCacheAsync(aggregate, deleteAggregateEvent);
+		await AddToCacheAsync(aggregate, new EventRecord(deleteAggregateEvent, metadata));
 
 		return true;
 	}
@@ -134,22 +140,25 @@ public partial class InMemoryEventStore<T>(
 			events.Clear();
 	}
 
-	Task<T> AddToCacheAsync(T aggregate, params IEvent[] additionalEvents) =>
+	Task<T> AddToCacheAsync(T aggregate, params EventRecord[] additionalEvents) =>
 		AddToCache(aggregate, true, additionalEvents);
 
-	Task<T> AddToCache(T aggregate, bool fulfilRequirements, params IEvent[] additionalEvents)
+	Task<T> AddToCache(T aggregate, bool fulfilRequirements, params EventRecord[] additionalEvents)
 	{
 		var events = _events.GetOrAdd(aggregate.Id(), _ => new());
-		foreach (var @event in aggregate.GetUnsavedEvents().Concat(additionalEvents ?? []))
+		var unsavedEvents = aggregate.GetUnsavedEvents();
+		var toPersist = additionalEvents is { Length: > 0 } ? unsavedEvents.Concat(additionalEvents) : unsavedEvents;
+
+		foreach (var record in toPersist)
 		{
 			// A conflicting version means another write already persisted this aggregate
 			// version. Surface it as a concurrency conflict rather than silently dropping the
 			// event, which would lose data.
-			if (!events.TryAdd(@event.Details.AggregateVersion, @event))
+			if (!events.TryAdd(record.Metadata.AggregateVersion, record))
 				throw new Exceptions.ConcurrencyException(
 					aggregate.Id(),
-					@event.Details.IdempotencyId ?? $"{Guid.NewGuid()}",
-					@event.Details.AggregateVersion,
+					record.Metadata.IdempotencyId ?? $"{Guid.NewGuid()}",
+					record.Metadata.AggregateVersion,
 					!events.IsEmpty ? events.Keys.Max() : aggregate.Details.SavedVersion
 				);
 		}
@@ -218,9 +227,14 @@ public partial class InMemoryEventStore<T>(
 		{
 			if (!await ReturnAggregateAsync(aggregate.Details.IsDeleted, aggregateId, operationContext))
 				return null;
+
+			// Cache hit: return the aggregate directly. Requirements are fulfilled when the
+			// aggregate is first created/loaded; re-fulfilling here would refresh scoped services
+			// but is skipped for the hot read path.
+			return aggregate;
 		}
 
-		aggregate ??= new T { Details = { Id = aggregateId } };
+		aggregate = new T { Details = { Id = aggregateId } };
 		return await AddToCacheAsync(aggregate);
 	}
 
@@ -239,8 +253,8 @@ public partial class InMemoryEventStore<T>(
 		T aggregate = new() { Details = new() { Id = aggregateId } };
 
 		var events = GetEventRangeAsync(aggregateId, 1, version, cancellationToken);
-		await foreach (var @event in events.WithCancellation(cancellationToken))
-			aggregate.ApplyEvent(@event.@event);
+		await foreach (var eventResult in events.WithCancellation(cancellationToken))
+			aggregate.ApplyEvent(eventResult.EventRecord.Event, eventResult.EventRecord.Metadata);
 
 		return FulfilRequirements(aggregate);
 	}
@@ -260,7 +274,7 @@ public partial class InMemoryEventStore<T>(
 	}
 
 	///<inheritdoc/>
-	public IAsyncEnumerable<(IEvent @event, string eventType)> GetEventRangeAsync(
+	public IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync(
 		string aggregateId,
 		int versionFrom,
 		int? versionTo,
@@ -268,14 +282,17 @@ public partial class InMemoryEventStore<T>(
 	)
 	{
 		if (!_events.TryGetValue(aggregateId, out var eventList))
-			return AsyncEnumerable.Empty<(IEvent @event, string eventType)>();
+			return AsyncEnumerable.Empty<(EventRecord EventRecord, string EventType)>();
 
-		// We have some events... so query and return.
-		return eventList
+		// We have some events... so query and return. Materialize once instead of chaining LINQ
+		// iterators over the concurrent dictionary for each enumeration.
+		var matched = eventList
 			.Where(kvp => kvp.Key >= versionFrom && (!versionTo.HasValue || kvp.Key <= versionTo.Value))
 			.OrderBy(kvp => kvp.Key)
-			.Select(kvp => (kvp.Value, kvp.Value.GetType().Name))
-			.ToAsyncEnumerable();
+			.Select(kvp => (kvp.Value, kvp.Value.Event.GetType().Name))
+			.ToArray();
+
+		return matched.ToAsyncEnumerable();
 	}
 
 	///<inheritdoc/>
@@ -313,16 +330,22 @@ public partial class InMemoryEventStore<T>(
 		if (!aggregate.Details.IsDeleted)
 			throw AggregateNotDeletedException(aggregate.Id());
 
-		Restored restoreAggregateEvent = new()
-		{
-			Details = { AggregateVersion = aggregate.Details.CurrentVersion + 1, When = DateTimeOffset.UtcNow },
-		};
-		aggregate.ApplyEvent(restoreAggregateEvent);
+		Restored restoreAggregateEvent = new();
+		EventMetadata metadata = new(
+			aggregate.Details.CurrentVersion + 1,
+			DateTimeOffset.UtcNow,
+			SchemaVersion: 1,
+			IdempotencyId: null,
+			CorrelationId: null,
+			CausationId: null,
+			UserId: null
+		);
+		aggregate.ApplyEvent(restoreAggregateEvent, metadata);
 
 		if (aggregate.IsNew())
 			return false;
 
-		await AddToCacheAsync(aggregate, restoreAggregateEvent);
+		await AddToCacheAsync(aggregate, new EventRecord(restoreAggregateEvent, metadata));
 
 		return true;
 	}
@@ -368,7 +391,7 @@ public partial class InMemoryEventStore<T>(
 
 		if (
 			operationContext.NotificationMode.HasFlag(NotificationModes.BeforeDelete)
-			&& changeEvents.OfType<Deleted>().Any()
+			&& changeEvents.Any(record => record.Event is Deleted)
 		)
 			await aggregateChangeNotifier.BeforeDeleteAsync(aggregate, cancellationToken);
 		else if (operationContext.NotificationMode.HasFlag(NotificationModes.BeforeSave))
@@ -376,7 +399,7 @@ public partial class InMemoryEventStore<T>(
 
 		if (await IsDeletedAsync(aggregate.Id(), cancellationToken))
 		{
-			var throwIfDeleted = !changeEvents.OfType<Restored>().Any();
+			var throwIfDeleted = !changeEvents.Any(record => record.Event is Restored);
 			if (throwIfDeleted)
 				throw AggregateIsDeletedException(aggregate.Id());
 		}
@@ -419,7 +442,7 @@ public partial class InMemoryEventStore<T>(
 
 			if (operationContext.NotificationMode.HasFlag(NotificationModes.OnFailure))
 			{
-				var deleteRequested = changeEvents.OfType<Deleted>().Any();
+				var deleteRequested = changeEvents.Any(record => record.Event is Deleted);
 				await aggregateChangeNotifier.FailureAsync(aggregate, deleteRequested, ex, cancellationToken);
 			}
 

@@ -9,6 +9,7 @@
 - [Transaction Guarantees](Transaction-Guarantees.md)
 - [Event Contract Manifest](Event-Contract-Manifest.md)
 - [Source Generator Performance](Source-Generator-Performance.md)
+- [Runtime Performance](Runtime-Performance.md)
 - [Dependency Guardrails](Dependency-Guardrails.md)
 - [Event Versioning Strategy](Event-Versioning-Strategy.md)
 - [Event Versioning Examples](Event-Versioning-Examples.md)

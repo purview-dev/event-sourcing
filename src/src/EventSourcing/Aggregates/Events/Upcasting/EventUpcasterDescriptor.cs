@@ -8,8 +8,8 @@ namespace Purview.EventSourcing.Aggregates.Events.Upcasting;
 /// <typeparam name="TSource">The legacy event type.</typeparam>
 /// <typeparam name="TTarget">The current event type.</typeparam>
 public sealed class EventUpcasterDescriptor<TSource, TTarget> : IEventUpcasterDescriptor
-	where TSource : IEvent
-	where TTarget : IEvent
+	where TSource : class
+	where TTarget : class
 {
 	readonly IEventUpcaster<TSource, TTarget> _upcaster;
 
@@ -30,12 +30,12 @@ public sealed class EventUpcasterDescriptor<TSource, TTarget> : IEventUpcasterDe
 	public Type TargetType => typeof(TTarget);
 
 	/// <inheritdoc/>
-	public IEvent Upcast(IEvent source)
+	public object Upcast(object source)
 	{
 		ArgumentNullException.ThrowIfNull(source);
 
 		return source is TSource typed
-			? (IEvent)_upcaster.Upcast(typed)
+			? _upcaster.Upcast(typed)
 			: throw new InvalidOperationException(
 				$"Cannot upcast event of type '{source.GetType().FullName}' using upcaster for '{typeof(TSource).FullName}'."
 			);

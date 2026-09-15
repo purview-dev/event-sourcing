@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,7 +30,7 @@ sealed class AggregateRequiredServiceManager(IServiceProvider serviceProvider) :
 
 	sealed class AggregateRequiredServiceManagerContext(Type aggregateType)
 	{
-		readonly List<Action<object[]>> _requiredServices = [];
+		readonly List<Action<IAggregate, IServiceProvider>> _requiredServices = [];
 
 		static readonly Lazy<MethodInfo> PopulateMethod = new(() =>
 			typeof(AggregateRequiredServiceManagerContext).GetMethod(
@@ -51,21 +51,16 @@ sealed class AggregateRequiredServiceManager(IServiceProvider serviceProvider) :
 				var serviceType = requiredService.GetGenericArguments()[0];
 
 				var genericMethod = PopulateMethod.Value.MakeGenericMethod(serviceType);
-				var parameters = genericMethod.GetParameters();
-				var actionParams = Expression.Parameter(typeof(object[]), "params");
-				var argExpressions = parameters
-					.Select(
-						(param, i) =>
-							Expression.Convert(
-								Expression.ArrayIndex(actionParams, Expression.Constant(i)),
-								param.ParameterType
-							)
-					)
-					.ToArray();
+				var aggregateParameter = Expression.Parameter(typeof(IAggregate), "aggregate");
+				var serviceProviderParameter = Expression.Parameter(typeof(IServiceProvider), "serviceProvider");
 
-				var callExpression = Expression.Call(null, genericMethod, argExpressions);
+				var callExpression = Expression.Call(null, genericMethod, aggregateParameter, serviceProviderParameter);
 
-				var lambda = Expression.Lambda<Action<object[]>>(callExpression, actionParams);
+				var lambda = Expression.Lambda<Action<IAggregate, IServiceProvider>>(
+					callExpression,
+					aggregateParameter,
+					serviceProviderParameter
+				);
 				var action = lambda.Compile();
 
 				_requiredServices.Add(action);
@@ -79,7 +74,7 @@ sealed class AggregateRequiredServiceManager(IServiceProvider serviceProvider) :
 			if (_hasRequirements)
 			{
 				foreach (var func in _requiredServices)
-					func([aggregate, serviceProvider]);
+					func(aggregate, serviceProvider);
 			}
 		}
 

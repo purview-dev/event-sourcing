@@ -174,7 +174,6 @@ public sealed class SqlServerEventStoreGuardTests(SqlServerEventStoreFixture fix
 			)
 		)
 		{
-			row.EventType = unknownEventType;
 			await client.UpsertAsync(
 				row.Id,
 				row.EntityType,
@@ -183,7 +182,7 @@ public sealed class SqlServerEventStoreGuardTests(SqlServerEventStoreFixture fix
 				row.Version,
 				row.IsDeleted,
 				row.Payload,
-				row.EventType,
+				unknownEventType,
 				row.IdempotencyId,
 				row.Timestamp,
 				cancellationToken

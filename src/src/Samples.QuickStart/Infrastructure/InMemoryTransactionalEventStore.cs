@@ -7,7 +7,6 @@ using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Purview.EventSourcing.Aggregates;
-using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.Internal;
 using Purview.EventSourcing.Validation;
 
@@ -123,7 +122,7 @@ sealed class InMemoryTransactionalEventStore<T>(InMemoryFailurePlan failurePlan)
 
 	public T FulfilRequirements(T aggregate) => aggregate;
 
-	public IAsyncEnumerable<(IEvent @event, string eventType)> GetEventRangeAsync(
+	public IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync(
 		string aggregateId,
 		int versionFrom,
 		int? versionTo,

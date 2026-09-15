@@ -16,7 +16,7 @@ This repository uses the shared [Purview.Build](https://github.com/purview-dev/b
 4. Unit tests (discovered under `src/tests` matching `*Tests.csproj`, run with the `/*/*/*/*[Category=Unit]` TUnit tree-node filter)
 5. `dotnet pack` and package-content validation
 
-Integration tests are never discovered in CI: `purview-build.json` sets `Build:TestPatterns` to `*Tests.csproj`, `Build:TestProjects` to `*UnitTests.csproj`, and `Build:TestFilter` to `/*/*/*/*[Category=Unit]`, so only unit-test projects (tagged `[Category=Unit]` by the `Purview.DotNetProjectSdk`) are executed; provider integration tests (which require Docker/Testcontainers) run only locally via `just test`. The performance harnesses live under `src/src/Benchmarks` (a single non-test `Benchmarks.csproj`) and run locally via `just perf-source-generator` / `just perf-sql-server`.
+Integration tests are never discovered in CI: `purview-build.json` sets `Build:TestPatterns` to `*Tests.csproj`, `Build:TestProjects` to `*UnitTests.csproj`, and `Build:TestFilter` to `/*/*/*/*[Category=Unit]`, so only unit-test projects (tagged `[Category=Unit]` by the `Purview.DotNetProjectSdk`) are executed; provider integration tests (which require Docker/Testcontainers) run only locally via `just test`. The performance harnesses live under `src/src/Benchmarks` (a single non-test `Benchmarks.csproj`) and run locally via `just perf-source-generator` / `just perf-runtime` / `just perf-sql-server`.
 
 The PR workflow does not tag, release, or publish packages.
 

@@ -156,8 +156,8 @@ public static class ServiceCollectionExtensions
 		/// <paramref name="services"/> collection.
 		/// </remarks>
 		public IServiceCollection AddEventUpcaster<TSource, TTarget, TUpcaster>()
-			where TSource : IEvent
-			where TTarget : IEvent
+			where TSource : class
+			where TTarget : class
 			where TUpcaster : class, IEventUpcaster<TSource, TTarget>
 		{
 			services

@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
 
 namespace Purview.EventSourcing.Postgres.Events;
@@ -6,14 +7,14 @@ namespace Purview.EventSourcing.Postgres.Events;
 partial class PostgresEventStore<T>
 {
 	/// <summary>
-	/// Gets a range of <see cref="IEvent"/>s for a given aggregate, as specified by it's <paramref name="aggregateId"/>.
+	/// Gets a range of events for a given aggregate, as specified by it's <paramref name="aggregateId"/>.
 	/// </summary>
 	/// <param name="aggregateId">The id of the aggregate.</param>
 	/// <param name="versionFrom">The inclusive event number to start the range at.</param>
 	/// <param name="versionTo">Optional, the inclusive event number to finish the range at.</param>
 	/// <param name="cancellationToken">The stopping token.</param>
 	/// <returns>If no <paramref name="versionTo"/> is specified all available events greater than <paramref name="versionFrom"/> are returned.</returns>
-	public async IAsyncEnumerable<(IEvent @event, string eventType)> GetEventRangeAsync(
+	public async IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync(
 		string aggregateId,
 		int versionFrom,
 		int? versionTo,
@@ -35,7 +36,6 @@ partial class PostgresEventStore<T>
 				$"{nameof(versionTo)} ({versionTo}) must be greater than or equal to {nameof(versionFrom)} ({versionFrom})."
 			);
 
-		var aggregateVersion = versionFrom;
 		var effectiveVersionTo = versionTo ?? int.MaxValue;
 		var entities = _client.GetEventRangeAsync(
 			aggregateId,
@@ -46,33 +46,40 @@ partial class PostgresEventStore<T>
 		);
 		await foreach (var entity in entities)
 		{
-			var item = DeserializeEvent(entity, aggregateVersion);
+			var item = DeserializeEvent(entity);
 			if (item != null)
-				yield return (item, entity.EventType!);
-
-			aggregateVersion++;
+				yield return (item.Value, entity.EventType!);
 		}
 	}
 
 	/// <param name="eventRow"></param>
-	/// <param name="aggregateVersion">Only used when an unknown event is found.</param>
-	IEvent? DeserializeEvent(PostgresEventStoreClient.RowData eventRow, int aggregateVersion)
+	EventRecord? DeserializeEvent(PostgresEventStoreClient.RowData eventRow)
 	{
 		static UnknownEvent ReturnUnknownEvent(PostgresEventStoreClient.RowData eventRow, int aggregateVersion) =>
 			new()
 			{
-				Details =
-				{
-					When = eventRow.Timestamp,
-					SchemaVersion = eventRow.SchemaVersion,
-					AggregateVersion = aggregateVersion,
-					IdempotencyId = eventRow.IdempotencyId,
-					CorrelationId = eventRow.CorrelationId,
-					CausationId = eventRow.CausationId,
-					UserId = eventRow.UserId,
-				},
+				SchemaVersion = eventRow.SchemaVersion,
+				Metadata = new EventMetadata(
+					aggregateVersion,
+					eventRow.Timestamp,
+					eventRow.SchemaVersion,
+					eventRow.IdempotencyId,
+					eventRow.CorrelationId,
+					eventRow.CausationId,
+					eventRow.UserId
+				),
 				Payload = eventRow.Payload,
 			};
+
+		EventMetadata metadata = new(
+			eventRow.Version,
+			eventRow.Timestamp,
+			eventRow.SchemaVersion,
+			eventRow.IdempotencyId,
+			eventRow.CorrelationId,
+			eventRow.CausationId,
+			eventRow.UserId
+		);
 
 		try
 		{
@@ -81,19 +88,25 @@ partial class PostgresEventStore<T>
 			{
 				_eventStoreTelemetry.MissingEventType(_aggregateTypeFullName, eventRow.EventType!);
 
-				return ReturnUnknownEvent(eventRow, aggregateVersion);
+				return new EventRecord(ReturnUnknownEvent(eventRow, eventRow.Version), metadata);
 			}
 
-			var runtimeEventType =
-				Type.GetType(eventType, throwOnError: false)
-				?? throw new ApplicationException($"Unable to load event type: {eventType}");
+			var runtimeEventType = EventTypeCache.GetOrAdd(
+				eventType,
+				static name =>
+					Type.GetType(name, throwOnError: false)
+					?? throw new ApplicationException($"Unable to load event type: {name}")
+			);
 			var @event = DeserializeEvent(eventRow.Payload!, runtimeEventType);
 
 			// Apply upcasting chain when a registry is available.
 			if (@event != null && _eventUpcasterRegistry?.CanUpcast(@event) == true)
 				@event = _eventUpcasterRegistry.Upcast(@event);
 
-			return @event;
+			if (@event == null)
+				return null;
+
+			return new EventRecord(@event, metadata);
 		}
 #pragma warning disable CA1031
 		catch (Exception ex)
@@ -101,7 +114,7 @@ partial class PostgresEventStore<T>
 		{
 			_eventStoreTelemetry.EventDeserializationFailed(eventRow.AggregateId, _aggregateTypeFullName, ex);
 
-			return ReturnUnknownEvent(eventRow, aggregateVersion);
+			return new EventRecord(ReturnUnknownEvent(eventRow, eventRow.Version), metadata);
 		}
 	}
 }

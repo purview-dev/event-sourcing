@@ -50,7 +50,7 @@ public interface IEventStoreTransaction : IAsyncDisposable
 	/// The correlation ID that binds all aggregates in this transaction together.
 	/// </summary>
 	/// <remarks>
-	/// This value is automatically propagated to every <see cref="Aggregates.Events.EventDetails.CorrelationId"/>
+	/// This value is automatically propagated to every <see cref="Aggregates.Events.EventMetadata.CorrelationId"/>
 	/// when <see cref="CommitAsync"/> is called.
 	/// </remarks>
 	string CorrelationId { get; }

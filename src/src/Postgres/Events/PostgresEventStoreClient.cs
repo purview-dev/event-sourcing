@@ -260,6 +260,11 @@ sealed partial class PostgresEventStoreClient
 		);
 	}
 
+	[System.Diagnostics.CodeAnalysis.SuppressMessage(
+		"Design",
+		"CA1068:CancellationToken parameters must come last",
+		Justification = "Optional internal batch parameter; CancellationToken keeps its established position."
+	)]
 	public async Task UpsertWithBatchAsync(
 		string id,
 		int entityType,
@@ -272,7 +277,9 @@ sealed partial class PostgresEventStoreClient
 		string? idempotencyId,
 		DateTimeOffset timestamp,
 		List<RowData> additionalInserts,
-		CancellationToken cancellationToken = default
+		CancellationToken cancellationToken = default,
+		RowData? snapshotRow = null,
+		bool snapshotIsNew = false
 	)
 	{
 		await EnsureConfiguredAsync(cancellationToken);
@@ -294,11 +301,25 @@ sealed partial class PostgresEventStoreClient
 			cancellationToken
 		);
 
+		if (snapshotRow is not null)
+			await UpsertSnapshotInBatchAsync(
+				context,
+				snapshotRow.Value,
+				snapshotIsNew,
+				additionalInserts,
+				cancellationToken
+			);
+
 		context.EventStoreEntities.AddRange(additionalInserts.Select(ToEntity));
 		await context.SaveChangesAsync(cancellationToken);
 		await transaction.CommitAsync(cancellationToken);
 	}
 
+	[System.Diagnostics.CodeAnalysis.SuppressMessage(
+		"Design",
+		"CA1068:CancellationToken parameters must come last",
+		Justification = "Optional internal batch parameter; CancellationToken keeps its established position."
+	)]
 	public async Task UpsertWithBatchAsync(
 		string id,
 		int entityType,
@@ -313,7 +334,9 @@ sealed partial class PostgresEventStoreClient
 		List<RowData> additionalInserts,
 		NpgsqlConnection connection,
 		NpgsqlTransaction transaction,
-		CancellationToken cancellationToken = default
+		CancellationToken cancellationToken = default,
+		RowData? snapshotRow = null,
+		bool snapshotIsNew = false
 	)
 	{
 		ArgumentNullException.ThrowIfNull(connection);
@@ -336,8 +359,48 @@ sealed partial class PostgresEventStoreClient
 			cancellationToken
 		);
 
+		if (snapshotRow is not null)
+			await UpsertSnapshotInBatchAsync(
+				context,
+				snapshotRow.Value,
+				snapshotIsNew,
+				additionalInserts,
+				cancellationToken
+			);
+
 		context.EventStoreEntities.AddRange(additionalInserts.Select(ToEntity));
 		await context.SaveChangesAsync(cancellationToken);
+	}
+
+	static async Task UpsertSnapshotInBatchAsync(
+		EventStoreDbContext context,
+		RowData snapshotRow,
+		bool snapshotIsNew,
+		List<RowData> additionalInserts,
+		CancellationToken cancellationToken
+	)
+	{
+		if (snapshotIsNew)
+		{
+			additionalInserts.Add(snapshotRow);
+			return;
+		}
+
+		await UpsertCoreAsync(
+			context,
+			snapshotRow.Id,
+			snapshotRow.EntityType,
+			snapshotRow.AggregateId,
+			snapshotRow.AggregateType,
+			snapshotRow.Version,
+			snapshotRow.IsDeleted,
+			snapshotRow.Payload,
+			snapshotRow.EventType,
+			snapshotRow.IdempotencyId,
+			snapshotRow.Timestamp,
+			snapshotRow.SchemaVersion,
+			cancellationToken
+		);
 	}
 
 	public async Task<bool> DeleteByIdAsync(string id, CancellationToken cancellationToken = default)
@@ -770,21 +833,23 @@ sealed partial class PostgresEventStoreClient
 	[GeneratedRegex(@"^[\w\-\.]+$")]
 	private static partial Regex IdentifierRegex();
 
-	internal sealed class RowData
+	internal readonly record struct RowData
 	{
-		public string Id { get; set; } = default!;
-		public int EntityType { get; set; }
-		public string AggregateId { get; set; } = default!;
-		public string AggregateType { get; set; } = default!;
-		public int Version { get; set; }
-		public bool IsDeleted { get; set; }
-		public string? Payload { get; set; }
-		public string? EventType { get; set; }
-		public string? IdempotencyId { get; set; }
-		public int SchemaVersion { get; set; } = 1;
-		public string? CorrelationId { get; set; }
-		public string? CausationId { get; set; }
-		public string? UserId { get; set; }
-		public DateTimeOffset Timestamp { get; set; }
+		public RowData() { }
+
+		public string Id { get; init; } = default!;
+		public int EntityType { get; init; }
+		public string AggregateId { get; init; } = default!;
+		public string AggregateType { get; init; } = default!;
+		public int Version { get; init; }
+		public bool IsDeleted { get; init; }
+		public string? Payload { get; init; }
+		public string? EventType { get; init; }
+		public string? IdempotencyId { get; init; }
+		public int SchemaVersion { get; init; } = 1;
+		public string? CorrelationId { get; init; }
+		public string? CausationId { get; init; }
+		public string? UserId { get; init; }
+		public DateTimeOffset Timestamp { get; init; }
 	}
 }

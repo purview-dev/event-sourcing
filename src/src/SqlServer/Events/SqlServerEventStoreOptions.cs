@@ -138,6 +138,16 @@ public sealed class SqlServerEventStoreOptions
 	public bool RequiresValidPrincipalIdentifier { get; set; } = true;
 
 	/// <summary>
+	/// Gets or sets a value indicating whether a snapshot write that fails must fail the save.
+	/// When true (the default), the snapshot is written atomically with the events in the same
+	/// batch/transaction. When false, the snapshot is written best-effort after the events are
+	/// committed and a snapshot failure is logged rather than failing the save. The per-operation
+	/// <see cref="EventStoreOperationContext.RequireSnapshotWrite"/> overrides this value.
+	/// </summary>
+	[DefaultValue(true)]
+	public bool RequireSnapshotWrite { get; set; } = true;
+
+	/// <summary>
 	/// Per-aggregate-type schema and/or table name overrides.
 	/// </summary>
 	/// <remarks>

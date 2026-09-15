@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Security.Claims;
 using Microsoft.Extensions.Caching.Distributed;
 using Purview.EventSourcing.Aggregates;
@@ -37,11 +37,25 @@ public sealed record class EventStoreOperationContext
 	public static SnapshotCachingOptions UseDefaultCacheMode { get; set; } = SnapshotCachingOptions.GetAndStore;
 
 	/// <summary>
-	/// Used during the saving of aggregates.
+	/// Gets or sets the default value for <see cref="RequireSnapshotWrite"/>. Defaults to true.
+	/// </summary>
+	public static bool RequireSnapshotWriteDefault { get; set; } = true;
+
+	/// <summary>
+	/// Gets or sets a value indicating whether a snapshot write that fails must fail the save.
+	/// When true (the default), the snapshot is written atomically with the events in the same
+	/// batch/transaction. When false, the snapshot is written best-effort after the events are
+	/// committed and a snapshot failure is logged rather than failing the save.
+	/// </summary>
+	public bool RequireSnapshotWrite { get; set; } = RequireSnapshotWriteDefault;
+
+	/// <summary>
+	/// Used during the saving of aggregates. The value is resolved once and cached for the lifetime
+	/// of this context, so a single save operation shares one correlation id across all of its events.
 	/// </summary>
 	public string CorrelationId
 	{
-		get => field ?? System.Diagnostics.Activity.Current?.Id ?? $"{Guid.NewGuid()}";
+		get => field ??= System.Diagnostics.Activity.Current?.Id ?? $"{Guid.NewGuid()}";
 		set;
 	}
 

@@ -1,7 +1,6 @@
 using System.Data.Common;
 using Npgsql;
 using Purview.EventSourcing.Aggregates;
-using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.Aggregates.Snapshotting;
 using Purview.EventSourcing.Internal;
 
@@ -43,7 +42,7 @@ partial class PostgresSnapshotEventStore<T>
 	)
 	{
 		ArgumentNullException.ThrowIfNull(aggregate, nameof(aggregate));
-		var eventsApplied = aggregate.GetUnsavedEvents().Count();
+		var eventsApplied = aggregate.GetUnsavedEvents().Count;
 
 		var result = await _eventStore.SaveAsync(aggregate, operationContext, cancellationToken);
 		if (
@@ -99,7 +98,7 @@ partial class PostgresSnapshotEventStore<T>
 		if (_eventStore is not ITransactionalEventStore<T> transactionalEventStore)
 			throw new InvalidOperationException("The inner event store does not support transactional saves.");
 
-		var eventsApplied = aggregate.GetUnsavedEvents().Count();
+		var eventsApplied = aggregate.GetUnsavedEvents().Count;
 		var innerOperation = await transactionalEventStore.SaveInTransactionAsync(
 			aggregate,
 			operationContext,
@@ -231,7 +230,7 @@ partial class PostgresSnapshotEventStore<T>
 	public T FulfilRequirements(T aggregate) => _eventStore.FulfilRequirements(aggregate);
 
 	///<inheritdoc/>
-	public IAsyncEnumerable<(IEvent @event, string eventType)> GetEventRangeAsync(
+	public IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync(
 		string aggregateId,
 		int versionFrom,
 		int? versionTo,

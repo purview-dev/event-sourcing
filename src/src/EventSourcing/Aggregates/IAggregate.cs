@@ -1,4 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using Purview.EventSourcing.Aggregates.Events;
 
 namespace Purview.EventSourcing.Aggregates;
@@ -26,15 +26,14 @@ public interface IAggregate
 	string AggregateType { get; }
 
 	/// <summary>
-	/// Gets all of the currently unsaved <see cref="IEvent"/>s
-	/// applied to this <see cref="IAggregate"/>.
+	/// Gets all of the currently unsaved events applied to this <see cref="IAggregate"/>,
+	/// paired with their framework-managed <see cref="EventMetadata"/>.
 	/// </summary>
-	/// <returns>An array of the unsaved events.</returns>
-	IEnumerable<IEvent> GetUnsavedEvents();
+	/// <returns>An array of the unsaved event records.</returns>
+	IReadOnlyList<EventRecord> GetUnsavedEvents();
 
 	/// <summary>
-	/// Gets an array of the <see cref="IEvent"/> types
-	/// that this <see cref="IAggregate"/> can apply.
+	/// Gets an array of the event types that this <see cref="IAggregate"/> can apply.
 	/// </summary>
 	/// <returns>An array of event types.</returns>
 	IEnumerable<Type> GetRegisteredEventTypes();
@@ -47,7 +46,7 @@ public interface IAggregate
 	bool HasUnsavedEvents();
 
 	/// <summary>
-	/// Clears any unsaved <see cref="IEvent"/>s passed the
+	/// Clears any unsaved events passed the
 	/// specified <paramref name="upToVersion"/> and resets the
 	/// <see cref="AggregateDetails.CurrentVersion"/> to the most recent value.
 	/// </summary>
@@ -56,23 +55,21 @@ public interface IAggregate
 
 	/// <summary>
 	/// <para>
-	/// Applies a <see cref="IEvent"/> instance, either from
-	/// a live update, or from a persisted store. Only registered event
-	/// types should be used.
+	/// Applies an event instance, either from a live update, or from a persisted store. Only registered
+	/// event types should be used.
 	/// </para>
 	/// <para>
-	/// Any aggregate-related properties on the <see cref="IEvent"/> instance
-	/// should be reflected on the this instance.
+	/// Any aggregate-related properties on the event instance should be reflected on the this instance.
 	/// </para>
 	/// </summary>
 	/// <param name="aggregateEvent">The event instance to apply.</param>
-	void ApplyEvent([DisallowNull] IEvent aggregateEvent);
+	/// <param name="metadata">The framework-managed metadata for the event.</param>
+	void ApplyEvent([DisallowNull] object aggregateEvent, EventMetadata metadata);
 
 	/// <summary>
-	/// Gets a value indicate if the <see cref="IEvent"/> type
-	/// can be applied to this instance.
+	/// Gets a value indicate if the event type can be applied to this instance.
 	/// </summary>
 	/// <param name="aggregateEvent">The event being tested.</param>
 	/// <returns>True if this instance can process this event, otherwise, false.</returns>
-	bool CanApplyEvent([DisallowNull] IEvent aggregateEvent);
+	bool CanApplyEvent([DisallowNull] object aggregateEvent);
 }

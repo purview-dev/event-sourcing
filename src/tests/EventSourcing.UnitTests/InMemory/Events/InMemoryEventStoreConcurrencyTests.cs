@@ -6,11 +6,14 @@ namespace Purview.EventSourcing.InMemory.Events;
 
 public sealed class InMemoryEventStoreConcurrencyTests
 {
-	sealed class ValueIncremented : EventBase
+	[EventContract]
+	sealed record ValueIncremented
 	{
-		public int Amount { get; set; }
+		public static int SchemaVersion => 1;
 
-		protected override void BuildEventHash(ref HashCode hash) => hash.Add(Amount);
+		public EventMetadata Metadata { get; init; }
+
+		public int Amount { get; set; }
 	}
 
 	sealed class TestAggregate : AggregateBase

@@ -183,11 +183,11 @@ public class InventoryAggregateTests
 	public async Task UpdateDetails_GivenProductNameAndLocationName_RaisesTwoEvents()
 	{
 		var inv = CreateInventory("inv-1");
-		var countBefore = inv.GetUnsavedEvents().Count();
+		var countBefore = inv.GetUnsavedEvents().Count;
 
 		inv.UpdateDetails(productName: "Widget A Pro", locationName: "Warehouse East");
 
-		await Assert.That(inv.GetUnsavedEvents().Count()).IsEqualTo(countBefore + 2);
+		await Assert.That(inv.GetUnsavedEvents().Count).IsEqualTo(countBefore + 2);
 		await Assert.That(inv.ProductName).IsEqualTo("Widget A Pro");
 		await Assert.That(inv.LocationName).IsEqualTo("Warehouse East");
 	}
@@ -196,11 +196,11 @@ public class InventoryAggregateTests
 	public async Task UpdateDetails_GivenOnlyProductName_UpdatesProductNameOnly()
 	{
 		var inv = CreateInventory("inv-1");
-		var countBefore = inv.GetUnsavedEvents().Count();
+		var countBefore = inv.GetUnsavedEvents().Count;
 
 		inv.UpdateDetails(productName: "Widget A Pro");
 
-		await Assert.That(inv.GetUnsavedEvents().Count()).IsEqualTo(countBefore + 1);
+		await Assert.That(inv.GetUnsavedEvents().Count).IsEqualTo(countBefore + 1);
 		await Assert.That(inv.ProductName).IsEqualTo("Widget A Pro");
 		await Assert.That(inv.LocationName).IsEqualTo("Main Warehouse");
 	}
@@ -209,11 +209,11 @@ public class InventoryAggregateTests
 	public async Task UpdateDetails_GivenSameValues_RaisesNoEvents()
 	{
 		var inv = CreateInventory("inv-1");
-		var countBefore = inv.GetUnsavedEvents().Count();
+		var countBefore = inv.GetUnsavedEvents().Count;
 
 		inv.UpdateDetails(productName: "Widget A", locationName: "Main Warehouse");
 
-		await Assert.That(inv.GetUnsavedEvents().Count()).IsEqualTo(countBefore);
+		await Assert.That(inv.GetUnsavedEvents().Count).IsEqualTo(countBefore);
 	}
 
 	[Test]
@@ -249,7 +249,7 @@ public class InventoryAggregateTests
 		await Assert.That(inv.AvailableQuantity).IsEqualTo(295);
 
 		// Total events: init + reserve + ship + receive = 4
-		await Assert.That(inv.GetUnsavedEvents().Count()).IsEqualTo(4);
+		await Assert.That(inv.GetUnsavedEvents().Count).IsEqualTo(4);
 	}
 
 	#endregion

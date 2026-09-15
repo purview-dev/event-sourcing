@@ -77,7 +77,7 @@ public static class IEventStoreCoreHistoryExtensions
 		var matchedCount = 0;
 		var hasMore = false;
 		await foreach (
-			var (@event, eventType) in historyStore.GetEventRangeAsync(
+			var (eventRecord, eventType) in historyStore.GetEventRangeAsync(
 				aggregateId,
 				scanFromVersion,
 				versionTo,
@@ -85,11 +85,11 @@ public static class IEventStoreCoreHistoryExtensions
 			)
 		)
 		{
-			var details = @event.Details;
-			if (request.FromUtc.HasValue && details.When < request.FromUtc.Value)
+			var metadata = eventRecord.Metadata;
+			if (request.FromUtc.HasValue && metadata.When < request.FromUtc.Value)
 				continue;
 
-			if (request.ToUtc.HasValue && details.When > request.ToUtc.Value)
+			if (request.ToUtc.HasValue && metadata.When > request.ToUtc.Value)
 				continue;
 
 			// Legacy offset tokens skip matched records rather than scanning from a keyset.
@@ -105,7 +105,7 @@ public static class IEventStoreCoreHistoryExtensions
 				break;
 			}
 
-			items.Add(ToHistoryItem<T>(aggregateId, eventType, @event));
+			items.Add(ToHistoryItem<T>(aggregateId, eventType, eventRecord));
 			matchedCount++;
 		}
 
@@ -119,10 +119,11 @@ public static class IEventStoreCoreHistoryExtensions
 		};
 	}
 
-	static AggregateEventHistoryItem ToHistoryItem<T>(string aggregateId, string eventType, IEvent @event)
+	static AggregateEventHistoryItem ToHistoryItem<T>(string aggregateId, string eventType, EventRecord eventRecord)
 		where T : class, IAggregate, new()
 	{
-		var details = @event.Details;
+		var @event = eventRecord.Event;
+		var metadata = eventRecord.Metadata;
 		var payload = @event is UnknownEvent unknown
 			? unknown.Payload
 			: JsonSerializer.Serialize(@event, @event.GetType());
@@ -133,13 +134,13 @@ public static class IEventStoreCoreHistoryExtensions
 			AggregateType = typeof(T).Name,
 			EventType = eventType,
 			EventClrType = @event.GetType().FullName ?? @event.GetType().Name,
-			SchemaVersion = details.SchemaVersion,
-			AggregateVersion = details.AggregateVersion,
-			When = details.When,
-			IdempotencyId = details.IdempotencyId,
-			UserId = details.UserId,
-			CausationId = details.CausationId,
-			CorrelationId = details.CorrelationId,
+			SchemaVersion = metadata.SchemaVersion,
+			AggregateVersion = metadata.AggregateVersion,
+			When = metadata.When,
+			IdempotencyId = metadata.IdempotencyId,
+			UserId = metadata.UserId,
+			CausationId = metadata.CausationId,
+			CorrelationId = metadata.CorrelationId,
 			IsUnknownEvent = @event is UnknownEvent,
 			Payload = payload,
 		};

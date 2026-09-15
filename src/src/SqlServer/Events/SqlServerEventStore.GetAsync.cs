@@ -153,7 +153,9 @@ partial class SqlServerEventStore<T>
 		);
 		await foreach (var eventResult in eventQuery)
 		{
-			var @event = eventResult.@event;
+			var eventRecord = eventResult.EventRecord;
+			var @event = eventRecord.Event;
+			var metadata = eventRecord.Metadata;
 			if (@event is UnknownEvent || !aggregate.CanApplyEvent(@event))
 			{
 				var eventType = @event.GetType();
@@ -163,13 +165,13 @@ partial class SqlServerEventStore<T>
 						aggregateId,
 						_aggregateTypeFullName,
 						aggregate.AggregateType,
-						eventResult.eventType,
-						@event.Details.AggregateVersion
+						eventResult.EventType,
+						metadata.AggregateVersion
 					);
 
 					(aggregate as AggregateBase)?.RecordSkippedEvent(
-						@event.Details.AggregateVersion,
-						eventResult.eventType,
+						metadata.AggregateVersion,
+						eventResult.EventType,
 						isUnknown: true
 					);
 				}
@@ -179,22 +181,22 @@ partial class SqlServerEventStore<T>
 						aggregateId,
 						_aggregateTypeFullName,
 						aggregate.AggregateType,
-						eventResult.eventType,
+						eventResult.EventType,
 						eventType.FullName ?? eventType.Name,
-						@event.Details.AggregateVersion
+						metadata.AggregateVersion
 					);
 
 					(aggregate as AggregateBase)?.RecordSkippedEvent(
-						@event.Details.AggregateVersion,
-						eventResult.eventType,
+						metadata.AggregateVersion,
+						eventResult.EventType,
 						isUnknown: false
 					);
 				}
 
-				aggregate.Details.CurrentVersion = @event.Details.AggregateVersion;
+				aggregate.Details.CurrentVersion = metadata.AggregateVersion;
 			}
 			else
-				aggregate.ApplyEvent(@event);
+				aggregate.ApplyEvent(@event, metadata);
 
 			eventCount++;
 		}
@@ -221,11 +223,11 @@ partial class SqlServerEventStore<T>
 			var row = await _client.GetByIdAsync(snapshotId, cancellationToken);
 			return
 				row == null
-				|| row.EntityType != SnapshotType
-				|| row.SchemaVersion != _snapshotSchemaVersion
-				|| string.IsNullOrWhiteSpace(row.Payload)
+				|| row.Value.EntityType != SnapshotType
+				|| row.Value.SchemaVersion != _snapshotSchemaVersion
+				|| string.IsNullOrWhiteSpace(row.Value.Payload)
 				? null
-				: DeserializeSnapshot(row.Payload);
+				: DeserializeSnapshot(row.Value.Payload);
 		}
 #pragma warning disable CA1031
 		catch (Exception ex)

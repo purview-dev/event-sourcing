@@ -34,7 +34,8 @@ public sealed class ReportUploadAggregateTests
 
 		// Assert (event contains the computed status value)
 		var completedEvent = sut.GetUnsavedEvents()
-			.Single(@event => @event.GetType().GetProperty("Status") is not null);
+			.Single(record => record.Event.GetType().GetProperty("Status") is not null)
+			.Event;
 		var statusProperty = completedEvent.GetType().GetProperty("Status");
 		await Assert.That(statusProperty).IsNotNull();
 		await Assert.That(statusProperty!.GetValue(completedEvent)).IsEqualTo(ReportProcessingStatus.Completed);

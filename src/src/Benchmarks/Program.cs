@@ -1,5 +1,13 @@
-using Purview.EventSourcing.SourceGenerator;
-using Purview.EventSourcing.SqlServer;
+using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Jobs;
+using BenchmarkDotNet.Running;
+using BenchmarkDotNet.Toolchains.InProcess.Emit;
+using Purview.EventSourcing.Benchmarks;
+
+// The suites run with the in-process toolchain: benchmarks execute directly in this process, which
+// avoids BenchmarkDotNet generating an out-of-process boilerplate project. The repository's
+// Purview.DotNetProjectSdk cannot build under BenchmarkDotNet's generated project layout, and an
+// in-process run keeps the harness self-contained and fast to invoke.
 
 var mode = args.Length > 0 ? args[0].ToLowerInvariant() : "all";
 var runBenchmark = Array.Exists(
@@ -11,68 +19,124 @@ switch (mode)
 {
 	case "source-generator":
 	case "sg":
-		return await RunSourceGeneratorAsync(runBenchmark);
+		return await RunSuiteAsync(
+			"source-generator",
+			"SourceGeneratorPerformance",
+			typeof(SourceGeneratorPerformanceBenchmarks),
+			BenchmarkPolicies.SourceGenerator,
+			runBenchmark
+		);
+	case "runtime":
+	case "rt":
+		return await RunSuiteAsync(
+			"runtime",
+			"RuntimePerformance",
+			typeof(RuntimePerformanceBenchmarks),
+			BenchmarkPolicies.Runtime,
+			runBenchmark
+		);
 	case "sql-server":
 	case "sql":
-		return await RunSqlServerAsync(runBenchmark);
+		return await RunSuiteAsync(
+			"sql-server",
+			"SqlServerPerformance",
+			typeof(SqlServerPerformanceBenchmarks),
+			BenchmarkPolicies.SqlServer,
+			runBenchmark
+		);
+	case "inmemory":
+	case "im":
+		return await RunSuiteAsync(
+			"inmemory",
+			"InMemoryPerformance",
+			typeof(InMemoryPerformanceBenchmarks),
+			BenchmarkPolicies.InMemory,
+			runBenchmark
+		);
 	case "all":
 	{
-		var sourceGeneratorExit = await RunSourceGeneratorAsync(runBenchmark);
-		var sqlServerExit = await RunSqlServerAsync(runBenchmark);
-		return Math.Max(sourceGeneratorExit, sqlServerExit);
+		var sourceGeneratorExit = await RunSuiteAsync(
+			"source-generator",
+			"SourceGeneratorPerformance",
+			typeof(SourceGeneratorPerformanceBenchmarks),
+			BenchmarkPolicies.SourceGenerator,
+			runBenchmark
+		);
+		var runtimeExit = await RunSuiteAsync(
+			"runtime",
+			"RuntimePerformance",
+			typeof(RuntimePerformanceBenchmarks),
+			BenchmarkPolicies.Runtime,
+			runBenchmark
+		);
+		var sqlServerExit = await RunSuiteAsync(
+			"sql-server",
+			"SqlServerPerformance",
+			typeof(SqlServerPerformanceBenchmarks),
+			BenchmarkPolicies.SqlServer,
+			runBenchmark
+		);
+		var inMemoryExit = await RunSuiteAsync(
+			"inmemory",
+			"InMemoryPerformance",
+			typeof(InMemoryPerformanceBenchmarks),
+			BenchmarkPolicies.InMemory,
+			runBenchmark
+		);
+		return Math.Max(Math.Max(Math.Max(sourceGeneratorExit, runtimeExit), sqlServerExit), inMemoryExit);
 	}
 	default:
 		await Console.Error.WriteLineAsync(
-			$"Unknown benchmark '{mode}'. Expected 'source-generator', 'sql-server', or 'all'."
+			$"Unknown benchmark '{mode}'. Expected 'source-generator', 'runtime', 'inmemory', 'sql-server', or 'all'."
 		);
 		return 2;
 }
 
-static Task<int> RunSourceGeneratorAsync(bool runBenchmark)
+static async Task<int> RunSuiteAsync(
+	string mode,
+	string suiteName,
+	Type benchmarkType,
+	BenchmarkSuitePolicy policy,
+	bool runBenchmark
+)
 {
-	SourceGeneratorPerformanceRunner runner = new();
-	PerformanceHistoryStore store = new();
+	var config = ManualConfig
+		.Create(DefaultConfig.Instance)
+		.WithArtifactsPath(Path.Combine("artifacts", "benchmarkdotnet", mode))
+		.AddJob(CreateJob(runBenchmark));
 
-	var previousRun = store.TryLoadLatest();
-	var run = runBenchmark ? runner.RunBenchmark() : runner.RunQuick();
-	var savedPath = store.Save(run);
+	var summary = BenchmarkRunner.Run(benchmarkType, config);
 
-	Console.WriteLine($"Saved {run.Mode} results to {savedPath}");
-	Console.WriteLine();
+	if (summary.HasCriticalValidationErrors)
+	{
+		await Console.Error.WriteLineAsync(
+			$"Benchmark validation failed for the {suiteName} suite. Run in Release configuration (e.g. just perf-{mode})."
+		);
+		return 1;
+	}
 
-	foreach (var line in run.FormatSummary(previousRun))
-		Console.WriteLine(line);
+	var run = await BenchmarkRunExporter.ExportAsync(mode, suiteName, summary, policy, CancellationToken.None);
 
-	return Task.FromResult(0);
-}
-
-static async Task<int> RunSqlServerAsync(bool runBenchmark)
-{
-	SqlServerStorePerformanceRunner runner = new();
-	SqlServerStorePerformanceHistoryStore store = new();
-
-	using CancellationTokenSource cancellationTokenSource = new();
-	Console.CancelKeyPress += (s, e) => cancellationTokenSource.Cancel();
-
-	var previousRun = store.TryLoadLatest();
-	var run = await (
-		runBenchmark
-			? runner.RunBenchmarkAsync(cancellationTokenSource.Token)
-			: runner.RunQuickAsync(cancellationTokenSource.Token)
-	);
-	var savedPath = await store.SaveAsync(run, cancellationTokenSource.Token);
-
-	await Console.Out.WriteLineAsync($"Saved {run.Mode} results to {savedPath}");
 	await Console.Out.WriteLineAsync();
-
-	foreach (var line in run.FormatSummary(previousRun))
+	foreach (var line in run.FormatSummary())
 		await Console.Out.WriteLineAsync(line);
 
-	if (run.Passed)
-		return 0;
+	return run.Passed ? 0 : 1;
+}
 
-	await Console.Out.WriteLineAsync();
-	await Console.Error.WriteLineAsync("Performance thresholds were not met.");
+static Job CreateJob(bool runBenchmark)
+{
+	var job = runBenchmark
+		? new Job
+		{
+			Run = { WarmupCount = 3, IterationCount = 12 },
+			Accuracy = { MinIterationTime = Perfolizer.Horology.TimeInterval.FromMilliseconds(100) },
+		}
+		: new Job
+		{
+			Run = { WarmupCount = 1, IterationCount = 3 },
+			Accuracy = { MinIterationTime = Perfolizer.Horology.TimeInterval.FromMilliseconds(50) },
+		};
 
-	return 1;
+	return job.WithToolchain(InProcessEmitToolchain.Instance);
 }

@@ -23,6 +23,6 @@ public sealed partial class CustomerAggregateTests
 
 		// Assert — 3 events = version 3
 		await Assert.That(customer.Details.CurrentVersion).IsEqualTo(3);
-		await Assert.That(customer.GetUnsavedEvents().Count()).IsEqualTo(3);
+		await Assert.That(customer.GetUnsavedEvents().Count).IsEqualTo(3);
 	}
 }

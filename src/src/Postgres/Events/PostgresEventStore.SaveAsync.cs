@@ -61,7 +61,7 @@ partial class PostgresEventStore<T>
 		NpgsqlConnection? connection,
 		NpgsqlTransaction? transaction,
 		CancellationToken cancellationToken,
-		params IEvent[] additionalEvents
+		params EventRecord[] additionalEvents
 	)
 	{
 		operationContext ??= EventStoreOperationContext.DefaultContext();
@@ -104,7 +104,10 @@ partial class PostgresEventStore<T>
 		}
 
 		var isNew = aggregate.IsNew();
-		var changeEvents = aggregate.GetUnsavedEvents().Concat((additionalEvents ?? []).AsEnumerable()).ToArray();
+		var changeEvents =
+			(additionalEvents?.Length ?? 0) == 0
+				? aggregate.GetUnsavedEvents().ToArray()
+				: aggregate.GetUnsavedEvents().Concat(additionalEvents!).ToArray();
 
 		if (changeEvents.Length > _eventStoreOptions.Value.MaxEventCountOnSave)
 		{
@@ -155,11 +158,16 @@ partial class PostgresEventStore<T>
 		);
 	}
 
+	[System.Diagnostics.CodeAnalysis.SuppressMessage(
+		"Maintainability",
+		"CA1502:Avoid excessive complexity",
+		Justification = "Save orchestration handles many interleaved states; keep the flow readable."
+	)]
 	async Task<TransactionalSaveOperation<T>> PersistAndNotifyAsync(
 		T aggregate,
 		EventStoreOperationContext operationContext,
 		string idempotencyId,
-		IEvent[] changeEvents,
+		EventRecord[] changeEvents,
 		bool isNew,
 		NpgsqlConnection? connection,
 		NpgsqlTransaction? transaction,
@@ -171,7 +179,7 @@ partial class PostgresEventStore<T>
 	{
 		if (
 			operationContext.NotificationMode.HasFlag(NotificationModes.BeforeDelete)
-			&& changeEvents.OfType<Deleted>().Any()
+			&& changeEvents.Any(record => record.Event is Deleted)
 		)
 			await _aggregateChangeNotifier.BeforeDeleteAsync(aggregate, cancellationToken);
 		else if (operationContext.NotificationMode.HasFlag(NotificationModes.BeforeSave))
@@ -187,7 +195,7 @@ partial class PostgresEventStore<T>
 
 		if (streamEntity?.IsDeleted == true)
 		{
-			var throwIfDeleted = !changeEvents.OfType<Restored>().Any();
+			var throwIfDeleted = !changeEvents.Any(record => record.Event is Restored);
 			if (throwIfDeleted)
 			{
 				activity?.Dispose();
@@ -222,29 +230,31 @@ partial class PostgresEventStore<T>
 			List<PostgresEventStoreClient.RowData> insertRows = [];
 			for (var i = 0; i < changeEvents.Length; i++)
 			{
-				var changeEvent = changeEvents[i];
-
-				changeEvent.Details.IdempotencyId = idempotencyIdAsString;
-				changeEvent.Details.SchemaVersion = changeEvent.SchemaVersion;
-				changeEvent.Details.UserId = userId;
-				changeEvent.Details.CorrelationId ??= operationContext.CorrelationId;
+				var changeEvent = changeEvents[i].Event;
+				var metadata = changeEvents[i].Metadata with
+				{
+					IdempotencyId = idempotencyIdAsString,
+					SchemaVersion = changeEvents[i].Metadata.SchemaVersion,
+					UserId = userId,
+					CorrelationId = changeEvents[i].Metadata.CorrelationId ?? operationContext.CorrelationId,
+				};
 
 				var serializedEvent = SerializeEvent(changeEvent);
 				insertRows.Add(
 					new PostgresEventStoreClient.RowData
 					{
-						Id = CreateEventId(aggregate.Id(), changeEvent.Details.AggregateVersion),
+						Id = CreateEventId(aggregate.Id(), metadata.AggregateVersion),
 						EntityType = EventType,
 						AggregateId = aggregate.Id(),
 						AggregateType = aggregate.AggregateType,
-						Version = changeEvent.Details.AggregateVersion,
+						Version = metadata.AggregateVersion,
 						Payload = serializedEvent,
 						EventType = _eventNameMapper.GetName<T>(changeEvent),
 						IdempotencyId = idempotencyMarkerId,
-						SchemaVersion = changeEvent.SchemaVersion,
-						CorrelationId = changeEvent.Details.CorrelationId,
-						CausationId = changeEvent.Details.CausationId,
-						UserId = changeEvent.Details.UserId,
+						SchemaVersion = metadata.SchemaVersion,
+						CorrelationId = metadata.CorrelationId,
+						CausationId = metadata.CausationId,
+						UserId = metadata.UserId,
 						Timestamp = now,
 					}
 				);
@@ -265,18 +275,28 @@ partial class PostgresEventStore<T>
 				);
 			}
 
+			var requireSnapshotWrite =
+				shouldSnapshot
+				&& operationContext.RequireSnapshotWrite
+				&& _eventStoreOptions.Value.RequireSnapshotWrite;
+			PostgresEventStoreClient.RowData? snapshotRow = requireSnapshotWrite
+				? BuildSnapshotRow(aggregate, now)
+				: null;
+
 			await SubmitBatchOperationsAsync(
 				aggregate,
 				idempotencyId,
 				streamVersionRow,
 				insertRows,
+				snapshotRow,
+				isNew,
 				connection,
 				transaction,
 				cancellationToken
 			);
 
-			if (shouldSnapshot)
-				await CreateSnapshotAsync(aggregate, connection, transaction, cancellationToken);
+			if (shouldSnapshot && !requireSnapshotWrite)
+				await CreateSnapshotBestEffortAsync(aggregate, connection, transaction, cancellationToken);
 
 			var result = SaveResultBuilder.Create(aggregate, true, false);
 
@@ -288,13 +308,13 @@ partial class PostgresEventStore<T>
 					{
 						FinalizeSuccessfulSave(aggregate, shouldSnapshot);
 
-						if (changeEvents.OfType<Deleted>().Any())
+						if (changeEvents.Any(record => record.Event is Deleted))
 							_eventStoreTelemetry.AggregateDeleted(
 								aggregate.Id(),
 								_aggregateTypeFullName,
 								aggregate.AggregateType
 							);
-						else if (changeEvents.OfType<Restored>().Any())
+						else if (changeEvents.Any(record => record.Event is Restored))
 							_eventStoreTelemetry.AggregateRestored(
 								aggregate.Id(),
 								_aggregateTypeFullName,
@@ -353,13 +373,13 @@ partial class PostgresEventStore<T>
 	async Task HandleSaveFailureAsync(
 		T aggregate,
 		EventStoreOperationContext operationContext,
-		IEvent[] changeEvents,
+		EventRecord[] changeEvents,
 		Exception exception
 	)
 	{
 		if (operationContext.NotificationMode.HasFlag(NotificationModes.OnFailure))
 		{
-			var deleteRequested = changeEvents.OfType<Deleted>().Any();
+			var deleteRequested = changeEvents.Any(record => record.Event is Deleted);
 			await _aggregateChangeNotifier.FailureAsync(aggregate, deleteRequested, exception);
 		}
 	}
@@ -373,28 +393,27 @@ partial class PostgresEventStore<T>
 			: await _validator.ValidateAsync(aggregate, cancellationToken);
 	}
 
-	static bool ShouldSnapShot(T aggregate, IEvent[] events, EventStoreOperationContext context)
+	static bool ShouldSnapShot(T aggregate, EventRecord[] events, EventStoreOperationContext context)
 	{
 		// Deleted/restored transitions must always be reflected promptly.
-		if (aggregate.Details.IsDeleted || events.OfType<Restored>().Any())
+		if (aggregate.Details.IsDeleted || events.Any(record => record.Event is Restored))
 			return true;
 
 		// Default to a snapshot on every save (matching the historical behavior) while honoring
 		// any per-operation strategy override or selector, so operators can reduce snapshot
 		// write amplification on high-frequency aggregates.
-		return SnapshotStrategyResolver.ShouldSnapshot(
-			aggregate,
-			events.Length,
-			context,
-			new IntervalSnapshotStrategy<T>()
-		);
+		return SnapshotStrategyResolver.ShouldSnapshot(aggregate, events.Length, context, DefaultSnapshotStrategy);
 	}
+
+	static readonly IntervalSnapshotStrategy<T> DefaultSnapshotStrategy = new();
 
 	async Task SubmitBatchOperationsAsync(
 		T aggregate,
 		string idempotencyId,
 		PostgresEventStoreClient.RowData streamVersionRow,
 		List<PostgresEventStoreClient.RowData> insertRows,
+		PostgresEventStoreClient.RowData? snapshotRow,
+		bool isNew,
 		NpgsqlConnection? connection,
 		NpgsqlTransaction? transaction,
 		CancellationToken cancellationToken
@@ -416,7 +435,9 @@ partial class PostgresEventStore<T>
 					streamVersionRow.IdempotencyId,
 					streamVersionRow.Timestamp,
 					insertRows,
-					cancellationToken
+					cancellationToken,
+					snapshotRow: snapshotRow,
+					snapshotIsNew: isNew
 				);
 			}
 			else
@@ -435,7 +456,9 @@ partial class PostgresEventStore<T>
 					insertRows,
 					connection,
 					transaction!,
-					cancellationToken
+					cancellationToken,
+					snapshotRow: snapshotRow,
+					snapshotIsNew: isNew
 				);
 			}
 		}
@@ -470,6 +493,59 @@ partial class PostgresEventStore<T>
 			ClearCacheFireAndForget(aggregate);
 
 			throw;
+		}
+	}
+
+	/// <summary>
+	/// Builds the snapshot row that is folded into the events batch so the snapshot is written
+	/// atomically with the events.
+	/// </summary>
+	PostgresEventStoreClient.RowData BuildSnapshotRow(T aggregate, DateTimeOffset now)
+	{
+		var previousSnapshotVersion = aggregate.Details.SnapshotVersion;
+		try
+		{
+			aggregate.Details.SnapshotVersion = aggregate.Details.CurrentVersion;
+
+			return new PostgresEventStoreClient.RowData
+			{
+				Id = CreateSnapshotId(aggregate.Id()),
+				EntityType = SnapshotType,
+				AggregateId = aggregate.Id(),
+				AggregateType = aggregate.AggregateType,
+				Version = aggregate.Details.CurrentVersion,
+				IsDeleted = aggregate.Details.IsDeleted,
+				Payload = SerializeSnapshot(aggregate),
+				SchemaVersion = _snapshotSchemaVersion,
+				Timestamp = now,
+			};
+		}
+		finally
+		{
+			aggregate.Details.SnapshotVersion = previousSnapshotVersion;
+		}
+	}
+
+	/// <summary>
+	/// Writes the snapshot best-effort after the events have been committed, logging rather than
+	/// failing the save when <see cref="EventStoreOperationContext.RequireSnapshotWrite"/> is false.
+	/// </summary>
+	async Task CreateSnapshotBestEffortAsync(
+		T aggregate,
+		NpgsqlConnection? connection,
+		NpgsqlTransaction? transaction,
+		CancellationToken cancellationToken
+	)
+	{
+		try
+		{
+			await CreateSnapshotAsync(aggregate, connection, transaction, cancellationToken);
+		}
+#pragma warning disable CA1031
+		catch (Exception ex)
+#pragma warning restore CA1031
+		{
+			_eventStoreTelemetry.SnapshotWriteFailure(aggregate.Id(), _aggregateTypeFullName, ex);
 		}
 	}
 

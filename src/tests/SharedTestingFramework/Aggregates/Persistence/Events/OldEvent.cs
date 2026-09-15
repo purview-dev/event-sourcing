@@ -1,14 +1,16 @@
+using System.Text.Json.Serialization;
 using Purview.EventSourcing.Aggregates.Events;
 
 namespace Purview.EventSourcing.Aggregates.Persistence.Events;
 
 [SentinelEvent(Justification = "This is an old event used for testing purposes.")]
-public sealed class OldEvent : EventBase
+[EventContract]
+public sealed record OldEvent
 {
-	public Guid Value { get; set; }
+	public static int SchemaVersion => 1;
 
-	protected override void BuildEventHash(ref HashCode hash)
-	{
-		hash.Add(Value);
-	}
+	[JsonIgnore]
+	public EventMetadata Metadata { get; init; }
+
+	public Guid Value { get; set; }
 }

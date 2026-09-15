@@ -1,4 +1,4 @@
-﻿namespace Purview.EventSourcing.Samples.Domain;
+namespace Purview.EventSourcing.Samples.Domain;
 
 partial class CustomerAggregateTests
 {
@@ -27,8 +27,8 @@ partial class CustomerAggregateTests
 		customer.RegisterCustomer("Jane Smith", "jane@test.com");
 
 		// Assert
-		await Assert.That(customer.GetUnsavedEvents().Count()).IsEqualTo(1);
-		await Assert.That(customer.GetUnsavedEvents().First()).IsTypeOf<CustomerEvents.CustomerRegisteredEvent>();
+		await Assert.That(customer.GetUnsavedEvents().Count).IsEqualTo(1);
+		await Assert.That(customer.GetUnsavedEvents()[0].Event).IsTypeOf<CustomerEvents.CustomerRegisteredEvent>();
 	}
 
 	[Test]

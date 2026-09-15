@@ -3,7 +3,6 @@ using System.ComponentModel;
 using System.Linq.Expressions;
 using Microsoft.Extensions.DependencyInjection;
 using Purview.EventSourcing.Aggregates;
-using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.Internal;
 
 namespace Purview.EventSourcing;
@@ -117,7 +116,7 @@ public sealed class QueryableEventStoreFacade(IServiceProvider serviceProvider)
 		where T : class, IAggregate, new() => GetQueryableEventStore<T>().FulfilRequirements(aggregate);
 
 	///<inheritdoc/>
-	public IAsyncEnumerable<(IEvent @event, string eventType)> GetEventRangeAsync<T>(
+	public IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync<T>(
 		string aggregateId,
 		int versionFrom,
 		int? versionTo,

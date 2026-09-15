@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
@@ -51,6 +52,8 @@ public sealed partial class MongoDBEventStore<T> : IMongoDBEventStore<T>, IDispo
 	readonly string _aggregateTypeFullName;
 	readonly string _aggregateTypeShortName;
 	readonly int _snapshotSchemaVersion = AggregateSnapshotSchema.GetVersion<T>();
+
+	static readonly ConcurrentDictionary<string, Type> EventTypeCache = new(StringComparer.Ordinal);
 
 	/// <summary>
 	/// Initializes a new <see cref="MongoDBEventStore{T}"/> instance.

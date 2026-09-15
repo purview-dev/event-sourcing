@@ -113,7 +113,11 @@ static partial class AggregateSourceEmitter
 			{
 				foreach (var method in outputContext.Aggregate.Methods)
 				{
-					bodyWriter.MethodCall("Register", ["Apply"], genericArguments: [method.EventType]);
+					bodyWriter.MethodCall(
+						"RegisterGenerated",
+						System.Array.Empty<string>(),
+						genericArguments: [method.EventType]
+					);
 				}
 			}
 		);
@@ -431,6 +435,24 @@ static partial class AggregateSourceEmitter
 			declareVariable ? "var @event" : "@event",
 			new ObjectCreationOptions(method.EventType) { InitializerMembers = [.. initializerMembers] }
 		);
+	}
+
+	/// <summary>
+	/// Re-synchronizes the payload properties of an already-constructed event from the post-hook
+	/// working values. The command emitters construct the event once and rely on this to reflect any
+	/// mutations the <c>OnRaising</c>/<c>OnComputing</c> hooks made via <see langword="ref"/> parameters,
+	/// avoiding a second event allocation per command invocation.
+	/// </summary>
+	internal static void EmitEventSync(CodeWriter writer, AggregateEventMethodInfo method)
+	{
+		foreach (var prop in method.EventParameters)
+		{
+			var valueExpression = GetWorkingValueName(prop);
+			if (prop.IsNotNull || prop.IsRequired)
+				valueExpression += "!";
+
+			writer.Assignment($"@event.{prop.PropertyName}", valueExpression);
+		}
 	}
 
 	internal static string BuildPropertyValueExpression(

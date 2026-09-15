@@ -12,6 +12,7 @@ public sealed class EventStoreAnalyzer : DiagnosticAnalyzer
 			DiagnosticLibrary.EventNameShouldBePastTense,
 			DiagnosticLibrary.NullableScalarEqualityNullComparisonShouldUsePatternMatching,
 			DiagnosticLibrary.EventMethodRequiresAggregateAttribute,
+			DiagnosticLibrary.EventTypeShouldBeMarkedWithEventContract,
 		];
 
 	public override void Initialize(AnalysisContext context)
@@ -26,7 +27,48 @@ public sealed class EventStoreAnalyzer : DiagnosticAnalyzer
 		RegisterManualEventTypeDiagnostics(context);
 		RegisterNullableScalarComparisonDiagnostics(context);
 		RegisterOrphanEventMethodDiagnostics(context);
+		RegisterEventContractDiagnostics(context);
 	}
+
+	static void RegisterEventContractDiagnostics(AnalysisContext context) =>
+		context.RegisterOperationAction(
+			static context =>
+			{
+				var invocation = (IInvocationOperation)context.Operation;
+				var targetMethod = invocation.TargetMethod;
+
+				if (targetMethod.Name is not ("Register" or "RegisterGenerated"))
+					return;
+
+				if (targetMethod.ContainingType.ToDisplayString() != "Purview.EventSourcing.Aggregates.AggregateBase")
+					return;
+
+				if (targetMethod.TypeArguments.Length != 1)
+					return;
+
+				var eventType = targetMethod.TypeArguments[0];
+				if (
+					TypeHelpers.HasAttribute(
+						eventType,
+						TypeLibrary.Purview.EventSourcing.Aggregates.Events.EventContractAttribute
+					)
+				)
+					return;
+
+				var location =
+					eventType.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax().GetLocation()
+					?? invocation.Syntax.GetLocation();
+
+				context.ReportDiagnostic(
+					Diagnostic.Create(
+						DiagnosticLibrary.EventTypeShouldBeMarkedWithEventContract,
+						location,
+						eventType.Name
+					)
+				);
+			},
+			OperationKind.Invocation
+		);
 
 	static void RegisterComputedParameterDiagnostics(AnalysisContext context) =>
 		context.RegisterOperationAction(
@@ -121,7 +163,10 @@ public sealed class EventStoreAnalyzer : DiagnosticAnalyzer
 				var typeSymbol = (INamedTypeSymbol)context.Symbol;
 
 				if (
-					!TypeHelpers.InheritsFrom(typeSymbol, TypeLibrary.Purview.EventSourcing.Aggregates.Events.EventBase)
+					!TypeHelpers.HasAttribute(
+						typeSymbol,
+						TypeLibrary.Purview.EventSourcing.Aggregates.Events.EventContractAttribute
+					)
 				)
 					return;
 

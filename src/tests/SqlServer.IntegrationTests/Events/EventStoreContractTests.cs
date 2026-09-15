@@ -51,7 +51,6 @@ public sealed class EventStoreContractTests<TAggregate>(SqlServerEventStoreFixtu
 			var row in client.GetEventRangeAsync(aggregateId, aggregateType, fromVersion, toVersion, cancellationToken)
 		)
 		{
-			row.EventType = eventType;
 			await client.UpsertAsync(
 				row.Id,
 				row.EntityType,
@@ -60,7 +59,7 @@ public sealed class EventStoreContractTests<TAggregate>(SqlServerEventStoreFixtu
 				row.Version,
 				row.IsDeleted,
 				row.Payload,
-				row.EventType,
+				eventType,
 				row.IdempotencyId,
 				row.Timestamp,
 				cancellationToken

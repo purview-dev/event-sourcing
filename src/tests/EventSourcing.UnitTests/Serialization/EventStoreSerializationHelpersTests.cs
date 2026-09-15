@@ -39,11 +39,19 @@ public sealed class EventStoreSerializationHelpersTests
 	}
 
 	[Test]
-	public async Task SerializeAndDeserialize_GivenEventWithDetails_RestoresEventDetails()
+	public async Task SerializeAndDeserialize_GivenEventWithMetadata_DoesNotSerializeMetadata()
 	{
 		SerializerEvent @event = new()
 		{
-			Details = new EventDetails { AggregateVersion = 2, CorrelationId = "corr-1" },
+			Metadata = new EventMetadata(
+				AggregateVersion: 2,
+				When: DateTimeOffset.UtcNow,
+				SchemaVersion: 1,
+				IdempotencyId: null,
+				CorrelationId: "corr-1",
+				CausationId: null,
+				UserId: null
+			),
 			Value = "event-value",
 		};
 
@@ -52,8 +60,10 @@ public sealed class EventStoreSerializationHelpersTests
 
 		await Assert.That(roundTripped).IsNotNull();
 		await Assert.That(roundTripped!.Value).IsEqualTo("event-value");
-		await Assert.That(roundTripped.Details.AggregateVersion).IsEqualTo(2);
-		await Assert.That(roundTripped.Details.CorrelationId).IsEqualTo("corr-1");
+		await Assert.That(roundTripped.Metadata).IsEqualTo(default(EventMetadata));
+
+		using var document = JsonDocument.Parse(json);
+		await Assert.That(document.RootElement.TryGetProperty("Metadata", out _)).IsFalse();
 	}
 
 	[Test]
@@ -86,11 +96,7 @@ public sealed class EventStoreSerializationHelpersTests
 	[Test]
 	public async Task Deserialize_GivenLegacyEventJson_ProducesEventThatCanBeUpcast()
 	{
-		LegacySerializerEvent legacyEvent = new()
-		{
-			Details = new EventDetails { CorrelationId = "corr-2" },
-			OldField = "legacy",
-		};
+		LegacySerializerEvent legacyEvent = new() { OldField = "legacy" };
 		var json = EventStoreSerializationHelpers.Serialize(legacyEvent, legacyEvent.GetType());
 		var deserialized = EventStoreSerializationHelpers.Deserialize<LegacySerializerEvent>(json)!;
 
@@ -103,7 +109,6 @@ public sealed class EventStoreSerializationHelpersTests
 		var upcast = (CurrentSerializerEvent)registry.Upcast(deserialized);
 
 		await Assert.That(upcast.NewField).IsEqualTo("legacy-upcast");
-		await Assert.That(upcast.Details.CorrelationId).IsEqualTo("corr-2");
 	}
 
 	sealed class SerializerAggregate : AggregateBase
@@ -137,11 +142,15 @@ public sealed class EventStoreSerializationHelpersTests
 		protected override void RegisterEvents() { }
 	}
 
-	sealed class SerializerEvent : EventBase
+	[EventContract]
+	sealed record SerializerEvent
 	{
-		public string Value { get; set; } = string.Empty;
+		public static int SchemaVersion => 1;
 
-		protected override void BuildEventHash(ref HashCode hash) => hash.Add(Value);
+		[JsonIgnore]
+		public EventMetadata Metadata { get; init; }
+
+		public string Value { get; set; } = string.Empty;
 	}
 
 	sealed class StringValuesEnvelope
@@ -149,23 +158,31 @@ public sealed class EventStoreSerializationHelpersTests
 		public StringValues Value { get; set; }
 	}
 
-	sealed class LegacySerializerEvent : EventBase
+	[EventContract]
+	sealed record LegacySerializerEvent
 	{
-		public string OldField { get; set; } = string.Empty;
+		public static int SchemaVersion => 1;
 
-		protected override void BuildEventHash(ref HashCode hash) => hash.Add(OldField);
+		[JsonIgnore]
+		public EventMetadata Metadata { get; init; }
+
+		public string OldField { get; set; } = string.Empty;
 	}
 
-	sealed class CurrentSerializerEvent : EventBase
+	[EventContract]
+	sealed record CurrentSerializerEvent
 	{
-		public string NewField { get; set; } = string.Empty;
+		public static int SchemaVersion => 1;
 
-		protected override void BuildEventHash(ref HashCode hash) => hash.Add(NewField);
+		[JsonIgnore]
+		public EventMetadata Metadata { get; init; }
+
+		public string NewField { get; set; } = string.Empty;
 	}
 
 	sealed class LegacySerializerEventUpcaster : IEventUpcaster<LegacySerializerEvent, CurrentSerializerEvent>
 	{
 		public CurrentSerializerEvent Upcast(LegacySerializerEvent source) =>
-			new() { Details = source.Details, NewField = source.OldField + "-upcast" };
+			new() { NewField = source.OldField + "-upcast" };
 	}
 }

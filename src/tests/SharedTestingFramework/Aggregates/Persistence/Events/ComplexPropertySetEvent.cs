@@ -1,13 +1,15 @@
-﻿using Purview.EventSourcing.Aggregates.Events;
+using System.Text.Json.Serialization;
+using Purview.EventSourcing.Aggregates.Events;
 
 namespace Purview.EventSourcing.Aggregates.Persistence.Events;
 
-public class ComplexPropertySetEvent : EventBase
+[EventContract]
+public sealed record ComplexPropertySetEvent
 {
-	public ComplexTestType ComplexProperty { get; set; } = default!;
+	public static int SchemaVersion => 1;
 
-	protected override void BuildEventHash(ref HashCode hash)
-	{
-		hash.Add(ComplexProperty);
-	}
+	[JsonIgnore]
+	public EventMetadata Metadata { get; init; }
+
+	public ComplexTestType ComplexProperty { get; set; } = default!;
 }

@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using Purview.EventSourcing.Aggregates;
-using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.Aggregates.Events.Upcasting;
 
 namespace Purview.EventSourcing.Services;
@@ -11,25 +10,37 @@ sealed partial class AggregateEventNameMapper(IEnumerable<IEventUpcasterDescript
 	readonly ConcurrentDictionary<string, string> _eventNamesByAssemblyTypeName = new(StringComparer.InvariantCulture);
 	readonly ConcurrentDictionary<string, string> _eventNamesByDefinedTypeName = new(StringComparer.InvariantCulture);
 	readonly ConcurrentDictionary<string, string> _registeredAggregateTypes = new(StringComparer.InvariantCulture);
+
+	// Forward cache keyed by CLR type that avoids building `Type.AssemblyQualifiedName` (a fresh
+	// string on every call) on the hot save path.
+	readonly ConcurrentDictionary<Type, string> _eventNamesByType = new();
 	readonly Type[] _upcasterSourceTypes =
 		upcasters?.Select(upcaster => upcaster.SourceType).Distinct().ToArray() ?? [];
 
-	public string GetName<T>(IEvent @event)
+	public string GetName<T>(object @event)
 		where T : IAggregate => GetName<T>(@event.GetType());
 
 	public string GetName<T>(Type aggregateEventType)
 		where T : IAggregate
 	{
+		if (_eventNamesByType.TryGetValue(aggregateEventType, out var eventName))
+			return eventName;
+
 		var eventTypeAssemblyQualifiedName = aggregateEventType.AssemblyQualifiedName.OrDefault(
 			aggregateEventType.ToString()
 		);
-		if (!_eventNamesByAssemblyTypeName.TryGetValue(eventTypeAssemblyQualifiedName, out var eventName))
+		if (_eventNamesByAssemblyTypeName.TryGetValue(eventTypeAssemblyQualifiedName, out eventName))
 		{
-			eventName = CreateEventName(aggregateEventType, typeof(T).FullName!);
-
-			if (_eventNamesByAssemblyTypeName.TryAdd(eventTypeAssemblyQualifiedName, eventName))
-				_eventNamesByDefinedTypeName.TryAdd(eventName, eventTypeAssemblyQualifiedName);
+			_eventNamesByType.TryAdd(aggregateEventType, eventName);
+			return eventName;
 		}
+
+		eventName = CreateEventName(aggregateEventType, typeof(T).FullName!);
+
+		if (_eventNamesByAssemblyTypeName.TryAdd(eventTypeAssemblyQualifiedName, eventName))
+			_eventNamesByDefinedTypeName.TryAdd(eventName, eventTypeAssemblyQualifiedName);
+
+		_eventNamesByType.TryAdd(aggregateEventType, eventName);
 
 		return eventName;
 	}
@@ -114,7 +125,10 @@ sealed partial class AggregateEventNameMapper(IEnumerable<IEventUpcasterDescript
 						eventName = $"{aggregateName}.{eventName}";
 
 					if (_eventNamesByAssemblyTypeName.TryAdd(eventTypeAssemblyQualifiedName, eventName))
+					{
 						_eventNamesByDefinedTypeName.TryAdd(eventName, eventTypeAssemblyQualifiedName);
+						_eventNamesByType.TryAdd(aggregateEventType, eventName);
+					}
 				}
 			}
 		}
@@ -136,7 +150,10 @@ sealed partial class AggregateEventNameMapper(IEnumerable<IEventUpcasterDescript
 				eventName = $"{aggregateName}.{eventName}";
 
 			if (_eventNamesByAssemblyTypeName.TryAdd(eventTypeAssemblyQualifiedName, eventName))
+			{
 				_eventNamesByDefinedTypeName.TryAdd(eventName, eventTypeAssemblyQualifiedName);
+				_eventNamesByType.TryAdd(sourceType, eventName);
+			}
 		}
 	}
 }

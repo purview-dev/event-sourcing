@@ -1,4 +1,4 @@
-﻿namespace Purview.EventSourcing.Samples.Domain;
+namespace Purview.EventSourcing.Samples.Domain;
 
 partial class CustomerAggregateTests
 {
@@ -23,13 +23,13 @@ partial class CustomerAggregateTests
 		var customer = CreateCustomer("cust-1");
 		customer.RegisterCustomer("Jane", "jane@test.com");
 		customer.Deactivate();
-		var eventCountBefore = customer.GetUnsavedEvents().Count();
+		var eventCountBefore = customer.GetUnsavedEvents().Count;
 
 		// Act
 		customer.Deactivate();
 
 		// Assert
-		await Assert.That(customer.GetUnsavedEvents().Count()).IsEqualTo(eventCountBefore);
+		await Assert.That(customer.GetUnsavedEvents().Count).IsEqualTo(eventCountBefore);
 	}
 
 	[Test]
@@ -54,12 +54,12 @@ partial class CustomerAggregateTests
 		var customer = CreateCustomer("cust-1");
 		customer.RegisterCustomer("Jane", "jane@test.com");
 		customer.Reactivate();
-		var eventCountBefore = customer.GetUnsavedEvents().Count();
+		var eventCountBefore = customer.GetUnsavedEvents().Count;
 
 		// Act
 		customer.Reactivate();
 
 		// Assert
-		await Assert.That(customer.GetUnsavedEvents().Count()).IsEqualTo(eventCountBefore);
+		await Assert.That(customer.GetUnsavedEvents().Count).IsEqualTo(eventCountBefore);
 	}
 }

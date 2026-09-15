@@ -242,11 +242,11 @@ public class OrderAggregateTests
 	public async Task UpdateDetails_GivenShippingAddressAndNotes_RaisesTwoEvents()
 	{
 		var order = CreateOrder("order-1");
-		var countBefore = order.GetUnsavedEvents().Count();
+		var countBefore = order.GetUnsavedEvents().Count;
 
 		order.UpdateDetails(shippingAddress: "456 New Street", notes: "Handle with care");
 
-		await Assert.That(order.GetUnsavedEvents().Count()).IsEqualTo(countBefore + 2);
+		await Assert.That(order.GetUnsavedEvents().Count).IsEqualTo(countBefore + 2);
 		await Assert.That(order.ShippingAddress).IsEqualTo("456 New Street");
 		await Assert.That(order.Notes).IsEqualTo("Handle with care");
 	}
@@ -256,11 +256,11 @@ public class OrderAggregateTests
 	{
 		var order = CreateOrder("order-1");
 		order.UpdateNotes("Old note");
-		var countBefore = order.GetUnsavedEvents().Count();
+		var countBefore = order.GetUnsavedEvents().Count;
 
 		order.UpdateDetails(shippingAddress: "789 Commerce Blvd");
 
-		await Assert.That(order.GetUnsavedEvents().Count()).IsEqualTo(countBefore + 1);
+		await Assert.That(order.GetUnsavedEvents().Count).IsEqualTo(countBefore + 1);
 		await Assert.That(order.ShippingAddress).IsEqualTo("789 Commerce Blvd");
 		await Assert.That(order.Notes).IsEqualTo("Old note");
 	}
@@ -270,11 +270,11 @@ public class OrderAggregateTests
 	{
 		var order = CreateOrder("order-1");
 		order.UpdateDetails(shippingAddress: "123 Main St", notes: "Urgent");
-		var countBefore = order.GetUnsavedEvents().Count();
+		var countBefore = order.GetUnsavedEvents().Count;
 
 		order.UpdateDetails(shippingAddress: "123 Main St", notes: "Urgent");
 
-		await Assert.That(order.GetUnsavedEvents().Count()).IsEqualTo(countBefore);
+		await Assert.That(order.GetUnsavedEvents().Count).IsEqualTo(countBefore);
 	}
 
 	[Test]
@@ -285,11 +285,11 @@ public class OrderAggregateTests
 	public async Task UpdateDetails_GivenNullOrWhitespaceAddress_RaisesNoEvents(string? shippingAddress)
 	{
 		var order = CreateOrder("order-1");
-		var countBefore = order.GetUnsavedEvents().Count();
+		var countBefore = order.GetUnsavedEvents().Count;
 
 		order.UpdateDetails(shippingAddress: shippingAddress);
 
-		await Assert.That(order.GetUnsavedEvents().Count()).IsEqualTo(countBefore);
+		await Assert.That(order.GetUnsavedEvents().Count).IsEqualTo(countBefore);
 		await Assert.That(order.ShippingAddress).IsNull();
 	}
 
@@ -310,7 +310,7 @@ public class OrderAggregateTests
 		order.CompleteOrder();
 
 		// Assert — CreateOrder + AddLineItem + SetShippingAddress + UpdateNotes + Confirm + Ship + Complete = 7
-		await Assert.That(order.GetUnsavedEvents().Count()).IsEqualTo(7);
+		await Assert.That(order.GetUnsavedEvents().Count).IsEqualTo(7);
 		await Assert.That(order.Details.CurrentVersion).IsEqualTo(7);
 	}
 

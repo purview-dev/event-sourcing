@@ -1,16 +1,17 @@
-﻿using Purview.EventSourcing.Aggregates.Events;
+using System.Text.Json.Serialization;
+using Purview.EventSourcing.Aggregates.Events;
 
 namespace Purview.EventSourcing.Aggregates.Test.Events;
 
-public class PropertyBaseExpressionEvent : EventBase
+[EventContract]
+public sealed record PropertyBaseExpressionEvent
 {
+	public static int SchemaVersion => 1;
+
+	[JsonIgnore]
+	public EventMetadata Metadata { get; init; }
+
 	public string? PropertyValue { get; set; }
 
 	public string PropertyName { get; set; } = default!;
-
-	protected override void BuildEventHash(ref HashCode hash)
-	{
-		hash.Add(PropertyValue);
-		hash.Add(PropertyName);
-	}
 }

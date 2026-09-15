@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.Services;
@@ -17,14 +18,22 @@ namespace Purview.EventSourcing
 			return eventNameMapper;
 		}
 
-		sealed class EventTypeEndingInEvent : EventBase
+		[EventContract]
+		sealed record EventTypeEndingInEvent
 		{
-			protected override void BuildEventHash(ref HashCode hash) { }
+			public static int SchemaVersion => 1;
+
+			[JsonIgnore]
+			public EventMetadata Metadata { get; init; }
 		}
 
-		sealed class EventTypeNotEndingInEvent2 : EventBase
+		[EventContract]
+		sealed record EventTypeNotEndingInEvent2
 		{
-			protected override void BuildEventHash(ref HashCode hash) { }
+			public static int SchemaVersion => 1;
+
+			[JsonIgnore]
+			public EventMetadata Metadata { get; init; }
 		}
 
 		sealed class CorrectlyNamedAggregate : AggregateBase
@@ -39,13 +48,21 @@ namespace Purview.EventSourcing
 namespace Purview.Services.UserProfile.Aggregates.UserProfile.Events
 #pragma warning restore IDE0130 // Namespace does not match folder structure
 {
-	public sealed class ClearProfileAttributesEvent : EventBase
+	[EventContract]
+	public sealed record ClearProfileAttributesEvent
 	{
-		protected override void BuildEventHash(ref HashCode hash) { }
+		public static int SchemaVersion => 1;
+
+		[JsonIgnore]
+		public EventMetadata Metadata { get; init; }
 	}
 
-	public sealed class ClearRolesEvent : EventBase
+	[EventContract]
+	public sealed record ClearRolesEvent
 	{
-		protected override void BuildEventHash(ref HashCode hash) { }
+		public static int SchemaVersion => 1;
+
+		[JsonIgnore]
+		public EventMetadata Metadata { get; init; }
 	}
 }

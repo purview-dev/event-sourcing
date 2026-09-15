@@ -1,12 +1,20 @@
-﻿namespace Purview.EventSourcing.Aggregates.Events;
+namespace Purview.EventSourcing.Aggregates.Events;
 
 /// <summary>
-/// Represents an <see cref="IEvent"/> that forces
+/// Represents an <see cref="EventContractAttribute"/> event that forces
 /// the saving an <see cref="IAggregate"/> when <see cref="IEventStore{T}.SaveAsync(T, EventStoreOperationContext?, CancellationToken)"/>
 /// is called.
 /// </summary>
-public sealed class ForceSaved : EventBase
+[EventContract]
+public sealed record ForceSaved
 {
-	///<inheritdoc />
-	protected override void BuildEventHash(ref HashCode hash) { }
+	/// <summary>
+	/// Gets the schema version of this event.
+	/// </summary>
+	public static int SchemaVersion => 1;
+
+	/// <summary>
+	/// Gets the framework-managed metadata for this event.
+	/// </summary>
+	public EventMetadata Metadata { get; init; }
 }

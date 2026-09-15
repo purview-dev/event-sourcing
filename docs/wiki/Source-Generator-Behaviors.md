@@ -139,6 +139,43 @@ public partial class CustomerAggregate : AggregateBase
 - Parameters must map to writable aggregate properties unless explicitly handled as metadata/manual payload.
 - Collection event methods (`[CollectionEvent]`) require `EventStoreList<T>` / `EventStoreSet<T>` target properties.
 
+### Event contracts
+
+Events are emitted as `[EventContract]` `sealed record` types — pure payload data with no base class
+or interface:
+
+```csharp
+[EventContract]
+public sealed record OrderCreatedEvent
+{
+    public static int SchemaVersion => 1;
+    [JsonIgnore] public EventMetadata Metadata { get; init; }
+    public string CustomerId { get; set; }
+}
+```
+
+- `[EventContract]` marks the type as an event contract (the generator, analyzer, and upcasting
+  registry use it to recognise event types; hand-written events registered via
+  `Register<TEvent>`/`RegisterGenerated<TEvent>` must be marked with it too — `EVENTSTORE037`).
+- `Metadata` (`EventMetadata`, a readonly record struct) carries framework-managed metadata
+  (aggregate version, timestamp, schema version, idempotency/correlation/causation/user ids). It is
+  `[JsonIgnore]`d, so event payloads no longer embed metadata; providers persist metadata to row
+  columns and rehydrate it on replay.
+- `GetHashCode` is content-based for payload properties and metadata, preserving stable event hashing
+  (used by the Azure idempotency compound key).
+- The generated `RegisterEvents` registers appliers with `RegisterGenerated<TEvent>()`, which resolves
+  the generated `Apply(TEvent)` method once per aggregate/event type and shares it statically, so
+  aggregate construction allocates no per-instance applier delegates.
+
+### Generated command method shape
+
+A generated command method constructs **one** event instance, runs the property `On<Property>Changing`
+hooks, evaluates `OnShouldApply` before `OnRaising`, runs `OnRaising`/`OnComputing` hooks (which may
+mutate parameters via `ref`), re-synchronizes the event's payload properties from the post-hook
+values, re-evaluates `OnShouldApply`, then records the event via `RecordAndApply`. The single
+allocation keeps command invocation allocation-light; the post-hook re-synchronization preserves the
+exact payload values that a second construction would have produced.
+
 ### Example
 
 ```csharp

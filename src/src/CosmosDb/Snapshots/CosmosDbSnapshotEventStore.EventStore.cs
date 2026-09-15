@@ -1,5 +1,4 @@
-﻿using Purview.EventSourcing.Aggregates;
-using Purview.EventSourcing.Aggregates.Events;
+using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Snapshotting;
 
 namespace Purview.EventSourcing.CosmosDb.Snapshot;
@@ -40,7 +39,7 @@ partial class CosmosDbSnapshotEventStore<T>
 	)
 	{
 		ArgumentNullException.ThrowIfNull(aggregate, nameof(aggregate));
-		var eventsApplied = aggregate.GetUnsavedEvents().Count();
+		var eventsApplied = aggregate.GetUnsavedEvents().Count;
 
 		var result = await _eventStore.SaveAsync(aggregate, operationContext, cancellationToken);
 		if (
@@ -113,7 +112,7 @@ partial class CosmosDbSnapshotEventStore<T>
 	public T FulfilRequirements(T aggregate) => _eventStore.FulfilRequirements(aggregate);
 
 	/// <inheritdoc/>
-	public IAsyncEnumerable<(IEvent @event, string eventType)> GetEventRangeAsync(
+	public IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync(
 		string aggregateId,
 		int versionFrom,
 		int? versionTo,
