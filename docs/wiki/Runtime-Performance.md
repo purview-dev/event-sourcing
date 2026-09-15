@@ -84,5 +84,5 @@ should be re-measured locally.
   implementation — save ~10 µs, cached get ~0.3 µs, and a 101-event replay ~35 µs — so provider
   overhead can be compared against a zero-I/O baseline.
 
-The source-generator suite has its own known incremental-caching hotspot; see
-`Source-Generator-Performance.md`.
+The source-generator suite now short-circuits identical reruns via a pre-compilation marker (warm ≈
+6–12% of cold); see `Source-Generator-Performance.md`.

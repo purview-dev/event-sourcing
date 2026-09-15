@@ -4,11 +4,10 @@ static class BenchmarkPolicies
 {
 	/// <summary>
 	/// The source-generator suite is guarded by structural ratios plus a previous-run comparison.
-	/// The incremental pipeline currently re-executes most aggregate-generation steps on an identical
-	/// rerun (a warm rerun measures close to cold generation), so the ratio thresholds are regression
-	/// guards that catch gross pipeline breaks (for example regenerating everything *and* making it
-	/// slower) rather than aspirational targets. See <c>docs/wiki/Source-Generator-Performance.md</c>
-	/// for the known incremental-caching hotspot.
+	/// The pre-compilation marker makes identical reruns short-circuit: warm reruns measure ~6-12% of
+	/// cold generation. The warm-rerun threshold guards against the marker silently regressing (a
+	/// rerun that regenerates everything again), while the single-edit threshold allows the inherent
+	/// transform re-execution when one aggregate changes.
 	/// </summary>
 	public static BenchmarkSuitePolicy SourceGenerator { get; } =
 		new()
@@ -16,11 +15,11 @@ static class BenchmarkPolicies
 			DefaultMaxMeanRegressionPercent = 40,
 			RatioPolicies =
 			[
-				new BenchmarkRatioPolicy("AggregateSimple", "WarmRerun", "ColdGeneration", 1.50),
-				new BenchmarkRatioPolicy("AggregateWithValueObjects", "WarmRerun", "ColdGeneration", 1.50),
-				new BenchmarkRatioPolicy("AggregateMulti", "WarmRerun", "ColdGeneration", 1.50),
-				new BenchmarkRatioPolicy("ScalarValueObject", "WarmRerun", "ColdGeneration", 1.50),
-				new BenchmarkRatioPolicy("ComplexValueObject", "WarmRerun", "ColdGeneration", 1.50),
+				new BenchmarkRatioPolicy("AggregateSimple", "WarmRerun", "ColdGeneration", 0.40),
+				new BenchmarkRatioPolicy("AggregateWithValueObjects", "WarmRerun", "ColdGeneration", 0.40),
+				new BenchmarkRatioPolicy("AggregateMulti", "WarmRerun", "ColdGeneration", 0.40),
+				new BenchmarkRatioPolicy("ScalarValueObject", "WarmRerun", "ColdGeneration", 0.40),
+				new BenchmarkRatioPolicy("ComplexValueObject", "WarmRerun", "ColdGeneration", 0.40),
 				new BenchmarkRatioPolicy("AggregateMulti", "SingleAggregateEdit", "ColdGeneration", 1.50),
 			],
 		};

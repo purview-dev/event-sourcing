@@ -86,7 +86,7 @@ public sealed class AggregateSourceGeneratorIncrementalTests : AggregateSourceGe
 
 		var reasons = StepReasons(result.Runs[1], "GetAggregateTargets");
 		await Assert.That(reasons.Length).IsEqualTo(2);
-		await Assert.That(reasons.All(static reason => reason is StepReason.Cached or StepReason.Unchanged)).IsTrue();
+		await Assert.That(reasons.All(static reason => reason == StepReason.Cached)).IsTrue();
 	}
 
 	[Test]
@@ -255,6 +255,7 @@ public sealed class AggregateSourceGeneratorIncrementalTests : AggregateSourceGe
 					source.HintName,
 					StringComparer.Ordinal
 				)
+				&& source.HintName != EventSourcingGeneratorTestOptions.PreCompilationMarkerHintName
 			),
 		];
 

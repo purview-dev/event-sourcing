@@ -23,6 +23,15 @@ public sealed partial class ValueObjectSourceGenerator : IIncrementalGenerator
 			static (_, _, _, _) => EmptyCapabilities.Instance
 		);
 
+		// Keep the compilation reference stable across identical reruns so the incremental pipeline
+		// short-circuits instead of re-executing every value-object transform (see PreCompilationMarker).
+#pragma warning disable RSEXPERIMENTAL007 // Pre-compilation source output is intentionally used to stabilize the incremental cache.
+		context.RegisterPreCompilationSourceOutput(
+			Common.PreCompilationMarker.Provider(context),
+			static (spc, source) => spc.AddSource(Common.PreCompilationMarker.HintName, source)
+		);
+#pragma warning restore RSEXPERIMENTAL007
+
 		var scalarCandidates = context
 			.SyntaxProvider.ForAttributeWithMetadataName(
 				ValueObjectSymbolInspector.ScalarAttributeName,

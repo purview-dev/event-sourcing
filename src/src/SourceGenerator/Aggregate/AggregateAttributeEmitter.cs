@@ -7,26 +7,28 @@ static class AggregateAttributeEmitter
 {
 	public static IEnumerable<(string HintName, SourceText Source)> Emit()
 	{
-		yield return ($"{nameof(AggregateAttribute)}.g.cs", AggregateAttribute());
-		yield return ($"{nameof(AggregateDefaultsAttribute)}.g.cs", AggregateDefaultsAttribute());
-		yield return ($"{nameof(CollectionEventAttribute)}.g.cs", CollectionEventAttribute());
-		yield return ($"{nameof(ComputedAttribute)}.g.cs", ComputedAttribute());
-		yield return ($"{nameof(EventAttribute)}.g.cs", EventAttribute());
-		yield return ($"{nameof(MetadataAttribute)}.g.cs", MetadataAttribute());
-		yield return ($"{nameof(PropertyAttribute)}.g.cs", PropertyAttribute());
-		yield return ($"{nameof(SentinelEventAttribute)}.g.cs", SentinelEventAttribute());
+		var writer = CreateCodeWriter(TypeLibrary.Purview.EventSourcing.Aggregates.AggregateAttribute);
+		AggregateAttribute(writer);
+		SentinelEventAttribute(writer);
+		AggregateDefaultsAttribute(writer);
+		CollectionEventAttribute(writer);
+		ComputedAttribute(writer);
+		EventAttribute(writer);
+		MetadataAttribute(writer);
+		PropertyAttribute(writer);
+
+		yield return ("AggregateAttributes.g.cs", writer);
 	}
 
-	static SourceText AggregateAttribute()
+	static void AggregateAttribute(CodeWriter writer)
 	{
-		var writer = CreateCodeWriter(TypeLibrary.Purview.EventSourcing.Aggregates.AggregateAttribute);
 		writer.XmlSummary(
 			"Marks a partial class extending <c>AggregateBase</c> for source generation.",
 			"The generator will create the <c>RegisterEvents()</c> override and",
 			$"event classes based on methods decorated with <see cref=\"{TypeLibrary.Purview.EventSourcing.Aggregates.EventAttribute}\" />."
 		);
 
-		return writer.AttributeClass(
+		writer.AttributeClass(
 			new(TypeLibrary.Purview.EventSourcing.Aggregates.AggregateAttribute) { IsSealed = true },
 			AttributeTargets.Class,
 			body =>
@@ -63,9 +65,8 @@ static class AggregateAttributeEmitter
 		);
 	}
 
-	static SourceText SentinelEventAttribute()
+	static void SentinelEventAttribute(CodeWriter writer)
 	{
-		var writer = CreateCodeWriter(TypeLibrary.Purview.EventSourcing.Aggregates.SentinelEventAttribute);
 		writer
 			.XmlSummary(
 				"Marks an event type as a sentinel (fallback) event that is intentionally exempt from the",
@@ -106,7 +107,7 @@ static class AggregateAttributeEmitter
 				"is not a past-tense fact."
 			);
 
-		return writer.AttributeClass(
+		writer.AttributeClass(
 			new(TypeLibrary.Purview.EventSourcing.Aggregates.SentinelEventAttribute) { IsSealed = true },
 			AttributeTargets.Class | AttributeTargets.Struct,
 			body =>
@@ -125,15 +126,14 @@ static class AggregateAttributeEmitter
 		);
 	}
 
-	static SourceText AggregateDefaultsAttribute()
+	static void AggregateDefaultsAttribute(CodeWriter writer)
 	{
-		var writer = CreateCodeWriter(TypeLibrary.Purview.EventSourcing.Aggregates.AggregateDefaultsAttribute);
 		writer.XmlSummary(
 			$"Sets default source-generation options for all <see cref=\"{TypeLibrary.Purview.EventSourcing.Aggregates.AggregateAttribute}\" /> aggregates in an assembly.",
 			"Aggregate-level options override these defaults."
 		);
 
-		return writer.AttributeClass(
+		writer.AttributeClass(
 			new(TypeLibrary.Purview.EventSourcing.Aggregates.AggregateDefaultsAttribute) { IsSealed = true },
 			AttributeTargets.Assembly,
 			body =>
@@ -164,10 +164,8 @@ static class AggregateAttributeEmitter
 		);
 	}
 
-	static SourceText CollectionEventAttribute()
+	static void CollectionEventAttribute(CodeWriter writer)
 	{
-		var writer = CreateCodeWriter(TypeLibrary.Purview.EventSourcing.Aggregates.CollectionEventAttribute);
-
 		writer
 			.XmlSummary(
 				"Indicates the type of collection operation that a method represents",
@@ -323,13 +321,10 @@ static class AggregateAttributeEmitter
 						);
 				}
 			);
-
-		return writer;
 	}
 
-	static SourceText ComputedAttribute()
+	static void ComputedAttribute(CodeWriter writer)
 	{
-		var writer = CreateCodeWriter(TypeLibrary.Purview.EventSourcing.Aggregates.ComputedAttribute);
 		writer.XmlSummary(
 			"Marks an event parameter as a deterministic computed value.",
 			"The parameter must be omitted by callers using the <see langword=\"default\"/> keyword",
@@ -337,16 +332,15 @@ static class AggregateAttributeEmitter
 			"before the event is recorded."
 		);
 
-		return writer.AttributeClass(
+		writer.AttributeClass(
 			new(TypeLibrary.Purview.EventSourcing.Aggregates.ComputedAttribute) { IsSealed = true },
 			AttributeTargets.Parameter,
 			bodyWriter => bodyWriter.Comment("Empty")
 		);
 	}
 
-	static SourceText EventAttribute()
+	static void EventAttribute(CodeWriter writer)
 	{
-		var writer = CreateCodeWriter(TypeLibrary.Purview.EventSourcing.Aggregates.EventAttribute);
 		writer.XmlSummary(
 			$"Marks a method on a <see cref=\"{TypeLibrary.Purview.EventSourcing.Aggregates.AggregateAttribute}\"/>-decorated class",
 			"as a command that should have an event class and registration generated.",
@@ -361,7 +355,7 @@ static class AggregateAttributeEmitter
 			"</para>"
 		);
 
-		return writer.AttributeClass(
+		writer.AttributeClass(
 			new(TypeLibrary.Purview.EventSourcing.Aggregates.EventAttribute) { IsSealed = true },
 			AttributeTargets.Method,
 			body =>
@@ -431,11 +425,9 @@ static class AggregateAttributeEmitter
 		);
 	}
 
-	static SourceText MetadataAttribute()
+	static void MetadataAttribute(CodeWriter writer)
 	{
-		var writer = CreateCodeWriter(TypeLibrary.Purview.EventSourcing.Aggregates.MetadataAttribute);
-
-		return writer
+		writer
 			.XmlSummary("Marks a parameter as metadata for the aggregate, indicating whether it should be stored.")
 			.AttributeClass(
 				new(TypeLibrary.Purview.EventSourcing.Aggregates.MetadataAttribute) { IsSealed = true },
@@ -464,16 +456,14 @@ static class AggregateAttributeEmitter
 			);
 	}
 
-	static SourceText PropertyAttribute()
+	static void PropertyAttribute(CodeWriter writer)
 	{
-		var writer = CreateCodeWriter(TypeLibrary.Purview.EventSourcing.Aggregates.PropertyAttribute);
-
 		writer.XmlSummary(
 			"Marks a property on an aggregate as a state property.",
 			"The generator will create a matching property on the generated event class",
 			"and set it in the <c>Apply({EventName})</c> method."
 		);
-		return writer.AttributeClass(
+		writer.AttributeClass(
 			new(TypeLibrary.Purview.EventSourcing.Aggregates.PropertyAttribute) { IsSealed = true },
 			AttributeTargets.Parameter,
 			body =>

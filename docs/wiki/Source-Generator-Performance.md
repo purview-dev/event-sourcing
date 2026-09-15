@@ -35,31 +35,21 @@ also compared against the previous run (40% mean regression threshold).
 
 ## Known incremental-caching hotspot
 
-The incremental pipeline currently **re-executes most aggregate-generation steps on an identical
-rerun**: a warm rerun measures close to cold generation for the aggregate scenarios, and a
-single-aggregate edit also re-executes most work. Step-reasoning caching tests in
-`SourceGenerator.UnitTests` prove the pipeline produces *stable* outputs (`Unchanged`), but the
-framework's incremental stages do not fully short-circuit to `Cached` on identical inputs. This is a
-known optimization target: making the intermediate transform results value-equal end-to-end would let
-Roslyn skip re-execution and drive the warm-rerun ratio toward a small fraction of cold generation.
+## Incremental caching
 
-Because of this, the ratio thresholds are regression guards (warm-rerun and single-edit must stay at
-or below **150%** of cold generation) rather than aspirational targets: they catch pipeline changes
-that make reruns slower than cold generation or grossly break caching, without failing on the current
-known hotspot. Track the warm/cold ratio across runs; if it starts trending down after an
-incremental-caching improvement, tighten the thresholds accordingly.
+The generator emits an inert **pre-compilation marker** (`RegisterPreCompilationSourceOutput`,
+experimental `RSEXPERIMENTAL007`) so Roslyn's `CompilationCache` reuses the previous run's compilation
+reference on an identical rerun. This short-circuits the per-candidate `ForAttributeWithMetadataName`
+transforms: a **warm rerun measures ~6–12% of cold generation** (the aggregate/value-object targets
+report exactly `Cached`), so identical incremental builds are effectively free.
 
-### Investigated: pre-compilation source output
+The harness also captures per-run **step run-reasons** (`Cached`/`Unchanged`/`Modified`/`New` per
+pipeline stage) to `artifacts/source-generator-performance/steps.txt` and prints them, so a regression
+that silently regenerates work on warm reruns is visible before the threshold trips.
 
-A spike registered `RegisterPreCompilationSourceOutput` (experimental, `RSEXPERIMENTAL007`) to emit an
-inert marker file so Roslyn's `CompilationCache` would reuse the previous run's compilation reference.
-The step-reason tests confirmed the aggregate targets became exactly `Cached` (the per-candidate
-transform was no longer re-executed). However, the measured warm-rerun time did **not** improve: the
-run is dominated by driver-level overhead that persists even when every step is cached, so the warm
-rerun stayed ≈ cold generation while cold generation picked up the extra marker file. The spike was
-therefore **reverted**: the re-execution is upstream of the generator (Roslyn's driver regenerates the
-compilation from post-initialization attribute trees and compares it by reference), and the
-`ForAttributeWithMetadataName` re-execution is not the measured bottleneck.
+The ratio thresholds are regression guards: warm-rerun must stay at or below **40%** of cold
+generation (guarding the marker against silently regressing), and single-aggregate-edit at or below
+**150%** (an edit inherently re-executes the changed aggregate's transform).
 
 ## Interpreting history
 

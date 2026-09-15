@@ -19,13 +19,17 @@ switch (mode)
 {
 	case "source-generator":
 	case "sg":
-		return await RunSuiteAsync(
+	{
+		var exit = await RunSuiteAsync(
 			"source-generator",
 			"SourceGeneratorPerformance",
 			typeof(SourceGeneratorPerformanceBenchmarks),
 			BenchmarkPolicies.SourceGenerator,
 			runBenchmark
 		);
+		await ExportSourceGeneratorStepReasonsAsync();
+		return exit;
+	}
 	case "runtime":
 	case "rt":
 		return await RunSuiteAsync(
@@ -139,4 +143,22 @@ static Job CreateJob(bool runBenchmark)
 		};
 
 	return job.WithToolchain(InProcessEmitToolchain.Instance);
+}
+
+static async Task ExportSourceGeneratorStepReasonsAsync()
+{
+	if (SourceGeneratorPerformanceBenchmarks.StepReasonsByCase.IsEmpty)
+		return;
+
+	var directory = Path.Combine("artifacts", "source-generator-performance");
+	Directory.CreateDirectory(directory);
+	var lines = SourceGeneratorPerformanceBenchmarks
+		.StepReasonsByCase.OrderBy(static p => p.Key, StringComparer.Ordinal)
+		.Select(static p => $"{p.Key}: {p.Value}");
+	await File.WriteAllLinesAsync(Path.Combine(directory, "steps.txt"), lines);
+
+	await Console.Out.WriteLineAsync("Incremental step run-reasons (diagnostic):");
+	foreach (var line in lines)
+		await Console.Out.WriteLineAsync($"  {line}");
+	await Console.Out.WriteLineAsync();
 }
