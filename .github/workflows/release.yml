@@ -5,16 +5,14 @@ on:
     branches: [main]
 
 concurrency:
-  group: purview-release-main
-  cancel-in-progress: false
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   release:
     name: Release packages
     uses: purview-dev/build/.github/workflows/purview-release.yml@main
     with:
-      dotnet-version: "10.0.400"
       release-mode: NuGet
       release-branch: main
-      upload-artifacts: true
     secrets: inherit

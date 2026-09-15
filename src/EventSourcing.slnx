@@ -46,13 +46,15 @@
 		<Project Path="src/Validation.FluentValidation/Validation.FluentValidation.csproj" />
 		<Project Path="src/Validation.ZodSharp/Validation.ZodSharp.csproj" />
 	</Folder>
+	<Folder Name="/src/benchmarks/">
+		<Project Path="src/Benchmarks/Benchmarks.csproj" />
+	</Folder>
 	<Folder Name="/tests/">
 		<Project Path="tests/Capabilities.UnitTests/Capabilities.UnitTests.csproj" />
 		<Project Path="tests/EntityFrameworkCore.SourceGenerator.UnitTests/EntityFrameworkCore.SourceGenerator.UnitTests.csproj" />
 		<Project Path="tests/EventSourcing.UnitTests/EventSourcing.UnitTests.csproj" />
 		<Project Path="tests/SharedTestingFramework/SharedTestingFramework.csproj" />
 		<Project Path="tests/SourceGenerator.CodeFixes.UnitTests/SourceGenerator.CodeFixes.UnitTests.csproj" />
-		<Project Path="tests/SourceGenerator.PerformanceTests/SourceGenerator.PerformanceTests.csproj" />
 		<Project Path="tests/SourceGenerator.UnitTests/SourceGenerator.UnitTests.csproj" />
 	</Folder>
 	<Folder Name="/tests/admin/">
@@ -70,10 +72,6 @@
 		<Project
 			Path="tests/SqlServer.IntegrationTests/SqlServer.IntegrationTests.csproj"
 			DisplayName="SQLServer.IntegrationTests"
-		/>
-		<Project
-			Path="tests/SqlServer.PerformanceTests/SqlServer.PerformanceTests.csproj"
-			DisplayName="SQLServer.PerformanceTests"
 		/>
 	</Folder>
 	<Folder Name="/tests/samples/">

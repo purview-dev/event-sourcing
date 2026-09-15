@@ -1,4 +1,4 @@
-﻿namespace Purview.EventSourcing.Samples.Domain;
+namespace Purview.EventSourcing.Samples.Domain;
 
 partial class CustomerAggregateTests
 {
@@ -7,11 +7,11 @@ partial class CustomerAggregateTests
 	{
 		var customer = CreateCustomer("cust-1");
 		customer.RegisterCustomer("Jane Smith", "jane@test.com");
-		var countBefore = customer.GetUnsavedEvents().Count();
+		var countBefore = customer.GetUnsavedEvents().Count;
 
 		customer.UpdateDetails(name: "Jane Doe", email: "janedoe@test.com");
 
-		await Assert.That(customer.GetUnsavedEvents().Count()).IsEqualTo(countBefore + 2);
+		await Assert.That(customer.GetUnsavedEvents().Count).IsEqualTo(countBefore + 2);
 		await Assert.That(customer.Name).IsEqualTo("Jane Doe");
 		await Assert.That(customer.Email).IsEqualTo("janedoe@test.com");
 	}
@@ -21,11 +21,11 @@ partial class CustomerAggregateTests
 	{
 		var customer = CreateCustomer("cust-1");
 		customer.RegisterCustomer("Jane Smith", "jane@test.com");
-		var countBefore = customer.GetUnsavedEvents().Count();
+		var countBefore = customer.GetUnsavedEvents().Count;
 
 		customer.UpdateDetails(name: "Jane Doe", email: "janedoe@test.com", phoneNumber: "+44 7700 900123");
 
-		await Assert.That(customer.GetUnsavedEvents().Count()).IsEqualTo(countBefore + 3);
+		await Assert.That(customer.GetUnsavedEvents().Count).IsEqualTo(countBefore + 3);
 		await Assert.That(customer.Name).IsEqualTo("Jane Doe");
 		await Assert.That(customer.Email).IsEqualTo("janedoe@test.com");
 		await Assert.That(customer.PhoneNumber).IsEqualTo("+44 7700 900123");
@@ -36,11 +36,11 @@ partial class CustomerAggregateTests
 	{
 		var customer = CreateCustomer("cust-1");
 		customer.RegisterCustomer("Jane Smith", "jane@test.com");
-		var countBefore = customer.GetUnsavedEvents().Count();
+		var countBefore = customer.GetUnsavedEvents().Count;
 
 		customer.UpdateDetails(name: "Jane Doe");
 
-		await Assert.That(customer.GetUnsavedEvents().Count()).IsEqualTo(countBefore + 1);
+		await Assert.That(customer.GetUnsavedEvents().Count).IsEqualTo(countBefore + 1);
 		await Assert.That(customer.Name).IsEqualTo("Jane Doe");
 		await Assert.That(customer.Email).IsEqualTo("jane@test.com");
 	}
@@ -50,11 +50,11 @@ partial class CustomerAggregateTests
 	{
 		var customer = CreateCustomer("cust-1");
 		customer.RegisterCustomer("Jane Smith", "jane@test.com");
-		var countBefore = customer.GetUnsavedEvents().Count();
+		var countBefore = customer.GetUnsavedEvents().Count;
 
 		customer.UpdateDetails(name: "Jane Smith", email: "jane@test.com");
 
-		await Assert.That(customer.GetUnsavedEvents().Count()).IsEqualTo(countBefore);
+		await Assert.That(customer.GetUnsavedEvents().Count).IsEqualTo(countBefore);
 	}
 
 	[Test]

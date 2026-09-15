@@ -3,13 +3,16 @@ using Purview.EventSourcing.SourceGenerator.Generators;
 
 namespace Purview.EventSourcing.SourceGenerator;
 
-sealed record SourceGeneratorScenario(
+public sealed record SourceGeneratorScenario(
 	string Name,
 	string GeneratorName,
 	string Source,
 	Func<IIncrementalGenerator> CreateGenerator,
 	string? EditedSource = null
-);
+)
+{
+	public override string ToString() => Name;
+}
 
 static class SourceGeneratorPerformanceScenarios
 {
@@ -88,6 +91,7 @@ static class SourceGeneratorPerformanceScenarios
 					public AggregateDetails Details { get; init; } = new();
 					protected abstract void RegisterEvents();
 					protected void Register<TEvent>(System.Action<TEvent> applier) where TEvent : class => _appliers[typeof(TEvent)] = applier;
+					protected void RegisterGenerated<TEvent>() where TEvent : class { }
 					protected AggregateBase RecordAndApply<TEvent>(TEvent @event) where TEvent : class
 					{
 						((System.Action<TEvent>)_appliers[typeof(TEvent)])(@event);
@@ -98,17 +102,22 @@ static class SourceGeneratorPerformanceScenarios
 
 			namespace Purview.EventSourcing.Aggregates.Events
 			{
-				public sealed class EventDetails
-				{
-					public string? CorrelationId { get; set; }
-				}
+				[System.AttributeUsage(System.AttributeTargets.Class | System.AttributeTargets.Struct, Inherited = false, AllowMultiple = false)]
+				public sealed class EventContractAttribute : System.Attribute { }
 
-				public abstract class EventBase
-				{
-					public EventDetails Details { get; init; } = new();
-					public virtual int SchemaVersion => 1;
-					protected abstract void BuildEventHash(ref System.HashCode hash);
-				}
+				public readonly record struct EventMetadata(
+					int AggregateVersion,
+					System.DateTimeOffset When,
+					int SchemaVersion,
+					string? IdempotencyId,
+					string? CorrelationId,
+					string? CausationId,
+					string? UserId);
+			}
+
+			namespace Purview.EventSourcing.Aggregates
+			{
+				public readonly record struct EventRecord(object Event, Purview.EventSourcing.Aggregates.Events.EventMetadata Metadata);
 			}
 
 			namespace Purview.EventSourcing.ValueObjects

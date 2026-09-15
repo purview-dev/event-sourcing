@@ -1,7 +1,6 @@
 using System.Data;
 using System.Data.Common;
 using Purview.EventSourcing.Aggregates;
-using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.Aggregates.Test;
 using Purview.EventSourcing.Internal;
 using ValidationFailure = Purview.EventSourcing.Validation.ValidationFailure;
@@ -827,7 +826,7 @@ public sealed class EventStoreTransactionTests
 
 		T IEventStore.FulfilRequirements<T>(T aggregate) => aggregate;
 
-		IAsyncEnumerable<(IEvent @event, string eventType)> IEventStore.GetEventRangeAsync<T>(
+		IAsyncEnumerable<(EventRecord EventRecord, string EventType)> IEventStore.GetEventRangeAsync<T>(
 			string aggregateId,
 			int versionFrom,
 			int? versionTo,
@@ -904,7 +903,7 @@ public sealed class EventStoreTransactionTests
 
 		public TestAggregate FulfilRequirements(TestAggregate aggregate) => aggregate;
 
-		public IAsyncEnumerable<(IEvent @event, string eventType)> GetEventRangeAsync(
+		public IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync(
 			string aggregateId,
 			int versionFrom,
 			int? versionTo,

@@ -954,11 +954,15 @@ static class AggregateEventMethodBuilder
 		return false;
 	}
 
-	public static bool IsEventType(INamedTypeSymbol typeSymbol)
-	{
-		return TypeHelpers.InheritsFrom(typeSymbol, TypeLibrary.Purview.EventSourcing.Aggregates.Events.EventBase)
-			|| TypeHelpers.Implements(typeSymbol, TypeLibrary.Purview.EventSourcing.Aggregates.Events.IEvent);
-	}
+	public static bool IsEventType(INamedTypeSymbol typeSymbol) =>
+		typeSymbol
+			.GetAttributes()
+			.Any(attribute =>
+				attribute.AttributeClass is not null
+				&& TypeLibrary.Purview.EventSourcing.Aggregates.Events.EventContractAttribute.Equals(
+					attribute.AttributeClass
+				)
+			);
 
 	public static string? GetAggregatePropertyNameOverride(IParameterSymbol parameterSymbol)
 	{

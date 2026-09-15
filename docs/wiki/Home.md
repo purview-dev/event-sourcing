@@ -14,6 +14,7 @@ This wiki is the project documentation hub for framework features, provider capa
 - [Transaction Guarantees](Transaction-Guarantees.md)
 - [Event Contract Manifest](Event-Contract-Manifest.md)
 - [Source Generator Performance](Source-Generator-Performance.md)
+- [Runtime Performance](Runtime-Performance.md)
 - [Dependency Guardrails](Dependency-Guardrails.md)
 - [Source Generator Behaviors](Source-Generator-Behaviors.md)
 - [Source Generator Code Fixes](Code-Fixes.md)

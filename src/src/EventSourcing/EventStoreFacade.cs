@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using System.ComponentModel;
 using Microsoft.Extensions.DependencyInjection;
 using Purview.EventSourcing.Aggregates;
-using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.Internal;
 
 namespace Purview.EventSourcing;
@@ -111,7 +110,7 @@ public sealed class EventStoreFacade(IServiceProvider serviceProvider) : IEventS
 		where T : class, IAggregate, new() => GetEventStore<T>().FulfilRequirements(aggregate);
 
 	///<inheritdoc/>
-	public IAsyncEnumerable<(IEvent @event, string eventType)> GetEventRangeAsync<T>(
+	public IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync<T>(
 		string aggregateId,
 		int versionFrom,
 		int? versionTo,

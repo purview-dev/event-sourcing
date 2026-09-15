@@ -1,5 +1,3 @@
-﻿using Purview.EventSourcing.Aggregates.Events;
-
 namespace Purview.EventSourcing.Aggregates.Exceptions;
 
 /// <summary>

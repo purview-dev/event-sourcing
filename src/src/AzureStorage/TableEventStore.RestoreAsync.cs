@@ -1,3 +1,4 @@
+using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
 
 namespace Purview.EventSourcing.AzureStorage;
@@ -19,11 +20,17 @@ partial class TableEventStore<T>
 
 		operationContext ??= EventStoreOperationContext.DefaultContext();
 
-		Restored restoreAggregateEvent = new()
-		{
-			Details = { AggregateVersion = aggregate.Details.CurrentVersion + 1, When = DateTimeOffset.UtcNow },
-		};
-		aggregate.ApplyEvent(restoreAggregateEvent);
+		Restored restoreAggregateEvent = new();
+		EventMetadata metadata = new(
+			aggregate.Details.CurrentVersion + 1,
+			DateTimeOffset.UtcNow,
+			SchemaVersion: 1,
+			IdempotencyId: null,
+			CorrelationId: null,
+			CausationId: null,
+			UserId: null
+		);
+		aggregate.ApplyEvent(restoreAggregateEvent, metadata);
 
 		if (aggregate.IsNew())
 			return false;
@@ -32,7 +39,7 @@ partial class TableEventStore<T>
 			aggregate,
 			operationContext,
 			cancellationToken,
-			restoreAggregateEvent
+			new EventRecord(restoreAggregateEvent, metadata)
 		);
 		return result.Saved;
 	}

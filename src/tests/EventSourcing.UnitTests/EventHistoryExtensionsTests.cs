@@ -76,18 +76,17 @@ public sealed class EventHistoryExtensionsTests
 		var timestamp = DateTimeOffset.UtcNow;
 		TestAuditEvent sourceEvent = new()
 		{
-			Details = new EventDetails
-			{
-				AggregateVersion = 7,
-				SchemaVersion = 3,
-				When = timestamp,
-				IdempotencyId = "idempotency-7",
-				CorrelationId = "correlation-7",
-				CausationId = "causation-6",
-				UserId = "user-7",
-			},
+			Metadata = new EventMetadata(
+				AggregateVersion: 7,
+				When: timestamp,
+				SchemaVersion: 3,
+				IdempotencyId: "idempotency-7",
+				CorrelationId: "correlation-7",
+				CausationId: "causation-6",
+				UserId: "user-7"
+			),
 		};
-		HistoryEnabledStore store = new([(sourceEvent, "Updated")]);
+		HistoryEnabledStore store = new([(new EventRecord(sourceEvent, sourceEvent.Metadata), "Updated")]);
 
 		var response = await store.GetEventHistoryAsync("agg-1", cancellationToken: cancellationToken);
 
@@ -201,33 +200,39 @@ public sealed class EventHistoryExtensionsTests
 		await Assert.That(exception.ParamName).IsEqualTo("request");
 	}
 
-	static (IEvent @event, string eventType) CreateEvent(string eventType, int version, DateTimeOffset when) =>
-		(
-			new TestAuditEvent
-			{
-				Details = new EventDetails
-				{
-					AggregateVersion = version,
-					When = when,
-					IdempotencyId = $"idem-{version}",
-					CorrelationId = "corr-1",
-				},
-			},
-			eventType
-		);
-
-	sealed class TestAuditEvent : IEvent
+	static (EventRecord eventRecord, string eventType) CreateEvent(string eventType, int version, DateTimeOffset when)
 	{
-		public EventDetails Details { get; set; } = new();
+		TestAuditEvent auditEvent = new()
+		{
+			Metadata = new EventMetadata(
+				AggregateVersion: version,
+				When: when,
+				SchemaVersion: 1,
+				IdempotencyId: $"idem-{version}",
+				CorrelationId: "corr-1",
+				CausationId: null,
+				UserId: null
+			),
+		};
+
+		return (new EventRecord(auditEvent, auditEvent.Metadata), eventType);
 	}
 
-	sealed class HistoryEnabledStore(IEnumerable<(IEvent @event, string eventType)> events)
+	[EventContract]
+	sealed record TestAuditEvent
+	{
+		public static int SchemaVersion => 1;
+
+		public EventMetadata Metadata { get; init; }
+	}
+
+	sealed class HistoryEnabledStore(IEnumerable<(EventRecord eventRecord, string eventType)> events)
 		: IEventStoreCore<TestAggregate>,
 			IAggregateEventHistoryStoreCore<TestAggregate>
 	{
-		readonly IReadOnlyList<(IEvent @event, string eventType)> _events = [.. events];
+		readonly IReadOnlyList<(EventRecord eventRecord, string eventType)> _events = [.. events];
 
-		public async IAsyncEnumerable<(IEvent @event, string eventType)> GetEventRangeAsync(
+		public async IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync(
 			string aggregateId,
 			int versionFrom,
 			int? versionTo,
@@ -237,7 +242,8 @@ public sealed class EventHistoryExtensionsTests
 			var upperBound = versionTo ?? int.MaxValue;
 			foreach (
 				var item in _events.Where(m =>
-					m.@event.Details.AggregateVersion >= versionFrom && m.@event.Details.AggregateVersion <= upperBound
+					m.eventRecord.Metadata.AggregateVersion >= versionFrom
+					&& m.eventRecord.Metadata.AggregateVersion <= upperBound
 				)
 			)
 			{

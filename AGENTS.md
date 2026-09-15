@@ -57,7 +57,6 @@ Use repository-local skills when their trigger applies:
 
 - `dotnet-tunit` for writing TUnit tests and `tunit-test-runner` for executing or filtering them.
 - `project-placement-defaults`, `sdk-configuration-reference`, and `sdk-project-behavior-and-detection` for project layout or `Purview.DotNetProjectSdk` behavior.
-- `changesets-prerelease` for prerelease version preparation.
 - `git-conventional-commits` for commit work and `lefthook-integration` for Git-hook changes.
 
 ## Architecture and domain invariants
@@ -129,7 +128,7 @@ Use repository-local skills when their trigger applies:
 - Centralize package versions in `Directory.Packages.props`; project files should normally contain versionless `PackageReference` entries.
 - Reuse existing dependencies when practical. New dependencies require a clear need, compatible target frameworks, acceptable licensing/security posture, and correct public/private asset flow.
 - Respect `Purview.DotNetProjectSdk` inference before adding manual properties or references. Repository-wide bootstrap properties that affect `Sdk.props` belong before the SDK import in `src/Directory.Build.props`.
-- Place source projects under `src/src` and test projects under `src/tests`, beside the closest peer. Follow established suffixes such as `.UnitTests`, `.IntegrationTests`, and `.PerformanceTests`.
+- Place source projects under `src/src` and test projects under `src/tests`, beside the closest peer. Follow established suffixes such as `.UnitTests`, `.IntegrationTests`, and `.PerformanceTests`. Performance harnesses are console projects consolidated under `src/src/Benchmarks` (`Benchmarks.csproj`), not test projects.
 - Keep packability explicit and package metadata consistent. Verify package contents when changing build assets, analyzers, transitive targets, README files, or project-reference packing.
 
 ## Administration, samples, and Aspire
@@ -149,10 +148,10 @@ Use repository-local skills when their trigger applies:
 - Prefer the smallest relevant project or tree-node filter during iteration. A typical solution-wide command is:
 
   ```text
-  dotnet test --project src/EventSourcing.slnx --configuration Release --treenode-filter "/*/*/*/*/" --ignore-exit-code 8
+  dotnet test --project src/EventSourcing.slnx --configuration Debug --treenode-filter "/*/*/*/*" --ignore-exit-code 8
   ```
 
-- PR validation restores and builds the Release solution, then runs the unit-test tree filter `/*UnitTest*/*/*/*` and emits TRX results.
+- PR validation restores and builds the Release solution, then runs the unit-test tree filter `/*/*/*/*[Category=Unit]` (the `Purview.DotNetProjectSdk` applies `[assembly: TUnit.Core.Category("Unit")]` to unit-test projects) and emits TRX results.
 - Unit tests should cover domain logic, contracts, failure behavior, and regressions without external infrastructure.
 - Source-generator tests should assert generated code and diagnostics using the existing testing framework.
 - Provider integration tests use `src/tests/SharedTestingFramework` and Testcontainers or provider infrastructure. Run affected-provider tests for translation, persistence, concurrency, or serialization changes when infrastructure is available.
@@ -196,12 +195,13 @@ Local CI-equivalent validation:
 ```text
 dotnet restore src/EventSourcing.slnx
 dotnet build src/EventSourcing.slnx --no-restore --configuration Release
-dotnet test src/EventSourcing.slnx --no-build --configuration Release --ignore-exit-code 8 -- --treenode-filter "/*UnitTest*/*/*/*"
+dotnet test src/EventSourcing.slnx --no-build --configuration Release --ignore-exit-code 8 -- --treenode-filter "/*/*/*/*[Category=Unit]"
 dotnet csharpier check .
 ```
 
 - Use `dotnet csharpier check .` for validation (the pipeline lints the repository root). Run the rewriting formatter only when formatting changes are in scope, and ensure it does not touch unrelated user files.
-- The pipeline discovers tests under `src/tests` with `Build:TestPatterns` (`*UnitTests.csproj`) and `Build:TestFilter`, so GH Actions never runs provider integration tests; run those locally with `just test` when Docker/Testcontainers infrastructure is available.
+- Local `just` recipes default to the `Debug` configuration; Release-style builds, tests, and packs run through the `Purview.Build` pipeline (`just pipeline-pr` / `just pipeline-build`).
+- The pipeline discovers tests under `src/tests` with `Build:TestPatterns` (`*Tests.csproj`), restricts the run list with `Build:TestProjects` (`*UnitTests.csproj`), and applies `Build:TestFilter` (`/*/*/*/*[Category=Unit]`), so GH Actions never runs provider integration tests or the performance harnesses; run those locally with `just test` when Docker/Testcontainers infrastructure is available.
 - Pack when package assets, public package dependencies, analyzers, build targets, or packaging metadata change.
 - Build the canonical solution when shared contracts, project configuration, central packages, or generator/package wiring change.
 
@@ -210,7 +210,6 @@ dotnet csharpier check .
 - `package.json` is the authoritative release/package version. `UsePackageJsonVersion` is strict; do not manually diverge project versions.
 - User-facing package changes normally require a Changeset when release preparation is in scope. Changeset text must describe actual consumer-visible behavior.
 - Version application updates `package.json`, `CHANGELOG.md`, and consumes the relevant `.changeset` files. Do not hand-edit only one part of that result.
-- Follow `.agents/skills/changesets-prerelease/SKILL.md` when preparing a prerelease.
 - Release is automatic on push to `main`: the `Release` workflow runs the shared `Purview.Build` pipeline with `Release:Mode=NuGet`, publishing packages and creating the `v<version>` GitHub release only when that tag does not already exist. NuGet publishing uses the `NUGET__APIKEY` organization secret.
 - Never create release tags or publish packages manually unless the user explicitly requests a documented recovery procedure. See `docs/wiki/Release-Flow.md`.
 

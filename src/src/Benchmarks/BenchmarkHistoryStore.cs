@@ -1,24 +1,28 @@
 using System.Globalization;
 using System.Text.Json;
 
-namespace Purview.EventSourcing.SourceGenerator;
+namespace Purview.EventSourcing.Benchmarks;
 
-sealed class PerformanceHistoryStore
+sealed class BenchmarkHistoryStore
 {
 	static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = true };
 
+	readonly string _mode;
+
 	readonly string _repositoryRoot = FindRepositoryRoot();
 
-	string HistoryDirectory => Path.Combine(_repositoryRoot, "artifacts", "source-generator-performance", "history");
+	public BenchmarkHistoryStore(string mode) => _mode = mode;
 
-	string LatestPath => Path.Combine(_repositoryRoot, "artifacts", "source-generator-performance", "latest.json");
+	string HistoryDirectory => Path.Combine(_repositoryRoot, "artifacts", $"{_mode}-performance", "history");
 
-	public PerformanceRun? TryLoadLatest() =>
+	string LatestPath => Path.Combine(_repositoryRoot, "artifacts", $"{_mode}-performance", "latest.json");
+
+	public BenchmarkSuiteRun? TryLoadLatest() =>
 		File.Exists(LatestPath)
-			? JsonSerializer.Deserialize<PerformanceRun>(File.ReadAllText(LatestPath), SerializerOptions)
+			? JsonSerializer.Deserialize<BenchmarkSuiteRun>(File.ReadAllText(LatestPath), SerializerOptions)
 			: null;
 
-	public string Save(PerformanceRun run)
+	public async Task<string> SaveAsync(BenchmarkSuiteRun run, CancellationToken cancellationToken)
 	{
 		Directory.CreateDirectory(HistoryDirectory);
 
@@ -26,8 +30,8 @@ sealed class PerformanceHistoryStore
 		var historyPath = Path.Combine(HistoryDirectory, $"{timestamp}-{run.Mode.ToUpperInvariant()}.json");
 		var json = JsonSerializer.Serialize(run, SerializerOptions);
 
-		File.WriteAllText(historyPath, json);
-		File.WriteAllText(LatestPath, json);
+		await File.WriteAllTextAsync(historyPath, json, cancellationToken);
+		await File.WriteAllTextAsync(LatestPath, json, cancellationToken);
 
 		return historyPath;
 	}

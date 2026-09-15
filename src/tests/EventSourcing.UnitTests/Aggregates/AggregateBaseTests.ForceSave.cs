@@ -13,7 +13,7 @@ public partial class AggregateBaseTests
 
 		// Assert
 		await Assert.That(aggregate.HasUnsavedEvents()).IsTrue();
-		await Assert.That(aggregate.GetUnsavedEvents().Count()).IsEqualTo(1);
+		await Assert.That(aggregate.GetUnsavedEvents().Count).IsEqualTo(1);
 	}
 
 	[Test]
@@ -23,13 +23,13 @@ public partial class AggregateBaseTests
 		Test.TestAggregate aggregate = new();
 		aggregate.RecordEvent();
 
-		var eventCountBefore = aggregate.GetUnsavedEvents().Count();
+		var eventCountBefore = aggregate.GetUnsavedEvents().Count;
 
 		// Act
 		aggregate.ForceSave();
 
 		// Assert — no additional event added since unsaved events already exist
-		await Assert.That(aggregate.GetUnsavedEvents().Count()).IsEqualTo(eventCountBefore);
+		await Assert.That(aggregate.GetUnsavedEvents().Count).IsEqualTo(eventCountBefore);
 	}
 
 	[Test]

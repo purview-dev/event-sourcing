@@ -75,8 +75,7 @@ public sealed class AggregateIncrementalCacheTests : AggregateSourceGeneratorTes
 		await Assert
 			.That(
 				frameworkStages.All(stage =>
-					second.TryGetValue(stage, out var reasons)
-					&& reasons.All(r => r is StepReason.Cached or StepReason.Unchanged)
+					second.TryGetValue(stage, out var reasons) && reasons.All(r => r == StepReason.Cached)
 				)
 			)
 			.IsTrue();

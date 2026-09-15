@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using Purview.EventSourcing.Aggregates;
-using Purview.EventSourcing.Aggregates.Events;
 
 namespace Purview.EventSourcing;
 
@@ -19,7 +18,7 @@ public interface IAggregateEventHistoryStoreCore<T>
 	/// <param name="versionTo">Optional, the inclusive event number to finish the range at.</param>
 	/// <param name="cancellationToken">A token that can be used to cancel the operation.</param>
 	/// <returns>The events and their persisted names in the requested range.</returns>
-	IAsyncEnumerable<(IEvent @event, string eventType)> GetEventRangeAsync(
+	IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync(
 		string aggregateId,
 		int versionFrom,
 		int? versionTo,

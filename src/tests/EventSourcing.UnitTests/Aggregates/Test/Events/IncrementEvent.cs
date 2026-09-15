@@ -1,8 +1,13 @@
-﻿using Purview.EventSourcing.Aggregates.Events;
+using System.Text.Json.Serialization;
+using Purview.EventSourcing.Aggregates.Events;
 
 namespace Purview.EventSourcing.Aggregates.Test.Events;
 
-public class IncrementEvent : EventBase
+[EventContract]
+public sealed record IncrementEvent
 {
-	protected override void BuildEventHash(ref HashCode hash) { }
+	public static int SchemaVersion => 1;
+
+	[JsonIgnore]
+	public EventMetadata Metadata { get; init; }
 }

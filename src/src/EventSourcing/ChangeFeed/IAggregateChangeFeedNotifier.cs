@@ -1,5 +1,4 @@
-﻿using Purview.EventSourcing.Aggregates;
-using Purview.EventSourcing.Aggregates.Events;
+using Purview.EventSourcing.Aggregates;
 
 namespace Purview.EventSourcing.ChangeFeed;
 
@@ -42,14 +41,14 @@ public interface IAggregateChangeFeedNotifier<T>
 	/// <param name="aggregate">The newly saved aggregate.</param>
 	/// <param name="previousSavedVersion">The aggregate version prior to being saved, if the aggregate is new then this will be 0 (zero).</param>
 	/// <param name="isNew">Indicates if the aggregate was new.</param>
-	/// <param name="events">The <see cref="IEvent"/>s that were saved as part of this operation.</param>
+	/// <param name="events">The <see cref="EventRecord"/>s that were saved as part of this operation.</param>
 	/// <param name="cancellationToken">The stopping token.</param>
 	/// <returns>An awaitable task.</returns>
 	Task AfterSaveAsync(
 		T aggregate,
 		int previousSavedVersion,
 		bool isNew,
-		IEvent[] events,
+		EventRecord[] events,
 		CancellationToken cancellationToken = default
 	);
 

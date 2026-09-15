@@ -1,5 +1,4 @@
 using Purview.EventSourcing.Aggregates;
-using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.ChangeFeed;
 
 namespace Purview.EventSourcing.Contracts;
@@ -100,7 +99,7 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 
 		// Assert
 		aggregateChangeNotifier
-			.AfterSaveAsync(aggregate, Any<int>(), true, Any<IEvent[]>(), Any<CancellationToken>())
+			.AfterSaveAsync(aggregate, Any<int>(), true, Any<EventRecord[]>(), Any<CancellationToken>())
 			.WasNeverCalled();
 	}
 
@@ -135,7 +134,7 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 			);
 
 		aggregateChangeNotifier
-			.AfterSaveAsync(aggregate, 0, true, Any<IEvent[]>(), Any<CancellationToken>())
+			.AfterSaveAsync(aggregate, 0, true, Any<EventRecord[]>(), Any<CancellationToken>())
 			.Callback(() => afterWasCalled = true);
 
 		// Act
@@ -152,7 +151,7 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 				aggregate,
 				Any<int>(),
 				true,
-				Is<IEvent[]>(events => events!.Length == eventsToCreate),
+				Is<EventRecord[]>(events => events!.Length == eventsToCreate),
 				Any<CancellationToken>()
 			)
 			.WasCalled(Times.Once);
@@ -791,8 +790,8 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		);
 
 		// Assert
-		await foreach ((var @event, _) in results)
-			await Assert.That(@event.Details.AggregateVersion).IsEqualTo(startEvent++);
+		await foreach ((var eventRecord, _) in results)
+			await Assert.That(eventRecord.Metadata.AggregateVersion).IsEqualTo(startEvent++);
 	}
 
 	[Test]
@@ -827,9 +826,9 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		);
 
 		// Assert
-		List<IEvent> eventList = [];
-		await foreach ((var @event, _) in results)
-			eventList.Add(@event);
+		List<EventRecord> eventList = [];
+		await foreach ((var eventRecord, _) in results)
+			eventList.Add(eventRecord);
 
 		await Assert.That(eventList.Count).IsEqualTo(expectedEventCount);
 	}

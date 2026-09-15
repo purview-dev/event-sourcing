@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<RootNamespace>Purview.EventSourcing</RootNamespace>
+		<LangVersion>preview</LangVersion>
+		<NoWarn>$(NoWarn);CA1303;CA1308;CA1707;CA1822;CA1515;CA1852;</NoWarn>
+		<OutputType>Exe</OutputType>
+		<IsPackable>false</IsPackable>
+		<!-- Do not change this, as the harness output is referenced by name. -->
+		<AssemblyName>Benchmarks</AssemblyName>
+		<!-- This project shadows src/Directory.Build.props, so set central package management explicitly. -->
+		<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+		<CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\EventSourcing\EventSourcing.csproj" />
+		<ProjectReference Include="..\SourceGenerator\SourceGenerator.csproj" />
+		<ProjectReference Include="..\SqlServer\SqlServer.csproj" />
+		<ProjectReference Include="..\InMemory\InMemory.csproj" />
+		<ProjectReference Include="..\Samples\Samples.csproj" />
+		<ProjectReference Include="..\..\tests\SharedTestingFramework\SharedTestingFramework.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="BenchmarkDotNet" />
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+		<PackageReference Include="Purview.SourceGeneratorFramework" />
+	</ItemGroup>
+</Project>

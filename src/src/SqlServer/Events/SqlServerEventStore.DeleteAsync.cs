@@ -1,4 +1,5 @@
-﻿using Purview.EventSourcing.Aggregates.Events;
+using Purview.EventSourcing.Aggregates;
+using Purview.EventSourcing.Aggregates.Events;
 
 namespace Purview.EventSourcing.SqlServer.Events;
 
@@ -25,11 +26,17 @@ partial class SqlServerEventStore<T>
 		if (operationContext.PermanentlyDelete)
 			return await PermanentlyDeleteAsync(aggregate, operationContext, cancellationToken);
 
-		Deleted deleteAggregateEvent = new()
-		{
-			Details = { AggregateVersion = aggregate.Details.CurrentVersion + 1, When = DateTimeOffset.UtcNow },
-		};
-		aggregate.ApplyEvent(deleteAggregateEvent);
+		Deleted deleteAggregateEvent = new();
+		EventMetadata metadata = new(
+			aggregate.Details.CurrentVersion + 1,
+			DateTimeOffset.UtcNow,
+			SchemaVersion: 1,
+			IdempotencyId: null,
+			CorrelationId: null,
+			CausationId: null,
+			UserId: null
+		);
+		aggregate.ApplyEvent(deleteAggregateEvent, metadata);
 
 		var result = await SaveCoreAsync(
 			aggregate,
@@ -37,7 +44,7 @@ partial class SqlServerEventStore<T>
 			null,
 			null,
 			cancellationToken,
-			deleteAggregateEvent
+			new EventRecord(deleteAggregateEvent, metadata)
 		);
 		await result.AfterCommitAsync(cancellationToken);
 

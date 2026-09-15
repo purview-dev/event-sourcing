@@ -103,7 +103,7 @@ builder.Services.AddSqlServerSnapshotQueryableEventStore();
   "EventStore:SqlServerSnapshot": {
     "ConnectionString": "Server=.;Database=MyApp;Trusted_Connection=True;",
     "SchemaName": "dbo",
-    "TableName": "Snapshots"
+    "TableName": "EventStoreSnapshots"
   }
 }
 ```
@@ -118,14 +118,14 @@ builder.Services.AddSqlServerSnapshotQueryableEventStore();
 | --- | --- | --- | --- |
 | `ConnectionString` | `string` | *(required)* | ADO.NET connection string |
 | `SchemaName` | `string` | `"dbo"` | Default schema for the events table |
-| `TableName` | `string` | `"EventStore"` | Default table name for events |
+| `TableName` | `string` | `"EventStoreEvents"` | Default table name for events |
 | `AutoCreateTable` | `bool` | `true` | Create table and indices on first use |
 | `UseDataCompression` | `bool` | `true` | Apply `PAGE` compression (Enterprise / Azure SQL) |
 | `TimeoutInSeconds` | `int?` | `60` | Command timeout (1–120 000 s) |
 | `MaxEventCountOnSave` | `int` | `1000` | Maximum events per save operation |
 | `EventSuffixLength` | `int` | `30` | Zero-padded version suffix on event row IDs |
 | `RemoveDeletedFromCache` | `bool` | `true` | Evict deleted aggregates from distributed cache |
-| `CacheMode` | `EventStoreCachingOptions` | `GetAndStore` | Distributed-cache interaction policy |
+| `CacheMode` | `SnapshotCachingOptions` | `GetAndStore` | Distributed-cache interaction policy |
 | `DefaultCacheSlidingDuration` | `TimeSpan` | `60 min` | Sliding cache expiry |
 | `RequiresValidPrincipalIdentifier` | `bool` | `true` | Require a `ClaimsPrincipal` identifier on save |
 | `AggregateTableOverrides` | `Dictionary<string, SqlServerAggregateTableOverride>` | `{}` | Per-aggregate schema/table overrides |
@@ -137,7 +137,7 @@ builder.Services.AddSqlServerSnapshotQueryableEventStore();
 | --- | --- | --- | --- |
 | `ConnectionString` | `string` | *(required)* | ADO.NET connection string |
 | `SchemaName` | `string` | `"dbo"` | Default schema for the snapshots table |
-| `TableName` | `string` | `"Snapshots"` | Default table name |
+| `TableName` | `string` | `"EventStoreSnapshots"` | Default table name |
 | `AutoCreateTable` | `bool` | `true` | Create table on first use |
 | `UseDataCompression` | `bool` | `true` | Apply `PAGE` compression |
 | `AggregateTableOverrides` | `Dictionary<string, SqlServerSnapshotAggregateTableOverride>` | `{}` | Per-aggregate schema/table overrides |
@@ -229,13 +229,13 @@ The internal replay snapshots in the event table are part of the event-store imp
 [Timestamp]     DATETIMEOFFSET    UTC timestamp of the operation
 ```
 
-Three covering indices are created automatically:
+Three covering indices are created automatically (named with the configured table name, so `IX_EventStoreEvents_*` with the default table):
 
 | Index | Columns | Purpose |
 | --- | --- | --- |
-| `IX_EventStore_AggregateId_EntityType` | `(AggregateId, EntityType)` INCLUDE all | Stream lookups |
-| `IX_EventStore_EventRange` | `(AggregateId, EntityType, Version)` WHERE EntityType=1 | Event replay |
-| `IX_EventStore_AggregateType_EntityType` | `(AggregateType, EntityType, IsDeleted)` INCLUDE AggregateId | Aggregate ID enumeration |
+| `IX_{table}_AggregateId_EntityType` | `(AggregateId, AggregateType, EntityType)` INCLUDE `(Version, IsDeleted)` | Stream lookups, idempotency markers, and deletes |
+| `IX_{table}_EventRange` | `(AggregateId, AggregateType, Version)` WHERE EntityType=1 INCLUDE `(Payload, EventType, IdempotencyId, SchemaVersion, CorrelationId, CausationId, UserId, Timestamp)` | Event replay |
+| `IX_{table}_AggregateType_EntityType` | `(AggregateType, EntityType, IsDeleted)` INCLUDE `AggregateId` | Aggregate ID enumeration |
 
 > The single-table design minimises DDL surface area and allows aggregates from different bounded contexts to share a connection pool and database.
 >
@@ -610,8 +610,8 @@ For generator/framework behavior (aggregate inheritance paths, hooks, event nami
 - Integration coverage includes replay compatibility scenarios for:
   - **Unknown events** (event type name no longer resolvable): replay skips affected records and continues.
   - **Schema-change style evolution** (event type still deserializes but is no longer applied/registered): replay logs `CannotApplyEvent` and continues.
-  - See: `src/tests/SqlServer.IntegrationTests/Events/SqlServerEventStoreTests.cs`
-    and `src/tests/SqlServer.IntegrationTests/Events/GenericSqlServerEventStoreTests.GetAsync.cs`.
+  - See: `src/tests/SqlServer.IntegrationTests/Guards/SqlServerEventStoreGuardTests.cs`
+    and the shared contract suites in `src/tests/SharedTestingFramework/Contracts/EventStoreContractTestsBase.cs`.
 - Principal enforcement is enabled by default (`RequiresValidPrincipalIdentifier = true`), so save operations require the configured claim identifier to be present on the current principal.
 
 ---

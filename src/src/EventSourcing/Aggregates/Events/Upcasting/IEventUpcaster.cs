@@ -14,7 +14,9 @@ namespace Purview.EventSourcing.Aggregates.Events.Upcasting;
 /// event to <see cref="IAggregate.ApplyEvent"/>.
 /// </para>
 /// <para>
-/// Only forward-direction upcasters (older → newer) are supported.
+/// Only forward-direction upcasters (older → newer) are supported. Upcasters transform event
+/// payloads only; <see cref="EventMetadata"/> is carried by the framework and re-attached by the
+/// store, so it should not be copied by the upcaster.
 /// </para>
 /// </remarks>
 /// <example>
@@ -26,7 +28,6 @@ namespace Purview.EventSourcing.Aggregates.Events.Upcasting;
 ///     public CustomerRegisteredEvent Upcast(CustomerRegisteredEventV1 source)
 ///         => new()
 ///         {
-///             Details    = source.Details,
 ///             CustomerId = source.CustomerId,
 ///             Email      = source.Email,
 ///             PhoneNumber = string.Empty  // default for legacy events
@@ -35,8 +36,8 @@ namespace Purview.EventSourcing.Aggregates.Events.Upcasting;
 /// </code>
 /// </example>
 public interface IEventUpcaster<TSource, TTarget>
-	where TSource : IEvent
-	where TTarget : IEvent
+	where TSource : class
+	where TTarget : class
 {
 	/// <summary>
 	/// Converts <paramref name="source"/> into an equivalent <typeparamref name="TTarget"/> instance.

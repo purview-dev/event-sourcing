@@ -4,70 +4,74 @@ public sealed class EventUpcasterRegistryTests
 {
 	#region Test event types
 
-	sealed class LegacyEvent : EventBase
+	[EventContract]
+	sealed record LegacyEvent
 	{
+		public static int SchemaVersion => 1;
+
+		public EventMetadata Metadata { get; init; }
+
 		public string OldField { get; set; } = default!;
-
-		protected override void BuildEventHash(ref HashCode hash) => hash.Add(OldField);
 	}
 
-	sealed class CurrentEvent : EventBase
+	[EventContract]
+	sealed record CurrentEvent
 	{
+		public static int SchemaVersion => 1;
+
+		public EventMetadata Metadata { get; init; }
+
 		public string NewField { get; set; } = default!;
-
-		protected override void BuildEventHash(ref HashCode hash) => hash.Add(NewField);
 	}
 
-	sealed class IntermediateEvent : EventBase
+	[EventContract]
+	sealed record IntermediateEvent
 	{
+		public static int SchemaVersion => 1;
+
+		public EventMetadata Metadata { get; init; }
+
 		public string MidField { get; set; } = default!;
-
-		protected override void BuildEventHash(ref HashCode hash) => hash.Add(MidField);
 	}
 
-	sealed class V3Event : EventBase
+	[EventContract]
+	sealed record V3Event
 	{
+		public static int SchemaVersion => 3;
+
+		public EventMetadata Metadata { get; init; }
+
 		public string V3Field { get; set; } = default!;
-
-		public override int SchemaVersion => 3;
-
-		protected override void BuildEventHash(ref HashCode hash) => hash.Add(V3Field);
 	}
 
 	sealed class LegacyToCurrentUpcaster : IEventUpcaster<LegacyEvent, CurrentEvent>
 	{
-		public CurrentEvent Upcast(LegacyEvent source) =>
-			new() { Details = source.Details, NewField = source.OldField + "_upgraded" };
+		public CurrentEvent Upcast(LegacyEvent source) => new() { NewField = source.OldField + "_upgraded" };
 	}
 
 	sealed class CurrentEventToLegacyUpcaster : IEventUpcaster<CurrentEvent, LegacyEvent>
 	{
-		public LegacyEvent Upcast(CurrentEvent source) =>
-			new() { Details = source.Details, OldField = source.NewField + "_downgraded" };
+		public LegacyEvent Upcast(CurrentEvent source) => new() { OldField = source.NewField + "_downgraded" };
 	}
 
 	sealed class InPlaceUpcaster : IEventUpcaster<LegacyEvent, LegacyEvent>
 	{
-		public LegacyEvent Upcast(LegacyEvent source) =>
-			new() { Details = source.Details, OldField = source.OldField + "_inplace" };
+		public LegacyEvent Upcast(LegacyEvent source) => new() { OldField = source.OldField + "_inplace" };
 	}
 
 	sealed class LegacyToIntermediateUpcaster : IEventUpcaster<LegacyEvent, IntermediateEvent>
 	{
-		public IntermediateEvent Upcast(LegacyEvent source) =>
-			new() { Details = source.Details, MidField = source.OldField + "_mid" };
+		public IntermediateEvent Upcast(LegacyEvent source) => new() { MidField = source.OldField + "_mid" };
 	}
 
 	sealed class IntermediateToCurrentUpcaster : IEventUpcaster<IntermediateEvent, CurrentEvent>
 	{
-		public CurrentEvent Upcast(IntermediateEvent source) =>
-			new() { Details = source.Details, NewField = source.MidField + "_final" };
+		public CurrentEvent Upcast(IntermediateEvent source) => new() { NewField = source.MidField + "_final" };
 	}
 
 	sealed class IntermediateToV3Upcaster : IEventUpcaster<IntermediateEvent, V3Event>
 	{
-		public V3Event Upcast(IntermediateEvent source) =>
-			new() { Details = source.Details, V3Field = source.MidField + "_v3" };
+		public V3Event Upcast(IntermediateEvent source) => new() { V3Field = source.MidField + "_v3" };
 	}
 
 	#endregion
@@ -202,40 +206,6 @@ public sealed class EventUpcasterRegistryTests
 	}
 
 	[Test]
-	public async Task Upcast_PreservesEventDetailsMetadata()
-	{
-		// Arrange
-		var now = DateTime.UtcNow;
-		EventUpcasterDescriptor<LegacyEvent, CurrentEvent> descriptor = new(new LegacyToCurrentUpcaster());
-		EventUpcasterRegistry registry = new([descriptor]);
-
-		LegacyEvent legacyEvent = new()
-		{
-			OldField = "test",
-			Details =
-			{
-				IdempotencyId = "idempotency-123",
-				When = now,
-				UserId = "user-456",
-				CorrelationId = "correlation-789",
-				AggregateVersion = 42,
-			},
-		};
-
-		// Act
-		var result = registry.Upcast(legacyEvent);
-
-		// Assert
-		await Assert.That(result).IsTypeOf<CurrentEvent>();
-		var upcastEvent = (CurrentEvent)result;
-		await Assert.That(upcastEvent.Details.IdempotencyId).IsEqualTo("idempotency-123");
-		await Assert.That(upcastEvent.Details.When).IsEqualTo(now);
-		await Assert.That(upcastEvent.Details.UserId).IsEqualTo("user-456");
-		await Assert.That(upcastEvent.Details.CorrelationId).IsEqualTo("correlation-789");
-		await Assert.That(upcastEvent.Details.AggregateVersion).IsEqualTo(42);
-	}
-
-	[Test]
 	public async Task Upcast_GivenThreeHopChain_AppliesAllStepsInOrder()
 	{
 		// Arrange: LegacyEvent → IntermediateEvent → V3Event (three hops)
@@ -252,7 +222,7 @@ public sealed class EventUpcasterRegistryTests
 		await Assert.That(result).IsTypeOf<V3Event>();
 		// LegacyEvent.OldField "source" → IntermediateEvent.MidField "source_mid" → V3Event.V3Field "source_mid_v3"
 		await Assert.That(((V3Event)result).V3Field).IsEqualTo("source_mid_v3");
-		await Assert.That(((V3Event)result).SchemaVersion).IsEqualTo(3);
+		await Assert.That(V3Event.SchemaVersion).IsEqualTo(3);
 	}
 
 	[Test]

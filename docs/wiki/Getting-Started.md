@@ -32,7 +32,7 @@ dotnet add package Purview.EventSourcing.Validation.ZodSharp
 If your project references the `Purview.EventSourcing.Validation.ZodSharp` project directly and uses `ZodSharp` types, you must add:
 
 ```xml
-<PackageReference Include="ZodSharp" />
+<PackageReference Include="Purview.ZodSharp" />
 ```
 
 `Purview.EventSourcing.Validation.ZodSharp` ships a build-time check (`ValidateZodSharpDirectReference`) in package `buildTransitive` assets so consumer projects fail fast with remediation guidance when this direct package reference is missing.

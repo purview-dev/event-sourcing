@@ -12,15 +12,21 @@ partial class AggregateSourceEmitter
 			$"Generating event class '{method.EventType}' for method '{method.MethodName}' with {method.EventParameters.Count} stored parameters and version {method.Version}."
 		);
 
-		var hashParameterName = method.EventParameters.IsEmpty ? "_" : "hash";
+		TypeDeclarationOptions declaration = new(method.EventType.Identity.Name, TypeDeclarationAccessibility.Public)
+		{
+			Kind = TypeDeclarationKind.RecordClass,
+			IsSealed = true,
+			IsPartial = false,
+			Attributes =
+			[
+				new AttributeDeclarationOptions(
+					TypeLibrary.Purview.EventSourcing.Aggregates.Events.EventContractAttribute
+				),
+			],
+		};
 
-		writer.Class(
-			new(method.EventType.Identity.Name, TypeDeclarationAccessibility.Public)
-			{
-				IsSealed = true,
-				IsPartial = false,
-				BaseType = TypeLibrary.Purview.EventSourcing.Aggregates.Events.EventBase,
-			},
+		writer.Type(
+			declaration,
 			bodyWriter =>
 			{
 				foreach (var prop in method.EventParameters)
@@ -37,23 +43,44 @@ partial class AggregateSourceEmitter
 				}
 
 				bodyWriter.Property(
+					new(
+						"Metadata",
+						TypeLibrary.Purview.EventSourcing.Aggregates.Events.EventMetadata,
+						TypeDeclarationAccessibility.Public
+					)
+					{
+						HasSetter = true,
+						Attributes =
+						[
+							new AttributeDeclarationOptions(
+								TypeLibrary.System.Text.Json.Serialization.JsonIgnoreAttribute
+							),
+						],
+					}
+				);
+
+				bodyWriter.Property(
 					new("SchemaVersion", PurviewTypeLibrary.System.Int32, TypeDeclarationAccessibility.Public)
 					{
-						IsOverride = true,
+						IsStatic = true,
 						ExpressionBody = $"{method.Version}",
 					}
 				);
 
 				bodyWriter.Method(
-					new("BuildEventHash", TypeDeclarationAccessibility.Protected)
+					new("GetHashCode", PurviewTypeLibrary.System.Int32, TypeDeclarationAccessibility.Public)
 					{
 						IsOverride = true,
-						Parameters = [new(hashParameterName, TypeLibrary.System.HashCode, ParameterModifier.Ref)],
 					},
 					methodBodyWriter =>
 					{
+						methodBodyWriter.Assignment("var hash", new ObjectCreationOptions(TypeLibrary.System.HashCode));
+						methodBodyWriter.MethodCallOn("hash", "Add", "GetType().FullName");
+						methodBodyWriter.MethodCallOn("hash", "Add", "Metadata");
+						methodBodyWriter.MethodCallOn("hash", "Add", "SchemaVersion");
 						foreach (var prop in method.EventParameters)
-							methodBodyWriter.MethodCallOn(hashParameterName, "Add", prop.PropertyName);
+							methodBodyWriter.MethodCallOn("hash", "Add", prop.PropertyName);
+						methodBodyWriter.Return("hash.ToHashCode()");
 					}
 				);
 			}

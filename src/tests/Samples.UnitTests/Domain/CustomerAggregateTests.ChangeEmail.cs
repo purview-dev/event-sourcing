@@ -1,4 +1,4 @@
-﻿namespace Purview.EventSourcing.Samples.Domain;
+namespace Purview.EventSourcing.Samples.Domain;
 
 partial class CustomerAggregateTests
 {
@@ -22,13 +22,13 @@ partial class CustomerAggregateTests
 		// Arrange
 		var customer = CreateCustomer("cust-1");
 		customer.RegisterCustomer("Jane", "same@test.com");
-		var eventCountBefore = customer.GetUnsavedEvents().Count();
+		var eventCountBefore = customer.GetUnsavedEvents().Count;
 
 		// Act
 		customer.ChangeEmail("same@test.com");
 
 		// Assert — no new event recorded
-		await Assert.That(customer.GetUnsavedEvents().Count()).IsEqualTo(eventCountBefore);
+		await Assert.That(customer.GetUnsavedEvents().Count).IsEqualTo(eventCountBefore);
 	}
 
 	[Test]

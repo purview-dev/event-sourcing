@@ -1,3 +1,4 @@
+using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
 
 namespace Purview.EventSourcing.Postgres.Events;
@@ -19,11 +20,17 @@ partial class PostgresEventStore<T>
 
 		operationContext ??= EventStoreOperationContext.DefaultContext();
 
-		Restored restoreAggregateEvent = new()
-		{
-			Details = { AggregateVersion = aggregate.Details.CurrentVersion + 1, When = DateTimeOffset.UtcNow },
-		};
-		aggregate.ApplyEvent(restoreAggregateEvent);
+		Restored restoreAggregateEvent = new();
+		EventMetadata metadata = new(
+			aggregate.Details.CurrentVersion + 1,
+			DateTimeOffset.UtcNow,
+			SchemaVersion: 1,
+			IdempotencyId: null,
+			CorrelationId: null,
+			CausationId: null,
+			UserId: null
+		);
+		aggregate.ApplyEvent(restoreAggregateEvent, metadata);
 
 		if (aggregate.IsNew())
 			return false;
@@ -34,7 +41,7 @@ partial class PostgresEventStore<T>
 			null,
 			null,
 			cancellationToken,
-			restoreAggregateEvent
+			new EventRecord(restoreAggregateEvent, metadata)
 		);
 		await result.AfterCommitAsync(cancellationToken);
 		return result.Result.Saved;

@@ -166,7 +166,9 @@ partial class TableEventStore<T>
 		);
 		await foreach (var eventResult in everQuery)
 		{
-			var @event = eventResult.@event;
+			var eventRecord = eventResult.EventRecord;
+			var @event = eventRecord.Event;
+			var metadata = eventRecord.Metadata;
 			if (@event is UnknownEvent || !aggregate.CanApplyEvent(@event))
 			{
 				var eventType = @event.GetType();
@@ -176,13 +178,13 @@ partial class TableEventStore<T>
 						aggregateId,
 						_aggregateTypeFullName,
 						aggregate.AggregateType,
-						eventResult.eventType,
-						@event.Details.AggregateVersion
+						eventResult.EventType,
+						metadata.AggregateVersion
 					);
 
 					(aggregate as AggregateBase)?.RecordSkippedEvent(
-						@event.Details.AggregateVersion,
-						eventResult.eventType,
+						metadata.AggregateVersion,
+						eventResult.EventType,
 						isUnknown: true
 					);
 				}
@@ -192,23 +194,23 @@ partial class TableEventStore<T>
 						aggregateId,
 						_aggregateTypeFullName,
 						aggregate.AggregateType,
-						eventResult.eventType,
+						eventResult.EventType,
 						eventType.FullName ?? eventType.Name,
-						@event.Details.AggregateVersion
+						metadata.AggregateVersion
 					);
 
 					(aggregate as AggregateBase)?.RecordSkippedEvent(
-						@event.Details.AggregateVersion,
-						eventResult.eventType,
+						metadata.AggregateVersion,
+						eventResult.EventType,
 						isUnknown: false
 					);
 				}
 
 				// Without doing this, you won't be able to write to this aggregate anymore.
-				aggregate.Details.CurrentVersion = @event.Details.AggregateVersion;
+				aggregate.Details.CurrentVersion = metadata.AggregateVersion;
 			}
 			else
-				aggregate.ApplyEvent(@event);
+				aggregate.ApplyEvent(@event, metadata);
 
 			eventCount++;
 		}

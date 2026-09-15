@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
-using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.Aggregates.Exceptions;
 
@@ -10,29 +11,44 @@ namespace Purview.EventSourcing.Aggregates;
 /// </summary>
 public abstract class AggregateBase : IAggregate
 {
-	readonly Dictionary<Type, Action<IEvent>> _appliersByEventType = [];
-
-	ConcurrentBag<IEvent> _unsavedEvents = [];
-
-	readonly List<SkippedEventRecord> _skippedEvents = [];
+	/// <summary>
+	/// Per-aggregate-type applier maps built once on first construction (G1). Appliers are open
+	/// delegates that take the aggregate instance, so they are shared across all instances of a type.
+	/// </summary>
+	static readonly ConcurrentDictionary<Type, Dictionary<Type, Action<IAggregate, object>>> StaticApplierMaps = new();
 
 	/// <summary>
-	/// Gets the events that were skipped during replay because they could not be resolved
-	/// (<see cref="UnknownEvent"/>) or applied by this aggregate.
+	/// Types whose <see cref="RegisterEvents"/> uses instance-bound custom appliers
+	/// (<see cref="Register{TEvent}(Action{TEvent})"/>), which cannot be shared statically.
 	/// </summary>
-	/// <remarks>
-	/// <para>
-	/// When an old consumer replays a stream that contains events it does not understand
-	/// (for example a newer schema version written by a different application generation),
-	/// those events are skipped but the aggregate version is still advanced. The resulting
-	/// aggregate is therefore only partially reconstructed.
-	/// </para>
-	/// <para>
-	/// This collection lets callers detect that replay was incomplete so they can fail
-	/// closed or rehydrate through a different path instead of acting on stale state.
-	/// </para>
-	/// </remarks>
-	public IReadOnlyList<SkippedEventRecord> SkippedEvents => _skippedEvents;
+	static readonly ConcurrentDictionary<Type, bool> DynamicTypes = new();
+
+	static readonly Lock ApplierBuildLock = new();
+
+	[ThreadStatic]
+	static Dictionary<Type, Action<IAggregate, object>>? s_applierBuildTarget;
+
+	[ThreadStatic]
+	static bool s_dynamicDetected;
+
+	/// <summary>
+	/// The shared static applier map for this aggregate type, or <see langword="null"/> when the type
+	/// uses per-instance registration.
+	/// </summary>
+	readonly Dictionary<Type, Action<IAggregate, object>>? _applierMap;
+
+	Dictionary<Type, Action<IAggregate, object>>? _customAppliers;
+
+	List<EventRecord> _unsavedEvents = [];
+
+	EventRecord[]? _unsavedEventsSnapshot;
+
+	List<SkippedEventRecord>? _skippedEvents;
+
+	/// <summary>
+	/// Gets the events that were skipped during replay because they could not be resolved or applied.
+	/// </summary>
+	public IReadOnlyList<SkippedEventRecord> SkippedEvents => _skippedEvents ?? [];
 
 	/// <summary>
 	/// Initializes the base-class.
@@ -44,10 +60,18 @@ public abstract class AggregateBase : IAggregate
 	{
 		AggregateType = aggregateType ?? TypeNameHelper.GetName(GetType(), "Aggregate");
 
-		RegisterSystemEvents();
+		var type = GetType();
+		if (!StaticApplierMaps.TryGetValue(type, out _applierMap) && !TryBuildStaticAppliers(type, out _applierMap))
+		{
+			// Dynamic type: run registration per instance into a lazily-allocated dictionary.
+			_customAppliers = [];
+			RegisterSystemAppliers(_customAppliers);
 #pragma warning disable CA2214 // Do not call overridable methods in constructors
-		RegisterEvents();
+			RegisterEvents();
 #pragma warning restore CA2214 // Do not call overridable methods in constructors
+		}
+
+		_unsavedEvents = [];
 	}
 
 	///<inheritdoc/>
@@ -56,16 +80,24 @@ public abstract class AggregateBase : IAggregate
 	///<inheritdoc/>
 	public AggregateDetails Details { get; init; } = new();
 
-	void RegisterSystemEvents()
+	static readonly Action<IAggregate, object> ApplyDeleted = static (aggregate, _) =>
+		aggregate.Details.IsDeleted = true;
+
+	static readonly Action<IAggregate, object> ApplyRestored = static (aggregate, _) =>
+		aggregate.Details.IsDeleted = false;
+
+	static readonly Action<IAggregate, object> ApplyForceSaved = static (_, _) => { };
+
+	static void RegisterSystemAppliers(Dictionary<Type, Action<IAggregate, object>> target)
 	{
-		Register<Deleted>(_ => Details.IsDeleted = true);
-		Register<Restored>(_ => Details.IsDeleted = false);
-		Register<ForceSaved>(_ => { });
+		target[typeof(Deleted)] = ApplyDeleted;
+		target[typeof(Restored)] = ApplyRestored;
+		target[typeof(ForceSaved)] = ApplyForceSaved;
 	}
 
 	/// <summary>
-	/// Used to register custom <see cref="IEvent"/>
-	/// implementations using the <see cref="Register{TEvent}(Action{TEvent})"/>. method.
+	/// Used to register custom <see cref="EventContractAttribute"/> event implementations using the
+	/// <see cref="Register{TEvent}(Action{TEvent})"/> method.
 	/// </summary>
 	protected abstract void RegisterEvents();
 
@@ -74,65 +106,72 @@ public abstract class AggregateBase : IAggregate
 	{
 		var unsavedEventCount = _unsavedEvents.Count;
 		if (upToVersion.HasValue)
-			_unsavedEvents = [.. _unsavedEvents.Where(m => m.Details.AggregateVersion > upToVersion)];
+			_unsavedEvents = [.. _unsavedEvents.Where(record => record.Metadata.AggregateVersion > upToVersion)];
 		else
 			_unsavedEvents.Clear();
 
+		_unsavedEventsSnapshot = null;
 		unsavedEventCount -= _unsavedEvents.Count;
 
 		Details.CurrentVersion -= unsavedEventCount;
 	}
 
 	///<inheritdoc/>
-	public IEnumerable<IEvent> GetUnsavedEvents() => [.. _unsavedEvents];
+	public IReadOnlyList<EventRecord> GetUnsavedEvents() => _unsavedEventsSnapshot ??= [.. _unsavedEvents];
 
 	///<inheritdoc/>
-	public bool HasUnsavedEvents() => !_unsavedEvents.IsEmpty;
+	public bool HasUnsavedEvents() => _unsavedEvents.Count > 0;
 
 	///<inheritdoc/>
-	public bool CanApplyEvent([NotNull] IEvent aggregateEvent) =>
-		_appliersByEventType.ContainsKey(aggregateEvent.GetType());
+	public bool CanApplyEvent(object aggregateEvent)
+	{
+		ArgumentNullException.ThrowIfNull(aggregateEvent);
+		return (_applierMap is not null && _applierMap.ContainsKey(aggregateEvent.GetType()))
+			|| (_customAppliers is not null && _customAppliers.ContainsKey(aggregateEvent.GetType()));
+	}
 
 	/// <summary>
-	/// Records an <see cref="IEvent"/> in the form of <typeparamref name="TEvent"/>.
-	/// and stores the record ready for saving via the <see cref="IEventStore{T}.SaveAsync(T, EventStoreOperationContext?, CancellationToken)"/>
-	/// method. The event is also applied (via <see cref="IAggregate.ApplyEvent(IEvent)"/>) once it's been recorded.
+	/// Records an event and stores the record ready for saving via
+	/// <see cref="IEventStore{T}.SaveAsync(T, EventStoreOperationContext?, CancellationToken)"/>.
+	/// The event is also applied once it's been recorded.
 	/// </summary>
-	/// <typeparam name="TEvent">The <see cref="IEvent"/> implementation type.</typeparam>
+	/// <typeparam name="TEvent">The event implementation type.</typeparam>
 	/// <param name="event">The event to save.</param>
 	/// <returns>The current <see cref="AggregateBase"/> instance.</returns>
-	/// <remarks>The <see cref="EventDetails.AggregateVersion"/> and <see cref="EventDetails.When"/>
-	/// of the <see cref="IEvent.Details"/> property are updated during this operation.</remarks>
 	protected internal AggregateBase RecordAndApply<TEvent>(TEvent @event)
-		where TEvent : IEvent
 	{
 		ArgumentNullException.ThrowIfNull(@event, nameof(@event));
 
-		if (@event.Details == null)
-			throw new NullReferenceException($"The {nameof(IEvent.Details)} is null.");
-
-		if (!_appliersByEventType.ContainsKey(@event.GetType()))
-			throw new UnregisteredEventException(@event.GetType(), this);
+		var eventType = @event.GetType();
+		if (!CanApplyEvent(@event))
+			throw new UnregisteredEventException(eventType, this);
 
 		if (Details.Locked)
 			throw new LockedException(Details.Id);
 
-		@event.Details.AggregateVersion = Details.CurrentVersion + 1;
-		@event.Details.When = DateTimeOffset.UtcNow;
+		EventMetadata metadata = new(
+			Details.CurrentVersion + 1,
+			DateTimeOffset.UtcNow,
+			GetSchemaVersion(eventType),
+			IdempotencyId: null,
+			CorrelationId: null,
+			CausationId: null,
+			UserId: null
+		);
 
-		_unsavedEvents.Add(@event);
+		_unsavedEvents.Add(new EventRecord(@event, metadata));
+		_unsavedEventsSnapshot = null;
 
-		((IAggregate)this).ApplyEvent(@event);
+		ApplyCore(@event, metadata);
 
 		return this;
 	}
 
 	/// <summary>
-	/// Applies the <see cref="ForceSaved"/> to the aggregate,
-	/// allowing the aggregate to be saved, regardless of other operations.
+	/// Applies the <see cref="ForceSaved"/> to the aggregate, allowing the aggregate to be saved,
+	/// regardless of other operations.
 	/// </summary>
-	/// <remarks>This is only applied if <see cref="HasUnsavedEvents"/> returns false. This can be useful for situations where
-	/// you need to re-populate a queryable store for example.</remarks>
+	/// <remarks>This is only applied if <see cref="HasUnsavedEvents"/> returns false.</remarks>
 	public void ForceSave()
 	{
 		if (!HasUnsavedEvents())
@@ -141,45 +180,203 @@ public abstract class AggregateBase : IAggregate
 
 	internal void RecordSkippedEvent(int aggregateVersion, string? eventTypeName, bool isUnknown)
 	{
+		_skippedEvents ??= [];
 		_skippedEvents.Add(new SkippedEventRecord(aggregateVersion, eventTypeName, isUnknown));
 	}
 
 	/// <summary>
-	/// Registers an <see cref="Action{T}"/> as the handler to apply
-	/// an <see cref="IEvent"/>.
+	/// Registers an <see cref="Action{T}"/> as the handler to apply an event. Because the supplied
+	/// delegate is instance-bound it cannot be shared statically; aggregates that use this method fall
+	/// back to per-instance registration.
 	/// </summary>
-	/// <typeparam name="TEvent">The <see cref="IEvent"/> type to register.</typeparam>
-	/// <param name="applier">The action used to apply the event.</param>
-	/// <remarks>The <typeparamref name="TEvent"/> <see cref="System.Reflection.MemberInfo.Name"/> of the event <see cref="Type"/>
-	/// must end with 'Event'.</remarks>
 	protected void Register<TEvent>(Action<TEvent> applier)
-		where TEvent : IEvent
+		where TEvent : class
 	{
 		ArgumentNullException.ThrowIfNull(applier);
 
-		_appliersByEventType.Add(typeof(TEvent), ev => applier((TEvent)ev));
+		if (s_applierBuildTarget is not null)
+		{
+			s_dynamicDetected = true;
+			return;
+		}
+
+		_customAppliers ??= [];
+		_customAppliers[typeof(TEvent)] = (aggregate, @event) => applier((TEvent)@event);
+	}
+
+	/// <summary>
+	/// Registers a generated event applier (the generated <c>Apply(TEvent)</c> method) without
+	/// allocating a per-instance delegate. Resolved once per aggregate/event type and cached.
+	/// </summary>
+	protected void RegisterGenerated<TEvent>()
+		where TEvent : class
+	{
+		var applier = GetGeneratedApplier(GetType(), typeof(TEvent));
+
+		if (s_applierBuildTarget is not null)
+		{
+			s_applierBuildTarget[typeof(TEvent)] = applier;
+			return;
+		}
+
+		_customAppliers ??= [];
+		_customAppliers[typeof(TEvent)] = applier;
 	}
 
 #pragma warning disable CA1033 // Interface methods should be callable by child types
 
 	///<inheritdoc/>
-	IEnumerable<Type> IAggregate.GetRegisteredEventTypes() => _appliersByEventType.Keys;
+	IEnumerable<Type> IAggregate.GetRegisteredEventTypes()
+	{
+		if (_applierMap is not null)
+			return _applierMap.Keys;
+
+		if (_customAppliers is not null)
+			return _customAppliers.Keys;
+
+		return [];
+	}
 
 	///<inheritdoc/>
-	void IAggregate.ApplyEvent(IEvent @event)
+	void IAggregate.ApplyEvent(object aggregateEvent, EventMetadata metadata)
 	{
 		if (Details.Locked)
 			throw new LockedException(Details.Id);
 
-		var eventApplier = _appliersByEventType[@event.GetType()];
-		eventApplier(@event);
-
-		if (@event.Details.AggregateVersion == 1)
-			Details.Created = @event.Details.When;
-
-		Details.Updated = @event.Details.When;
-		Details.CurrentVersion = @event.Details.AggregateVersion;
+		ApplyCore(aggregateEvent, metadata);
 	}
 
 #pragma warning restore CA1033 // Interface methods should be callable by child types
+
+	void ApplyCore(object @event, EventMetadata metadata)
+	{
+		var applier = GetApplier(@event.GetType());
+		applier(this, @event);
+
+		if (metadata.AggregateVersion == 1)
+			Details.Created = metadata.When;
+
+		Details.Updated = metadata.When;
+		Details.CurrentVersion = metadata.AggregateVersion;
+	}
+
+	Action<IAggregate, object> GetApplier(Type eventType)
+	{
+		if (_applierMap is not null && _applierMap.TryGetValue(eventType, out var applier))
+			return applier;
+
+		if (_customAppliers is not null && _customAppliers.TryGetValue(eventType, out applier))
+			return applier;
+
+		throw new UnregisteredEventException(eventType, this);
+	}
+
+	/// <summary>
+	/// Builds the static applier map for an aggregate type on first use. Returns false when the type
+	/// uses instance-bound custom appliers and must register per instance.
+	/// </summary>
+	static bool TryBuildStaticAppliers(Type aggregateType, out Dictionary<Type, Action<IAggregate, object>> map)
+	{
+		if (DynamicTypes.ContainsKey(aggregateType))
+		{
+			map = null!;
+			return false;
+		}
+
+		lock (ApplierBuildLock)
+		{
+			if (StaticApplierMaps.TryGetValue(aggregateType, out map!))
+				return true;
+
+			if (DynamicTypes.ContainsKey(aggregateType))
+			{
+				map = null!;
+				return false;
+			}
+
+			Dictionary<Type, Action<IAggregate, object>> candidate = new();
+			s_applierBuildTarget = candidate;
+			s_dynamicDetected = false;
+
+			try
+			{
+				var scratch = (AggregateBase)RuntimeHelpers.GetUninitializedObject(aggregateType);
+				RegisterSystemAppliers(candidate);
+				scratch.RegisterEvents();
+			}
+			finally
+			{
+				s_applierBuildTarget = null;
+			}
+
+			if (s_dynamicDetected)
+			{
+				DynamicTypes[aggregateType] = true;
+				map = null!;
+				return false;
+			}
+
+			map = candidate;
+			StaticApplierMaps[aggregateType] = map;
+			return true;
+		}
+	}
+
+	static readonly ConcurrentDictionary<
+		(Type AggregateType, Type EventType),
+		Action<IAggregate, object>
+	> GeneratedAppliers = new();
+
+	static Action<IAggregate, object> GetGeneratedApplier(Type aggregateType, Type eventType) =>
+		GeneratedAppliers.GetOrAdd(
+			(aggregateType, eventType),
+			static key =>
+			{
+				var (aggType, evType) = key;
+				var applyMethod =
+					aggType.GetMethod(
+						"Apply",
+						BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
+						null,
+						[evType],
+						null
+					)
+					?? throw new InvalidOperationException(
+						$"Aggregate '{aggType}' has no generated Apply method for event '{evType}'."
+					);
+
+				var openDelegateType = typeof(Action<,>).MakeGenericType(aggType, evType);
+				var openDelegate = applyMethod.CreateDelegate(openDelegateType);
+				var wrapMethod = typeof(AggregateBase)
+					.GetMethod(nameof(WrapGeneratedApplier), BindingFlags.NonPublic | BindingFlags.Static)!
+					.MakeGenericMethod(aggType, evType);
+				return (Action<IAggregate, object>)wrapMethod.Invoke(null, [openDelegate])!;
+			}
+		);
+
+	static Action<IAggregate, object> WrapGeneratedApplier<TAggregate, TEvent>(Action<TAggregate, TEvent> openDelegate)
+		where TAggregate : AggregateBase
+		where TEvent : class => (aggregate, @event) => openDelegate((TAggregate)aggregate, (TEvent)@event);
+
+	static readonly ConcurrentDictionary<Type, int> SchemaVersions = new();
+
+	static int GetSchemaVersion(Type eventType) =>
+		SchemaVersions.GetOrAdd(
+			eventType,
+			static type =>
+			{
+				var property = type.GetProperty(
+					"SchemaVersion",
+					BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static
+				);
+				if (property is null || property.GetMethod is null)
+					return 1;
+
+				if (property.GetMethod.IsStatic)
+					return (int)property.GetValue(null)!;
+
+				var instance = RuntimeHelpers.GetUninitializedObject(type);
+				return (int)property.GetValue(instance)!;
+			}
+		);
 }

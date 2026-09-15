@@ -1,3 +1,4 @@
+using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.MongoDB.Events.Entities;
 
@@ -26,13 +27,24 @@ partial class MongoDBEventStore<T>
 		if (operationContext.PermanentlyDelete)
 			return await PermanentlyDeleteAsync(aggregate, operationContext, cancellationToken);
 
-		Deleted deleteAggregateEvent = new()
-		{
-			Details = { AggregateVersion = aggregate.Details.CurrentVersion + 1, When = DateTimeOffset.UtcNow },
-		};
-		aggregate.ApplyEvent(deleteAggregateEvent);
+		Deleted deleteAggregateEvent = new();
+		EventMetadata metadata = new(
+			aggregate.Details.CurrentVersion + 1,
+			DateTimeOffset.UtcNow,
+			SchemaVersion: 1,
+			IdempotencyId: null,
+			CorrelationId: null,
+			CausationId: null,
+			UserId: null
+		);
+		aggregate.ApplyEvent(deleteAggregateEvent, metadata);
 
-		var result = await SaveCoreAsync(aggregate, operationContext, cancellationToken, deleteAggregateEvent);
+		var result = await SaveCoreAsync(
+			aggregate,
+			operationContext,
+			cancellationToken,
+			new EventRecord(deleteAggregateEvent, metadata)
+		);
 
 		return result.Saved;
 	}

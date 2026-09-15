@@ -39,7 +39,7 @@ save:
 ```csharp
 public sealed class OrderService(
     ISqlServerEventStoreTransactionFactory transactionFactory,
-    ISqlServerEventStore orderStore,
+    ISqlServerEventStore<OrderAggregate> orderStore,
     SqlServerOutboxStore outboxStore)
 {
     public async Task PlaceOrderAsync(OrderAggregate order, CancellationToken cancellationToken)

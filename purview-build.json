@@ -2,15 +2,90 @@
 	"Build": {
 		"Solution": "src/EventSourcing.slnx",
 		"TestRoot": "src/tests",
-		"TestPatterns": "*UnitTests.csproj",
-		"TestFilter": "/*/*/*/*/"
+		"TestPatterns": "*Tests.csproj",
+		"TestProjects": "*UnitTests.csproj",
+		"TestFilter": "/*/*/*/*[Category=Unit]"
 	},
 	"PackValidation": {
 		"RequireSymbolPackage": true,
 		"RequireSymbolFiles": true,
 		"RequiredContent": {
-			"purview.eventsourcing.zodsharp": [
-				"buildTransitive/Purview.EventSourcing.ZodSharp.targets"
+			"purview.eventsourcing": [
+				"README.md",
+				"purview-logo.png",
+				"buildTransitive/Purview.EventSourcing.targets",
+				"analyzers/dotnet/cs/Purview.EventSourcing.SourceGenerator.dll",
+				"analyzers/dotnet/cs/Purview.EventSourcing.SourceGenerator.CodeFixes.dll"
+			],
+			"purview.eventsourcing.sqlserver": [
+				"README.md",
+				"lib/net10.0/Purview.EventSourcing.SqlServer.dll",
+				"analyzers/dotnet/cs/Purview.EventSourcing.EntityFrameworkCore.SourceGenerator.dll"
+			],
+			"purview.eventsourcing.postgres": [
+				"README.md",
+				"lib/net10.0/Purview.EventSourcing.Postgres.dll",
+				"analyzers/dotnet/cs/Purview.EventSourcing.EntityFrameworkCore.SourceGenerator.dll"
+			],
+			"purview.eventsourcing.azurestorage": [
+				"README.md",
+				"lib/net10.0/Purview.EventSourcing.AzureStorage.dll"
+			],
+			"purview.eventsourcing.mongodb": [
+				"README.md",
+				"lib/net10.0/Purview.EventSourcing.MongoDB.dll"
+			],
+			"purview.eventsourcing.cosmosdb": [
+				"README.md",
+				"lib/net10.0/Purview.EventSourcing.CosmosDb.dll"
+			],
+			"purview.eventsourcing.inmemory": [
+				"README.md",
+				"lib/net10.0/Purview.EventSourcing.InMemory.dll"
+			],
+			"purview.eventsourcing.validation.fluentvalidation": [
+				"README.md",
+				"lib/net10.0/Purview.EventSourcing.Validation.FluentValidation.dll"
+			],
+			"purview.eventsourcing.validation.zodsharp": [
+				"README.md",
+				"buildTransitive/Purview.EventSourcing.Validation.ZodSharp.targets"
+			],
+			"purview.eventsourcing.admin.abstractions": [
+				"README.md",
+				"lib/net10.0/Purview.EventSourcing.Admin.Abstractions.dll"
+			],
+			"purview.eventsourcing.admin.api": [
+				"README.md",
+				"lib/net10.0/Purview.EventSourcing.Admin.API.dll"
+			],
+			"purview.eventsourcing.admin.azurestorage": [
+				"README.md",
+				"lib/net10.0/Purview.EventSourcing.Admin.AzureStorage.dll"
+			],
+			"purview.eventsourcing.admin.client": [
+				"README.md",
+				"lib/net10.0/Purview.EventSourcing.Admin.Client.dll"
+			],
+			"purview.eventsourcing.admin.mongodb": [
+				"README.md",
+				"lib/net10.0/Purview.EventSourcing.Admin.MongoDB.dll"
+			],
+			"purview.eventsourcing.admin.postgres": [
+				"README.md",
+				"lib/net10.0/Purview.EventSourcing.Admin.Postgres.dll"
+			],
+			"purview.eventsourcing.admin.security": [
+				"README.md",
+				"lib/net10.0/Purview.EventSourcing.Admin.Security.dll"
+			],
+			"purview.eventsourcing.admin.site": [
+				"README.md",
+				"lib/net10.0/Purview.EventSourcing.Admin.Site.dll"
+			],
+			"purview.eventsourcing.admin.sqlserver": [
+				"README.md",
+				"lib/net10.0/Purview.EventSourcing.Admin.SqlServer.dll"
 			]
 		},
 		"ForbiddenContent": {}

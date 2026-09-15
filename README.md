@@ -1,8 +1,9 @@
 # Purview EventSourcing
 
-Purview EventSourcing is a .NET event sourcing framework for building aggregate-based applications with provider-agnostic store facades, source-generated aggregates, transaction coordination, and storage packages for SQL Server, Azure Storage, MongoDB, and Azure Cosmos DB.
-
+[![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.svg)](https://www.nuget.org/packages/Purview.EventSourcing)
 [![Release](https://github.com/purview-dev/eventsourcing/actions/workflows/release.yml/badge.svg)](https://github.com/purview-dev/eventsourcing/actions/workflows/release.yml)
+
+Purview EventSourcing is a .NET event sourcing framework for building aggregate-based applications with provider-agnostic store facades, source-generated aggregates, transaction coordination, and storage packages for SQL Server, PostgreSQL, MongoDB, Azure Storage, Azure Cosmos DB, and in-memory.
 
 ## Why use it
 
@@ -14,17 +15,17 @@ Purview EventSourcing is a .NET event sourcing framework for building aggregate-
 
 ## Packages
 
-| Package ID | Purpose | Project README |
-| --- | --- | --- |
-| `Purview.EventSourcing` | Core abstractions, aggregate types, facades, transactions, DI extensions, and source generation support | [`src/src/EventSourcing/Sdk/README.md`](src/src/EventSourcing/Sdk/README.md) |
-| `Purview.EventSourcing.SqlServer` | Azure SQL / SQL Server event stream and queryable snapshot stores | [`src/src/SqlServer/Sdk/README.md`](src/src/SqlServer/Sdk/README.md) |
-| `Purview.EventSourcing.Postgres` | PostgreSQL event stream and queryable snapshot stores | [`src/src/Postgres/Sdk/README.md`](src/src/Postgres/Sdk/README.md) |
-| `Purview.EventSourcing.AzureStorage` | Azure Table / Blob event store | [`src/src/AzureStorage/Sdk/README.md`](src/src/AzureStorage/Sdk/README.md) |
-| `Purview.EventSourcing.MongoDB` | MongoDB event stream and queryable snapshot stores | [`src/src/MongoDB/Sdk/README.md`](src/src/MongoDB/Sdk/README.md) |
-| `Purview.EventSourcing.CosmosDb` | Azure Cosmos DB queryable snapshot store | [`src/src/CosmosDb/Sdk/README.md`](src/src/CosmosDb/Sdk/README.md) |
-| `Purview.EventSourcing.InMemory` | In-memory event/snapshot store implementation for local and test scenarios | (see package source at `src/src/InMemory`) |
-| `Purview.EventSourcing.Validation.FluentValidation` | `FluentValidation` adapter for aggregate save-time validation | (see package source at `src/src/Validation.FluentValidation`) |
-| `Purview.EventSourcing.Validation.ZodSharp` | `ZodSharp` adapter for aggregate save-time validation | (see package source at `src/src/Validation.ZodSharp`) |
+| Package ID | Purpose | Project README | NuGet |
+| --- | --- | --- | --- |
+| `Purview.EventSourcing` | Core abstractions, aggregate types, facades, transactions, DI extensions, and source generation support | [`src/src/EventSourcing/Sdk/README.md`](src/src/EventSourcing/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.svg)](https://www.nuget.org/packages/Purview.EventSourcing) |
+| `Purview.EventSourcing.SqlServer` | Azure SQL / SQL Server event stream and queryable snapshot stores | [`src/src/SqlServer/Sdk/README.md`](src/src/SqlServer/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.SqlServer.svg)](https://www.nuget.org/packages/Purview.EventSourcing.SqlServer) |
+| `Purview.EventSourcing.Postgres` | PostgreSQL event stream and queryable snapshot stores | [`src/src/Postgres/Sdk/README.md`](src/src/Postgres/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.Postgres.svg)](https://www.nuget.org/packages/Purview.EventSourcing.Postgres) |
+| `Purview.EventSourcing.AzureStorage` | Azure Table / Blob event store | [`src/src/AzureStorage/Sdk/README.md`](src/src/AzureStorage/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.AzureStorage.svg)](https://www.nuget.org/packages/Purview.EventSourcing.AzureStorage) |
+| `Purview.EventSourcing.MongoDB` | MongoDB event stream and queryable snapshot stores | [`src/src/MongoDB/Sdk/README.md`](src/src/MongoDB/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.MongoDB.svg)](https://www.nuget.org/packages/Purview.EventSourcing.MongoDB) |
+| `Purview.EventSourcing.CosmosDb` | Azure Cosmos DB queryable snapshot store | [`src/src/CosmosDb/Sdk/README.md`](src/src/CosmosDb/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.CosmosDb.svg)](https://www.nuget.org/packages/Purview.EventSourcing.CosmosDb) |
+| `Purview.EventSourcing.InMemory` | In-memory event/snapshot store implementation for local and test scenarios | (see package source at `src/src/InMemory`) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.InMemory.svg)](https://www.nuget.org/packages/Purview.EventSourcing.InMemory) |
+| `Purview.EventSourcing.Validation.FluentValidation` | `FluentValidation` adapter for aggregate save-time validation | (see package source at `src/src/Validation.FluentValidation`) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.Validation.FluentValidation.svg)](https://www.nuget.org/packages/Purview.EventSourcing.Validation.FluentValidation) |
+| `Purview.EventSourcing.Validation.ZodSharp` | `ZodSharp` adapter for aggregate save-time validation | (see package source at `src/src/Validation.ZodSharp`) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.Validation.ZodSharp.svg)](https://www.nuget.org/packages/Purview.EventSourcing.Validation.ZodSharp) |
 
 ## Install the packages you need
 
@@ -47,10 +48,10 @@ dotnet add package Purview.EventSourcing.Validation.ZodSharp
 If your project directly references `Purview.EventSourcing.Validation.ZodSharp` (project reference) and uses types from `ZodSharp`, you must include a direct package reference:
 
 ```xml
-<PackageReference Include="ZodSharp" />
+<PackageReference Include="Purview.ZodSharp" />
 ```
 
-`Purview.EventSourcing.Validation.ZodSharp` now ships a build-time guard target (`ValidateZodSharpDirectReference`) via NuGet `buildTransitive` assets. If the direct `ZodSharp` reference is missing, the consumer build fails with remediation guidance instead of allowing a runtime assembly-load failure.
+`Purview.EventSourcing.Validation.ZodSharp` ships a build-time guard target (`ValidateZodSharpDirectReference`) via NuGet `buildTransitive` assets. If the direct `Purview.ZodSharp` reference is missing, the consumer build fails with remediation guidance instead of allowing a runtime assembly-load failure.
 
 ## Quick start
 
@@ -146,16 +147,31 @@ public sealed class CheckoutService(
 
 ## Storage provider matrix
 
-| Provider | Package | Registration API | Notes |
-| --- | --- | --- | --- |
-| Core only | `Purview.EventSourcing` | `AddNullQueryableEventStore()` | No persistent query store |
-| Azure SQL / SQL Server | `Purview.EventSourcing.SqlServer` | `AddSqlServerEventStore()` and `AddSqlServerSnapshotQueryableEventStore()` | Separate event and snapshot implementations in one package |
-| PostgreSQL | `Purview.EventSourcing.Postgres` | `AddPostgresEventStore()` and `AddPostgresSnapshotQueryableEventStore()` | Separate event and snapshot implementations in one package |
-| Azure Table / Blob | `Purview.EventSourcing.AzureStorage` | `AddAzureStorageEventStore()` | Table events plus Blob support for large payloads and snapshots |
-| MongoDB | `Purview.EventSourcing.MongoDB` | `AddMongoDBEventStore()` and `AddMongoDBSnapshotQueryableEventStore()` | Separate event and snapshot implementations in one package |
-| Azure Cosmos DB snapshots | `Purview.EventSourcing.CosmosDb` | `AddCosmosDbSnapshotQueryableEventStore()` | Queryable snapshot store |
+| Provider | Package | Registration API | Notes | NuGet |
+| --- | --- | --- | --- | --- |
+| Core only | `Purview.EventSourcing` | `AddNullQueryableEventStore()` | No persistent query store | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.svg)](https://www.nuget.org/packages/Purview.EventSourcing) |
+| Azure SQL / SQL Server | `Purview.EventSourcing.SqlServer` | `AddSqlServerEventStore()` and `AddSqlServerSnapshotQueryableEventStore()` | Separate event and snapshot implementations in one package | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.SqlServer.svg)](https://www.nuget.org/packages/Purview.EventSourcing.SqlServer) |
+| PostgreSQL | `Purview.EventSourcing.Postgres` | `AddPostgresEventStore()` and `AddPostgresSnapshotQueryableEventStore()` | Separate event and snapshot implementations in one package | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.Postgres.svg)](https://www.nuget.org/packages/Purview.EventSourcing.Postgres) |
+| Azure Table / Blob | `Purview.EventSourcing.AzureStorage` | `AddAzureStorageEventStore()` | Table events plus Blob support for large payloads and snapshots | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.AzureStorage.svg)](https://www.nuget.org/packages/Purview.EventSourcing.AzureStorage) |
+| MongoDB | `Purview.EventSourcing.MongoDB` | `AddMongoDBEventStore()` and `AddMongoDBSnapshotQueryableEventStore()` | Separate event and snapshot implementations in one package | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.MongoDB.svg)](https://www.nuget.org/packages/Purview.EventSourcing.MongoDB) |
+| Azure Cosmos DB snapshots | `Purview.EventSourcing.CosmosDb` | `AddCosmosDbSnapshotQueryableEventStore()` | Queryable snapshot store | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.CosmosDb.svg)](https://www.nuget.org/packages/Purview.EventSourcing.CosmosDb) |
+| In-memory | `Purview.EventSourcing.InMemory` | `AddInMemoryEventStore()` and `AddInMemorySnapshotEventStore()` | Non-persistent stores for local and test scenarios | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.InMemory.svg)](https://www.nuget.org/packages/Purview.EventSourcing.InMemory) |
 
 For SQL Server and Azure SQL schema, permissions, and event-versioning guidance, see [docs/wiki/SQL-Server-Guide.md](docs/wiki/SQL-Server-Guide.md).
+
+## Administration packages
+
+| Package ID | Purpose | Project README | NuGet |
+| --- | --- | --- | --- |
+| `Purview.EventSourcing.Admin.Abstractions` | Provider-neutral admin contracts and abstractions | [`src/src/Admin.Abstractions/Sdk/README.md`](src/src/Admin.Abstractions/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.Admin.Abstractions.svg)](https://www.nuget.org/packages/Purview.EventSourcing.Admin.Abstractions) |
+| `Purview.EventSourcing.Admin.API` | Admin API endpoints and OpenAPI document | [`src/src/Admin.API/Sdk/README.md`](src/src/Admin.API/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.Admin.API.svg)](https://www.nuget.org/packages/Purview.EventSourcing.Admin.API) |
+| `Purview.EventSourcing.Admin.Security` | Authorization policies for admin endpoints | [`src/src/Admin.Security/Sdk/README.md`](src/src/Admin.Security/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.Admin.Security.svg)](https://www.nuget.org/packages/Purview.EventSourcing.Admin.Security) |
+| `Purview.EventSourcing.Admin.Site` | Admin web UI | [`src/src/Admin.Site/Sdk/README.md`](src/src/Admin.Site/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.Admin.Site.svg)](https://www.nuget.org/packages/Purview.EventSourcing.Admin.Site) |
+| `Purview.EventSourcing.Admin.Client` | Typed admin API client (NSwag) | [`src/src/Admin.Client/Sdk/README.md`](src/src/Admin.Client/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.Admin.Client.svg)](https://www.nuget.org/packages/Purview.EventSourcing.Admin.Client) |
+| `Purview.EventSourcing.Admin.SqlServer` | SQL Server admin persistence adapter | [`src/src/Admin.SqlServer/Sdk/README.md`](src/src/Admin.SqlServer/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.Admin.SqlServer.svg)](https://www.nuget.org/packages/Purview.EventSourcing.Admin.SqlServer) |
+| `Purview.EventSourcing.Admin.Postgres` | PostgreSQL admin persistence adapter | [`src/src/Admin.Postgres/Sdk/README.md`](src/src/Admin.Postgres/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.Admin.Postgres.svg)](https://www.nuget.org/packages/Purview.EventSourcing.Admin.Postgres) |
+| `Purview.EventSourcing.Admin.MongoDB` | MongoDB admin persistence adapter | [`src/src/Admin.MongoDB/Sdk/README.md`](src/src/Admin.MongoDB/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.Admin.MongoDB.svg)](https://www.nuget.org/packages/Purview.EventSourcing.Admin.MongoDB) |
+| `Purview.EventSourcing.Admin.AzureStorage` | Azure Storage admin persistence adapter | [`src/src/Admin.AzureStorage/Sdk/README.md`](src/src/Admin.AzureStorage/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.Admin.AzureStorage.svg)](https://www.nuget.org/packages/Purview.EventSourcing.Admin.AzureStorage) |
 
 ## Sample application
 
@@ -184,17 +200,17 @@ The repository uses the shared [`Purview.Build`](https://github.com/purview-dev/
 dotnet tool restore
 just pipeline-pr              # restore, build, lint, unit tests, pack, and package validation
 just pipeline-build           # restore, build, lint, pack, and package validation (no tests)
-just build                    # dotnet build src/EventSourcing.slnx --configuration Release
+just build                    # dotnet build src/EventSourcing.slnx --configuration Debug (local default; CI uses the Release pipeline)
 just test                     # dotnet test with a TUnit tree-node filter
 just lint-check               # csharpier check
 ```
 
 Additional notes:
 
-- `just` recipes in the `Justfile` wrap the same restore, build, test, pack, and version commands for local development.
-- `just pipeline-pr` and `just pipeline-tests` run the unit test projects discovered under `src/tests` (`*UnitTests.csproj`); integration tests use Testcontainers and run locally via `just test` when Docker is available.
+- `just` recipes in the `Justfile` wrap the same restore, build, test, pack, and version commands for local development. Local recipes default to `Debug`; Release-style CI builds run through the shared `Purview.Build` pipeline (`just pipeline-pr` / `just pipeline-build`).
+- `just pipeline-pr` and `just pipeline-tests` run the unit test projects discovered under `src/tests` (restricted to `*UnitTests.csproj` via `Build:TestProjects`, filtered with the TUnit `[Category=Unit]` filter); integration tests use Testcontainers and run locally via `just test` when Docker is available.
 - `package.json` is the release version source of truth for builds and packages.
-- `dotnet pack` or `just pack` writes packages to `artifacts/packages`.
+- `dotnet pack` or `just pack` writes packages to `artifacts`.
 
 ## Release workflow
 

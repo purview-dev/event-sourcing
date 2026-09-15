@@ -1,5 +1,6 @@
-﻿using Azure.Data.Tables;
+using Azure.Data.Tables;
 using Azure.Storage.Blobs.Models;
+using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.AzureStorage.StorageClients.Table;
 
@@ -28,17 +29,23 @@ partial class TableEventStore<T>
 		if (operationContext.PermanentlyDelete)
 			return await PermanentlyDeleteAsync(aggregate, cancellationToken);
 
-		Deleted deleteAggregateEvent = new()
-		{
-			Details = { AggregateVersion = aggregate.Details.CurrentVersion + 1, When = DateTimeOffset.UtcNow },
-		};
-		aggregate.ApplyEvent(deleteAggregateEvent);
+		Deleted deleteAggregateEvent = new();
+		EventMetadata metadata = new(
+			aggregate.Details.CurrentVersion + 1,
+			DateTimeOffset.UtcNow,
+			SchemaVersion: 1,
+			IdempotencyId: null,
+			CorrelationId: null,
+			CausationId: null,
+			UserId: null
+		);
+		aggregate.ApplyEvent(deleteAggregateEvent, metadata);
 
 		var result = await _saveOperation.SaveCoreAsync(
 			aggregate,
 			operationContext,
 			cancellationToken,
-			deleteAggregateEvent
+			new EventRecord(deleteAggregateEvent, metadata)
 		);
 
 		return result.Saved;

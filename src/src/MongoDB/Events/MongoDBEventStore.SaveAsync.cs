@@ -27,7 +27,7 @@ partial class MongoDBEventStore<T>
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken,
-		params IEvent[] additionalEvents
+		params EventRecord[] additionalEvents
 	)
 	{
 		var preparation = await PrepareSaveAsync(aggregate, operationContext, additionalEvents, cancellationToken);
@@ -38,7 +38,7 @@ partial class MongoDBEventStore<T>
 	async Task<MongoSavePreparation> PrepareSaveAsync(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
-		IEvent[]? additionalEvents,
+		EventRecord[]? additionalEvents,
 		CancellationToken cancellationToken
 	)
 	{
@@ -99,7 +99,7 @@ partial class MongoDBEventStore<T>
 		}
 
 		var isNew = aggregate.IsNew();
-		var changeEvents = aggregate.GetUnsavedEvents().Concat((additionalEvents ?? []).AsEnumerable()).ToArray();
+		var changeEvents = aggregate.GetUnsavedEvents().Concat(additionalEvents ?? []).ToArray();
 		var idempotencyMarkerOperation = CreateIdempotencyMarkerOperation(aggregate, idempotencyId, changeEvents);
 
 		if (changeEvents.Length > _eventStoreOptions.Value.MaxEventCountOnSave)
@@ -157,7 +157,7 @@ partial class MongoDBEventStore<T>
 
 		if (
 			operationContext.NotificationMode.HasFlag(NotificationModes.BeforeDelete)
-			&& changeEvents.OfType<Deleted>().Any()
+			&& changeEvents.Any(record => record.Event is Deleted)
 		)
 			await _aggregateChangeNotifier.BeforeDeleteAsync(aggregate, cancellationToken);
 		else if (operationContext.NotificationMode.HasFlag(NotificationModes.BeforeSave))
@@ -167,7 +167,7 @@ partial class MongoDBEventStore<T>
 		var hasStreamEntity = streamEntity != null;
 		if (streamEntity?.IsDeleted == true)
 		{
-			var throwIfDeleted = !changeEvents.OfType<Restored>().Any();
+			var throwIfDeleted = !changeEvents.Any(record => record.Event is Restored);
 			if (throwIfDeleted)
 				throw new AggregateDeletedException(aggregate.Id(), idempotencyId);
 		}
@@ -202,19 +202,22 @@ partial class MongoDBEventStore<T>
 			var idempotencyIdAsString = idempotencyId.ToUpperInvariant();
 			for (var i = 0; i < changeEvents.Length; i++)
 			{
-				var changeEvent = changeEvents[i];
-
-				changeEvent.Details.IdempotencyId = idempotencyIdAsString;
-				changeEvent.Details.UserId = userId;
-				changeEvent.Details.CorrelationId ??= operationContext.CorrelationId;
-				changeEvent.Details.SchemaVersion = changeEvent.SchemaVersion;
+				var changeEvent = changeEvents[i].Event;
+				var metadata = changeEvents[i].Metadata with
+				{
+					IdempotencyId = idempotencyIdAsString,
+					SchemaVersion = changeEvents[i].Metadata.SchemaVersion,
+					UserId = userId,
+					CorrelationId = changeEvents[i].Metadata.CorrelationId ?? operationContext.CorrelationId,
+				};
 
 				var serializedEvent = SerializeEvent(changeEvent);
 				var eventEntity = CreateSerializedEvent(
 					aggregate.Id(),
 					changeEvent,
 					serializedEvent,
-					idempotencyMarkerOperation.AggregateId
+					metadata,
+					idempotencyMarkerOperation.Id
 				);
 
 				batchOperation.Insert(eventEntity);
@@ -229,9 +232,9 @@ partial class MongoDBEventStore<T>
 			if (shouldSnapshot)
 				await CreateSnapshotAsync(aggregate, cancellationToken);
 
-			if (changeEvents.OfType<Deleted>().Any())
+			if (changeEvents.Any(record => record.Event is Deleted))
 				_eventStoreTelemetry.AggregateDeleted(aggregate.Id(), _aggregateTypeFullName, aggregate.AggregateType);
-			else if (changeEvents.OfType<Restored>().Any())
+			else if (changeEvents.Any(record => record.Event is Restored))
 				_eventStoreTelemetry.AggregateRestored(aggregate.Id(), _aggregateTypeFullName, aggregate.AggregateType);
 
 			_eventStoreTelemetry.SavedAggregate(
@@ -262,7 +265,7 @@ partial class MongoDBEventStore<T>
 
 			if (operationContext.NotificationMode.HasFlag(NotificationModes.OnFailure))
 			{
-				var deleteRequested = changeEvents.OfType<Deleted>().Any();
+				var deleteRequested = changeEvents.Any(record => record.Event is Deleted);
 				await _aggregateChangeNotifier.FailureAsync(aggregate, deleteRequested, ex, cancellationToken);
 			}
 
@@ -277,7 +280,7 @@ partial class MongoDBEventStore<T>
 		T aggregate,
 		EventStoreOperationContext operationContext,
 		string idempotencyId,
-		IEvent[] changeEvents,
+		EventRecord[] changeEvents,
 		bool isNew,
 		IdempotencyMarkerEntity? marker
 	)
@@ -286,7 +289,7 @@ partial class MongoDBEventStore<T>
 		public T Aggregate => aggregate;
 		public EventStoreOperationContext OperationContext => operationContext;
 		public string IdempotencyId => idempotencyId;
-		public IEvent[] ChangeEvents => changeEvents;
+		public EventRecord[] ChangeEvents => changeEvents;
 		public bool IsNew => isNew;
 		public IdempotencyMarkerEntity? Marker => marker;
 	}
@@ -301,18 +304,22 @@ partial class MongoDBEventStore<T>
 		;
 	}
 
-	static bool ShouldSnapShot(T aggregate, IEvent[] events)
+	static bool ShouldSnapShot(T aggregate, EventRecord[] events)
 	{
-		return aggregate.Details.IsDeleted || events.OfType<Restored>().Any() || events.Length > 0;
+		return aggregate.Details.IsDeleted || events.Any(record => record.Event is Restored) || events.Length > 0;
 	}
 
-	IdempotencyMarkerEntity CreateIdempotencyMarkerOperation(T aggregate, string idempotencyId, IEvent[] changeEvents)
+	IdempotencyMarkerEntity CreateIdempotencyMarkerOperation(
+		T aggregate,
+		string idempotencyId,
+		EventRecord[] changeEvents
+	)
 	{
 		IdempotencyMarkerEntity marker = new()
 		{
 			Id = CreateIdempotencyCheckId(aggregate.Id(), idempotencyId),
 			AggregateId = aggregate.Id(),
-			EventVersions = [.. changeEvents.Select(m => m.Details.AggregateVersion).OrderBy(m => m)],
+			EventVersions = [.. changeEvents.Select(m => m.Metadata.AggregateVersion).OrderBy(m => m)],
 			Timestamp = DateTimeOffset.UtcNow,
 		};
 
@@ -398,22 +405,23 @@ partial class MongoDBEventStore<T>
 
 	EventEntity CreateSerializedEvent(
 		string aggregateId,
-		IEvent @event,
+		object @event,
 		string serializedEvent,
-		string idempotencyId
+		EventMetadata metadata,
+		string idempotencyMarkerId
 	) =>
 		new()
 		{
-			Id = CreateEventId(aggregateId, @event.Details.AggregateVersion),
+			Id = CreateEventId(aggregateId, metadata.AggregateVersion),
 			AggregateId = aggregateId,
-			Version = @event.Details.AggregateVersion,
+			Version = metadata.AggregateVersion,
 			Payload = serializedEvent,
 			EventType = _eventNameMapper.GetName<T>(@event),
-			IdempotencyId = idempotencyId,
-			SchemaVersion = @event.SchemaVersion,
-			CorrelationId = @event.Details.CorrelationId,
-			CausationId = @event.Details.CausationId,
-			UserId = @event.Details.UserId,
+			IdempotencyId = idempotencyMarkerId,
+			SchemaVersion = metadata.SchemaVersion,
+			CorrelationId = metadata.CorrelationId,
+			CausationId = metadata.CausationId,
+			UserId = metadata.UserId,
 			Timestamp = DateTimeOffset.UtcNow,
 		};
 

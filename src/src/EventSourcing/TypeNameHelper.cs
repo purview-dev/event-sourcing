@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
@@ -15,6 +16,8 @@ public static partial class TypeNameHelper
 	private static partial Regex TitleSplitCaseRegex();
 
 	static readonly Regex TitleCaseSplit = TitleSplitCaseRegex();
+
+	static readonly ConcurrentDictionary<(string Name, string TrimPart), string> NameCache = new();
 
 	/// <summary>
 	/// <para>
@@ -43,13 +46,16 @@ public static partial class TypeNameHelper
 		{
 			var result = name[..^trimPart.Length];
 			if (result.Length > 0)
-			{
-#pragma warning disable CA1308 // Normalize strings to uppercase
-				return TitleCaseSplit.Replace(result, "-$1").ToLowerInvariant();
-#pragma warning restore CA1308 // Normalize strings to uppercase
-			}
+				return NameCache.GetOrAdd((name, trimPart), static (_, value) => ConvertTitleSplit(value), result);
 		}
 
 		return fallThroughToFullTypeName ? objectType.FullName ?? objectType.Name : name;
+	}
+
+	static string ConvertTitleSplit(string result)
+	{
+#pragma warning disable CA1308 // Normalize strings to uppercase
+		return TitleCaseSplit.Replace(result, "-$1").ToLowerInvariant();
+#pragma warning restore CA1308 // Normalize strings to uppercase
 	}
 }

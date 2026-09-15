@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using Purview.EventSourcing.Samples.Domain;
 using Purview.EventSourcing.Samples.Services;
-using Purview.EventSourcing.Samples.Web.Infrastructure;
 using Purview.EventSourcing.Samples.Web.Services;
 
 namespace Purview.EventSourcing.Samples.Web.Pages.Customer.Catalog;

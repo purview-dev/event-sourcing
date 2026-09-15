@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
@@ -52,7 +54,12 @@ public sealed partial class PostgresEventStore<T> : IPostgresEventStore<T>, ITra
 
 	readonly string _aggregateTypeFullName;
 	readonly string _aggregateTypeShortName;
+	readonly string _eventIdPrefix;
+	readonly string _idempotencyCheckIdPrefix;
+	readonly string _snapshotIdPrefix;
 	readonly int _snapshotSchemaVersion = AggregateSnapshotSchema.GetVersion<T>();
+
+	static readonly ConcurrentDictionary<string, Type> EventTypeCache = new(StringComparer.Ordinal);
 
 	/// <summary>
 	/// Creates a new <see cref="PostgresEventStore{T}"/>.
@@ -94,6 +101,10 @@ public sealed partial class PostgresEventStore<T> : IPostgresEventStore<T>, ITra
 		var aggregateName = _eventNameMapper.InitializeAggregate<T>();
 		if (!aggregateName.Contains('.', StringComparison.InvariantCulture))
 			_aggregateTypeShortName = aggregateName;
+
+		_eventIdPrefix = $"e_{_aggregateTypeShortName}_";
+		_idempotencyCheckIdPrefix = $"i_{_aggregateTypeShortName}_";
+		_snapshotIdPrefix = $"snap_{_aggregateTypeShortName}_";
 
 		var clientOptions = ResolveClientOptions(sqlServerOptions.Value, _aggregateTypeShortName);
 		_client = new PostgresEventStoreClient(clientOptions);
@@ -193,7 +204,7 @@ public sealed partial class PostgresEventStore<T> : IPostgresEventStore<T>, ITra
 
 			elapsedMilliseconds = sw.ElapsedMilliseconds;
 
-			if (row == null || row.EntityType != StreamVersionType)
+			if (row == null || row.Value.EntityType != StreamVersionType)
 			{
 				if (expectedToExist)
 					_eventStoreTelemetry.StreamVersionExpectedToExistButNotFound(
@@ -208,11 +219,11 @@ public sealed partial class PostgresEventStore<T> : IPostgresEventStore<T>, ITra
 			{
 				result = new StreamVersionData
 				{
-					Id = row.Id,
-					AggregateId = row.AggregateId,
-					AggregateType = row.AggregateType,
-					Version = row.Version,
-					IsDeleted = row.IsDeleted,
+					Id = row.Value.Id,
+					AggregateId = row.Value.AggregateId,
+					AggregateType = row.Value.AggregateType,
+					Version = row.Value.Version,
+					IsDeleted = row.Value.IsDeleted,
 				};
 				_eventStoreTelemetry.StreamVersionFound(
 					aggregateId,
@@ -254,13 +265,32 @@ public sealed partial class PostgresEventStore<T> : IPostgresEventStore<T>, ITra
 
 	string CreateStreamVersionId(string aggregateId) => $"s_{_aggregateTypeShortName}_{aggregateId}";
 
-	string CreateEventId(string aggregateId, int version) =>
-		$"e_{_aggregateTypeShortName}_{aggregateId}_{$"{version}".PadLeft(_eventStoreOptions.Value.EventSuffixLength, '0')}";
+	string CreateEventId(string aggregateId, int version)
+	{
+		var versionText = version.ToString(CultureInfo.InvariantCulture);
+		var padLength = Math.Max(0, _eventStoreOptions.Value.EventSuffixLength - versionText.Length);
+		return string.Create(
+			_eventIdPrefix.Length + aggregateId.Length + 1 + versionText.Length + padLength,
+			(_eventIdPrefix, aggregateId, versionText, padLength),
+			static (span, state) =>
+			{
+				state._eventIdPrefix.AsSpan().CopyTo(span);
+				var position = state._eventIdPrefix.Length;
+				state.aggregateId.AsSpan().CopyTo(span[position..]);
+				position += state.aggregateId.Length;
+				span[position] = '_';
+				position++;
+				span.Slice(position, state.padLength).Fill('0');
+				position += state.padLength;
+				state.versionText.AsSpan().CopyTo(span[position..]);
+			}
+		);
+	}
 
 	string CreateIdempotencyCheckId(string aggregateId, string idempotencyId) =>
-		$"i_{_aggregateTypeShortName}_{aggregateId}_{idempotencyId}";
+		string.Concat(_idempotencyCheckIdPrefix, aggregateId, "_", idempotencyId);
 
-	string CreateSnapshotId(string aggregateId) => $"snap_{_aggregateTypeShortName}_{aggregateId}";
+	string CreateSnapshotId(string aggregateId) => string.Concat(_snapshotIdPrefix, aggregateId);
 
 	/// <summary>
 	/// Creates the distributed-cache key for the given aggregate id.

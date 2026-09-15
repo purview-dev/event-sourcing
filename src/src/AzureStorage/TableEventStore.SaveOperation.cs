@@ -48,7 +48,7 @@ sealed class TableSaveOperation<T>(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken,
-		params IEvent[] additionalEvents
+		params EventRecord[] additionalEvents
 	)
 	{
 		var (Terminal, Aggregate, OperationContext, IdempotencyId, ChangeEvents, IsNew, Marker) =
@@ -71,13 +71,13 @@ sealed class TableSaveOperation<T>(
 		T Aggregate,
 		EventStoreOperationContext OperationContext,
 		string IdempotencyId,
-		IEvent[] ChangeEvents,
+		EventRecord[] ChangeEvents,
 		bool IsNew,
 		IdempotencyMarkerEntity? Marker
 	)> PrepareSaveAsync(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
-		IEvent[]? additionalEvents,
+		EventRecord[]? additionalEvents,
 		CancellationToken cancellationToken
 	)
 	{
@@ -134,7 +134,7 @@ sealed class TableSaveOperation<T>(
 		}
 
 		var isNew = aggregate.IsNew();
-		var changeEvents = aggregate.GetUnsavedEvents().Concat((additionalEvents ?? []).AsEnumerable()).ToArray();
+		var changeEvents = aggregate.GetUnsavedEvents().Concat(additionalEvents ?? []).ToArray();
 		var idempotencyMarkerOperation = CreateIdempotencyMarkerOperation(aggregate, idempotencyId, changeEvents);
 
 		if (changeEvents.Length > eventStoreOptions.Value.MaxEventCountOnSave)
@@ -167,11 +167,16 @@ sealed class TableSaveOperation<T>(
 		return (null, aggregate, operationContext, idempotencyId, changeEvents, isNew, idempotencyMarkerOperation);
 	}
 
+	[System.Diagnostics.CodeAnalysis.SuppressMessage(
+		"Maintainability",
+		"CA1502:Avoid excessive complexity",
+		Justification = "Save orchestration handles many interleaved states; keep the flow readable."
+	)]
 	async Task<SaveResult<T>> PersistAndNotifyAsync(
 		T aggregate,
 		EventStoreOperationContext operationContext,
 		string idempotencyId,
-		IEvent[] changeEvents,
+		EventRecord[] changeEvents,
 		bool isNew,
 		IdempotencyMarkerEntity idempotencyMarkerOperation,
 		CancellationToken cancellationToken
@@ -179,7 +184,7 @@ sealed class TableSaveOperation<T>(
 	{
 		if (
 			operationContext.NotificationMode.HasFlag(NotificationModes.BeforeDelete)
-			&& changeEvents.OfType<Deleted>().Any()
+			&& changeEvents.Any(record => record.Event is Deleted)
 		)
 			await aggregateChangeNotifier.BeforeDeleteAsync(aggregate, cancellationToken);
 		else if (operationContext.NotificationMode.HasFlag(NotificationModes.BeforeSave))
@@ -189,7 +194,7 @@ sealed class TableSaveOperation<T>(
 		var hasStreamEntity = streamEntity != null;
 		if (streamEntity?.IsDeleted == true)
 		{
-			var throwIfDeleted = !changeEvents.OfType<Restored>().Any();
+			var throwIfDeleted = !changeEvents.Any(record => record.Event is Restored);
 			if (throwIfDeleted)
 				throw new Exceptions.AggregateDeletedException(aggregate.Id(), idempotencyId);
 		}
@@ -221,18 +226,27 @@ sealed class TableSaveOperation<T>(
 				);
 
 			var idempotencyIdAsString = idempotencyId.ToUpperInvariant();
-			Dictionary<string, IEvent> largeChangeEvents = [];
+			Dictionary<string, object> largeChangeEvents = [];
 			for (var i = 0; i < changeEvents.Length; i++)
+			{
+				var changeEvent = changeEvents[i].Event;
+				var metadata = changeEvents[i].Metadata with
+				{
+					IdempotencyId = idempotencyIdAsString,
+					SchemaVersion = changeEvents[i].Metadata.SchemaVersion,
+					UserId = userId,
+					CorrelationId = changeEvents[i].Metadata.CorrelationId ?? operationContext.CorrelationId,
+				};
+
 				AppendEventToBatch(
-					changeEvents[i],
+					changeEvent,
+					metadata,
 					aggregate,
-					idempotencyIdAsString,
-					userId,
-					operationContext,
 					idempotencyMarkerOperation,
 					batchOperation,
 					largeChangeEvents
 				);
+			}
 
 			if (operationContext.UseIdempotencyMarker)
 				batchOperation.Add(idempotencyMarkerOperation, recordAt: 0);
@@ -263,9 +277,9 @@ sealed class TableSaveOperation<T>(
 			if (shouldSnapshot)
 				await CreateSnapshotAsync(aggregate, cancellationToken);
 
-			if (changeEvents.OfType<Deleted>().Any())
+			if (changeEvents.Any(record => record.Event is Deleted))
 				eventStoreTelemetry.AggregateDeleted(aggregate.Id(), aggregateTypeFullName, aggregate.AggregateType);
-			else if (changeEvents.OfType<Restored>().Any())
+			else if (changeEvents.Any(record => record.Event is Restored))
 				eventStoreTelemetry.AggregateRestored(aggregate.Id(), aggregateTypeFullName, aggregate.AggregateType);
 
 			eventStoreTelemetry.SavedAggregate(
@@ -296,7 +310,7 @@ sealed class TableSaveOperation<T>(
 
 			if (operationContext.NotificationMode.HasFlag(NotificationModes.OnFailure))
 			{
-				var deleteRequested = changeEvents.OfType<Deleted>().Any();
+				var deleteRequested = changeEvents.Any(record => record.Event is Deleted);
 				await aggregateChangeNotifier.FailureAsync(aggregate, deleteRequested, ex, cancellationToken);
 			}
 
@@ -307,25 +321,19 @@ sealed class TableSaveOperation<T>(
 	}
 
 	void AppendEventToBatch(
-		IEvent changeEvent,
+		object changeEvent,
+		EventMetadata metadata,
 		T aggregate,
-		string idempotencyIdAsString,
-		string? userId,
-		EventStoreOperationContext operationContext,
 		IdempotencyMarkerEntity idempotencyMarkerOperation,
 		BatchOperation batchOperation,
-		Dictionary<string, IEvent> largeChangeEvents
+		Dictionary<string, object> largeChangeEvents
 	)
 	{
-		changeEvent.Details.IdempotencyId = idempotencyIdAsString;
-		changeEvent.Details.UserId = userId;
-		changeEvent.Details.CorrelationId ??= operationContext.CorrelationId;
-		changeEvent.Details.SchemaVersion = changeEvent.SchemaVersion;
-
 		var serializedEvent = TableEventStore<T>.SerializeEvent(changeEvent);
 		var eventEntity = CreateSerializedEvent(
 			aggregate.Id(),
 			changeEvent,
+			metadata,
 			serializedEvent,
 			idempotencyMarkerOperation.RowKey
 		);
@@ -338,6 +346,7 @@ sealed class TableSaveOperation<T>(
 			var serializedEventPointer = CreateSerializedEvent(
 				aggregate.Id(),
 				changeEvent,
+				metadata,
 				TableEventStore<T>.SerializeEvent(largeEventPointer),
 				idempotencyMarkerOperation.RowKey
 			);
@@ -459,26 +468,27 @@ sealed class TableSaveOperation<T>(
 
 	EventEntity CreateSerializedEvent(
 		string aggregateId,
-		IEvent @event,
+		object @event,
+		EventMetadata metadata,
 		string serializedEvent,
 		string compoundIdempotencyId
 	) =>
 		new()
 		{
 			PartitionKey = aggregateId,
-			RowKey = store.CreateEventRowKey(@event.Details.AggregateVersion),
+			RowKey = store.CreateEventRowKey(metadata.AggregateVersion),
 			Payload = serializedEvent,
 			EventType = eventNameMapper.GetName<T>(@event),
 			IdempotencyId = compoundIdempotencyId,
-			SchemaVersion = @event.SchemaVersion,
-			CorrelationId = @event.Details.CorrelationId,
-			CausationId = @event.Details.CausationId,
-			UserId = @event.Details.UserId,
+			SchemaVersion = metadata.SchemaVersion,
+			CorrelationId = metadata.CorrelationId,
+			CausationId = metadata.CausationId,
+			UserId = metadata.UserId,
 		};
 
 	async Task WriteLargeEventEntitiesAsync(
 		T aggregate,
-		KeyValuePair<string, IEvent>[] largeChangeEvents,
+		KeyValuePair<string, object>[] largeChangeEvents,
 		string idempotencyId,
 		string compoundIdempotencyId,
 		CancellationToken cancellationToken
@@ -522,7 +532,7 @@ sealed class TableSaveOperation<T>(
 	static IdempotencyMarkerEntity CreateIdempotencyMarkerOperation(
 		T aggregate,
 		string idempotencyId,
-		IEvent[] changeEvents
+		EventRecord[] changeEvents
 	)
 	{
 		var compoundIdempotencyId = GenerateIdempotencyId(idempotencyId, changeEvents);
@@ -530,7 +540,7 @@ sealed class TableSaveOperation<T>(
 		IdempotencyMarkerEntity marker = new(aggregate.Id(), rowKey);
 		IdempotencyMarkerEventPayload eventObject = new()
 		{
-			EventIds = [.. changeEvents.Select(m => m.Details.AggregateVersion).OrderBy(m => m)],
+			EventIds = [.. changeEvents.Select(m => m.Metadata.AggregateVersion).OrderBy(m => m)],
 		};
 
 		marker.Events = EventStoreSerializationHelpers.Serialize(eventObject);
@@ -538,21 +548,21 @@ sealed class TableSaveOperation<T>(
 		return marker;
 	}
 
-	static string GenerateIdempotencyId(string idempotencyId, IEvent[] changeEvents)
+	static string GenerateIdempotencyId(string idempotencyId, EventRecord[] changeEvents)
 	{
 		HashCode hash = new();
 		for (var i = 0; i < changeEvents.Length; i++)
 		{
-			var @event = changeEvents[i];
+			var @event = changeEvents[i].Event;
 			hash.Add(@event);
 		}
 
 		return $"{idempotencyId}_{hash.ToHashCode()}";
 	}
 
-	bool ShouldSnapShot(T aggregate, IEvent[] events, EventStoreOperationContext? operationContext)
+	bool ShouldSnapShot(T aggregate, EventRecord[] events, EventStoreOperationContext? operationContext)
 	{
-		if (aggregate.Details.IsDeleted || events.OfType<Restored>().Any())
+		if (aggregate.Details.IsDeleted || events.Any(record => record.Event is Restored))
 			return true;
 
 		// If the aggregate hasn't been deleted or restored, run the strategy to

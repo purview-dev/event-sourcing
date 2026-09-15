@@ -50,13 +50,13 @@ partial class CustomerAggregateTests
 		// Arrange
 		var customer = CreateCustomer("cust-1");
 		customer.RegisterCustomer("Jane Smith", "jane@test.com");
-		var countBefore = customer.GetUnsavedEvents().Count();
+		var countBefore = customer.GetUnsavedEvents().Count;
 
 		// Act
 		customer.UpdateDetails(); // all nulls
 
 		// Assert
-		await Assert.That(customer.GetUnsavedEvents().Count()).IsEqualTo(countBefore);
+		await Assert.That(customer.GetUnsavedEvents().Count).IsEqualTo(countBefore);
 	}
 
 	[Test]
@@ -65,12 +65,12 @@ partial class CustomerAggregateTests
 		// Arrange
 		var customer = CreateCustomer("cust-1");
 		customer.RegisterCustomer("Jane Smith", "jane@test.com");
-		var countBefore = customer.GetUnsavedEvents().Count();
+		var countBefore = customer.GetUnsavedEvents().Count;
 
 		// Act & Assert — fails on invalid name, so no events recorded
 		await Assert.That(() => customer.UpdateDetails(name: "  ", email: "new@test.com")).Throws<ArgumentException>();
 
 		// Verify state unchanged
-		await Assert.That(customer.GetUnsavedEvents().Count()).IsEqualTo(countBefore);
+		await Assert.That(customer.GetUnsavedEvents().Count).IsEqualTo(countBefore);
 	}
 }

@@ -16,7 +16,7 @@ This document codifies the product-wide approach to event versioning and schema 
 1. **Events are append-only immutable facts.** Never change the meaning of persisted event data.
 2. **SchemaVersion is the versioning contract.** Track breaking payload changes through the `SchemaVersion` property on event classes.
 3. **Upcasting bridges payload versions.** When old events must hydrate into new event shapes, implement `IEventUpcaster<TSource, TTarget>`.
-4. **Unknown events fail safely.** Providers return `EventUnknown` when event types cannot be resolved or deserialized.
+4. **Unknown events fail safely.** Providers return `UnknownEvent` when event types cannot be resolved or deserialized.
 5. **All providers implement consistent replay semantics.** Replay-time upcasting is applied uniformly across SQL Server, Azure Storage, and MongoDB.
 
 ## When to Version vs. When to Rename
@@ -123,7 +123,7 @@ services.AddEventUpcaster<OrderCreatedV2, OrderCreated, OrderCreatedV2ToV3Upcast
 - **Legacy type resolution:** Legacy (source) event types are registered automatically from the upcaster registry when an aggregate is initialized, so stored legacy event names resolve back to CLR types during replay. No extra registration is required.
 - **Same-type upcasters:** An upcaster whose source and target types are the same (an in-place transform) is applied exactly once; it is not treated as a cycle.
 - **Cycle detection:** The registry detects and rejects circular upcaster chains (for example v1 → v2 → v1) when it is constructed.
-- **Unknown target:** If an old event has no upcaster path to a known type, it remains `EventUnknown`.
+- **Unknown target:** If an old event has no upcaster path to a known type, it remains `UnknownEvent`.
 
 ### Detecting Partial Replay
 
@@ -140,15 +140,15 @@ Downgrading (downcasting newer events into older shapes) remains unsupported; th
 
 When replaying an aggregate from the event stream:
 
-1. **Deserialize** the event from JSON. If the event type cannot be resolved, return `EventUnknown`.
+1. **Deserialize** the event from JSON. If the event type cannot be resolved, return `UnknownEvent`.
 2. **Apply upcasting chain** (if a registry is present). Follow all registered upcasters in sequence until no further upcaster is found.
 3. **Call aggregate.ApplyEvent()** with the (possibly upcast) event.
-4. **Handle unknown events** gracefully. The aggregate's `CanApplyEvent()` should return false for `EventUnknown`; the store logs and continues replay.
+4. **Handle unknown events** gracefully. The aggregate's `CanApplyEvent()` should return false for `UnknownEvent`; the store logs and continues replay.
 
 ### Provider Implementation Checklist
 - [ ] `GetEventRangeAsync()` applies the upcaster registry after deserializing.
 - [ ] `GetAsync()` (single aggregate load) applies the upcaster registry during replay.
-- [ ] Unknown event types return `EventUnknown` with metadata populated.
+- [ ] Unknown event types return `UnknownEvent` with metadata populated.
 - [ ] Upcasting errors are logged and surfaced (not silently swallowed).
 - [ ] Multi-hop upcasting chains are tested end-to-end.
 
@@ -174,7 +174,7 @@ All providers must verify:
 2. **Versioned events** – New events with `SchemaVersion > 1` deserialize correctly.
 3. **Single-hop upcasting** – V1 events are upcast to V2 during replay.
 4. **Multi-hop upcasting** – V1 → V2 → V3 chains work end-to-end.
-5. **Unknown events** – Missing event types produce `EventUnknown` and replay continues.
+5. **Unknown events** – Missing event types produce `UnknownEvent` and replay continues.
 6. **EventDetails preservation** – Metadata (idempotency, correlation, user) is copied in upcasters.
 7. **Cycle detection** – Circular upcaster chains are rejected at registry construction.
 
@@ -182,7 +182,7 @@ All providers must verify:
 
 - **Core abstractions:** `src/src/EventSourcing/Aggregates/Events/EventBase.cs`, `IEventUpcaster.cs`, `EventUpcasterRegistry.cs`
 - **SQL Server replay:** `src/src/SqlServer/Events/SqlServerEventStore.GetEventRangeAsync.cs` (reference implementation)
-- **Sample:** Versioned event example in `docs/wiki/` (to be added)
+- **Sample:** [Event-Versioning-Examples.md](Event-Versioning-Examples.md)
 - **Tests:** Provider-specific replay tests (to be harmonized)
 
 ---

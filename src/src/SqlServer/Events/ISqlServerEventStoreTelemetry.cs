@@ -218,6 +218,15 @@ public interface ISqlServerEventStoreTelemetry
 	void SnapshotDeserializationFailed(string aggregateId, string aggregateTypeFullName, Exception exception);
 
 	/// <summary>
+	/// Logs a failure while writing a best-effort snapshot after the events were committed.
+	/// </summary>
+	/// <param name="aggregateId">The id of the aggregate.</param>
+	/// <param name="aggregateTypeFullName">The full name of the aggregate type.</param>
+	/// <param name="exception">The exception that was thrown.</param>
+	[Log(LogLevel.Error)]
+	void SnapshotWriteFailure(string aggregateId, string aggregateTypeFullName, Exception exception);
+
+	/// <summary>
 	/// Logs a failure while reading an aggregate from the distributed cache.
 	/// </summary>
 	/// <param name="aggregateId">The id of the aggregate.</param>

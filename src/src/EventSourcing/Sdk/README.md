@@ -37,9 +37,11 @@ await store.SaveAsync(order, cancellationToken);
 ## Related packages
 
 - SQL Server (events and snapshots): `Purview.EventSourcing.SqlServer`
+- PostgreSQL (events and snapshots): `Purview.EventSourcing.Postgres`
 - Azure Storage (events with blob-backed snapshots/large payloads): `Purview.EventSourcing.AzureStorage`
 - MongoDB (events and snapshots): `Purview.EventSourcing.MongoDB`
 - Cosmos DB (snapshot only): `Purview.EventSourcing.CosmosDb`
+- In-memory (local and test scenarios): `Purview.EventSourcing.InMemory`
 
 ## Documentation
 

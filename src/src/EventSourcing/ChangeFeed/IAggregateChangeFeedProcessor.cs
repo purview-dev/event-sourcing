@@ -1,5 +1,4 @@
-﻿using Purview.EventSourcing.Aggregates;
-using Purview.EventSourcing.Aggregates.Events;
+using Purview.EventSourcing.Aggregates;
 
 namespace Purview.EventSourcing.ChangeFeed;
 
@@ -38,7 +37,7 @@ public interface IAggregateChangeFeedProcessor
 	/// <param name="aggregate">The aggregate that was saved.</param>
 	/// <param name="previousSavedVersion">The aggregate version prior to being saved, if the aggregate is new then this will be 0 (zero).</param>
 	/// <param name="isNew">Indicates if the aggregate was new.</param>
-	/// <param name="events">The <see cref="IEvent"/>s that were saved as part of this operation.</param>
+	/// <param name="events">The <see cref="EventRecord"/>s that were saved as part of this operation.</param>
 	/// <param name="cancellationToken">The stopping token.</param>
 	/// <returns>An awaitable task.</returns>
 	/// <remarks>Returns a <see cref="Task.CompletedTask"/>.</remarks>
@@ -46,7 +45,7 @@ public interface IAggregateChangeFeedProcessor
 		IAggregate aggregate,
 		int previousSavedVersion,
 		bool isNew,
-		IEvent[] events,
+		EventRecord[] events,
 		CancellationToken cancellationToken = default
 	) => Task.CompletedTask;
 
@@ -109,7 +108,7 @@ public interface IAggregateChangeFeedProcessor<T>
 	/// <param name="aggregate">The aggregate to be saved.</param>
 	/// <param name="previousSavedVersion">The aggregate version prior to being saved, if the aggregate is new then this will be 0 (zero).</param>
 	/// <param name="isNew">Indicates if the aggregate is new or it is an existing aggregate.</param>
-	/// <param name="events">The <see cref="IEvent"/>s that were saved as part of this operation.</param>
+	/// <param name="events">The <see cref="EventRecord"/>s that were saved as part of this operation.</param>
 	/// <param name="cancellationToken">The stopping token.</param>
 	/// <returns>An awaitable task.</returns>
 	/// <remarks>Returns a <see cref="Task.CompletedTask"/>.</remarks>
@@ -117,7 +116,7 @@ public interface IAggregateChangeFeedProcessor<T>
 		T aggregate,
 		int previousSavedVersion,
 		bool isNew,
-		IEvent[] events,
+		EventRecord[] events,
 		CancellationToken cancellationToken = default
 	) => Task.CompletedTask;
 

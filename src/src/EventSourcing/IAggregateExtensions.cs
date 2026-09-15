@@ -1,8 +1,7 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using Purview.EventSourcing.Aggregates;
-using Purview.EventSourcing.Aggregates.Events;
 
 namespace Purview.EventSourcing;
 
@@ -43,7 +42,7 @@ public static class IAggregateExtensions
 	/// </summary>
 	/// <typeparam name="TAggregate">The <see cref="AggregateBase"/> type.</typeparam>
 	/// <typeparam name="TProperty">The type of the property on the <typeparamref name="TAggregate"/>.</typeparam>
-	/// <typeparam name="TEvent">The type of <see cref="IEvent"/> to create.</typeparam>
+	/// <typeparam name="TEvent">The type of event to create.</typeparam>
 	/// <param name="aggregate">The <typeparamref name="TAggregate"/> instance.</param>
 	/// <param name="aggregatePropertyExpression">An expression to the property to update.</param>
 	/// <param name="proposedValue">The new value of the property.</param>
@@ -56,7 +55,7 @@ public static class IAggregateExtensions
 		[NotNull] Func<TProperty, TEvent> eventCreator
 	)
 		where TAggregate : AggregateBase
-		where TEvent : IEvent
+		where TEvent : class
 	{
 		if (aggregatePropertyExpression.Body is not MemberExpression aggregateExpressionMember)
 			throw new ArgumentException("Invalid property expression.", nameof(aggregatePropertyExpression));

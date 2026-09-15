@@ -13,7 +13,7 @@ When a consumer project directly references the `Purview.EventSourcing.Validatio
 Add a direct package reference:
 
 ```xml
-<PackageReference Include="ZodSharp" />
+<PackageReference Include="Purview.ZodSharp" />
 ```
 
 ### Automated enforcement
@@ -24,7 +24,7 @@ Add a direct package reference:
 - Runs: `BeforeTargets="ResolveReferences"`
 - Behavior:
   - Detects projects that reference `Purview.EventSourcing.Validation.ZodSharp` via `ProjectReference`
-  - Fails the build if `PackageReference Include="ZodSharp"` is missing
+  - Fails the build if `PackageReference Include="Purview.ZodSharp"` is missing
   - Emits a remediation message with the exact package reference to add
 
 This shifts failure left from runtime to build-time.
@@ -42,8 +42,8 @@ When using either adapter package directly from source projects, keep direct pac
 
 ## Admin API validation and OpenAPI dependencies
 
-`Purview.EventSourcing.Admin.Api` validates its request contracts and options with ZodSharp source-generated schemas and ships the Admin API OpenAPI document (`/openapi/admin.json`) used to generate `Purview.EventSourcing.Admin.Client`. As a result `ZodSharp`, `ZodSharp.AspNetCore`, and `ZodSharp.SystemTextJson` are direct dependencies of the Admin API package.
+`Purview.EventSourcing.Admin.API` validates its request contracts and options with ZodSharp source-generated schemas and ships the Admin API OpenAPI document (`/openapi/admin.json`) used to generate `Purview.EventSourcing.Admin.Client`. As a result `ZodSharp`, `ZodSharp.AspNetCore`, and `ZodSharp.SystemTextJson` are direct dependencies of the Admin API package.
 
 ### OpenAPI XML-comment source generator is disabled in Admin.API
 
-The `Microsoft.AspNetCore.OpenApi` package ships a source generator that builds a runtime cache of XML doc IDs across the compilation and its referenced assemblies. Purview's telemetry scaffolding (`Purview.Telemetry.SourceGenerator`) re-declares the same attribute types in every assembly, which makes that cache throw at runtime with a duplicate key when an OpenAPI document is generated. The Admin.API project therefore removes the `Microsoft.AspNetCore.OpenApi.SourceGenerators` analyzer from its compilation (see `Admin.API.csproj`), and the spec-export tool (`src/tools/AdminApi.OpenApi`) does not feed referenced assembly XML docs to the generator. The generated Admin API document and typed client remain complete; XML-comment-derived schema descriptions are omitted.
+The `Microsoft.AspNetCore.OpenApi` package ships a source generator that builds a runtime cache of XML doc IDs across the compilation and its referenced assemblies. Purview's telemetry scaffolding (`Purview.Telemetry.SourceGenerator`) re-declares the same attribute types in every assembly, which makes that cache throw at runtime with a duplicate key when an OpenAPI document is generated. The Admin.API project therefore removes the `Microsoft.AspNetCore.OpenApi.SourceGenerators` analyzer from its compilation (see `Admin.API.csproj`), and the spec-export tool (`src/tools/AdminAPI.OpenAPI`) does not feed referenced assembly XML docs to the generator. The generated Admin API document and typed client remain complete; XML-comment-derived schema descriptions are omitted.

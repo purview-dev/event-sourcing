@@ -1,4 +1,4 @@
-﻿using Purview.EventSourcing.Aggregates.Test;
+using Purview.EventSourcing.Aggregates.Test;
 using Purview.EventSourcing.Aggregates.Test.Events;
 
 namespace Purview.EventSourcing.Aggregates;
@@ -71,7 +71,7 @@ public partial class AggregateBaseTests
 
 		// Assert
 		await Assert.That(aggregate.Details.CurrentVersion).IsEqualTo(expectedVersion);
-		await Assert.That(aggregate.GetUnsavedEvents().Count()).IsEqualTo(expectedVersion);
+		await Assert.That(aggregate.GetUnsavedEvents().Count).IsEqualTo(expectedVersion);
 	}
 
 	[Test]

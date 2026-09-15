@@ -32,16 +32,16 @@ partial class SQLServerSnapshotEventStoreTests
 
 		public IReadOnlyList<int> UnsupportedMap { get; init; } = [];
 
-		public IEnumerable<IEvent> GetUnsavedEvents() => [];
+		public IReadOnlyList<EventRecord> GetUnsavedEvents() => [];
 
 		public bool HasUnsavedEvents() => false;
 
 		public IEnumerable<Type> GetRegisteredEventTypes() => [];
 
-		public bool CanApplyEvent(IEvent aggregateEvent) => false;
+		public bool CanApplyEvent(object aggregateEvent) => false;
 
 		public void ClearUnsavedEvents(int? upToVersion = null) { }
 
-		void IAggregate.ApplyEvent(IEvent @event) { }
+		void IAggregate.ApplyEvent(object @event, EventMetadata metadata) { }
 	}
 }

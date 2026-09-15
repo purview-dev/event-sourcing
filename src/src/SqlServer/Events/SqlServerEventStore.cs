@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
@@ -50,7 +52,15 @@ public sealed partial class SqlServerEventStore<T> : ISqlServerEventStore<T>, IT
 
 	readonly string _aggregateTypeFullName;
 	readonly string _aggregateTypeShortName;
+	readonly string _cacheKeyPrefix;
+	readonly string _eventIdPrefix;
+	readonly string _idempotencyCheckIdPrefix;
+	readonly string _snapshotIdPrefix;
 	readonly int _snapshotSchemaVersion = AggregateSnapshotSchema.GetVersion<T>();
+
+	static readonly string CacheStorageSuffix = AggregateSnapshotSchema.GetStorageSuffix<T>();
+
+	static readonly ConcurrentDictionary<string, Type> EventTypeCache = new(StringComparer.Ordinal);
 
 	/// <summary>
 	/// Creates a new <see cref="SqlServerEventStore{T}"/> instance.
@@ -98,6 +108,11 @@ public sealed partial class SqlServerEventStore<T> : ISqlServerEventStore<T>, IT
 		if (!aggregateName.Contains('.', StringComparison.InvariantCulture))
 			_aggregateTypeShortName = aggregateName;
 
+		_cacheKeyPrefix = $"{_aggregateTypeShortName}:{CacheStorageSuffix}";
+		_eventIdPrefix = $"e_{_aggregateTypeShortName}_";
+		_idempotencyCheckIdPrefix = $"i_{_aggregateTypeShortName}_";
+		_snapshotIdPrefix = $"snap_{_aggregateTypeShortName}_";
+
 		var clientOptions = ResolveClientOptions(sqlServerOptions.Value, _aggregateTypeShortName);
 		_client = new SqlServerEventStoreClient(clientOptions);
 	}
@@ -116,24 +131,24 @@ public sealed partial class SqlServerEventStore<T> : ISqlServerEventStore<T>, IT
 		CancellationToken cancellationToken = default
 	)
 	{
-		cacheEntryOptions = GetCacheEntryOptions(cacheEntryOptions);
-
 		try
 		{
-			var cacheKey = CreateCacheKey(aggregate.Id());
 			if (
 				aggregate.Details.Locked
 				|| (aggregate.Details.IsDeleted && _eventStoreOptions.Value.RemoveDeletedFromCache)
 			)
-				await _distributedCache.RemoveAsync(cacheKey, cancellationToken);
-			else
 			{
-				if (!_eventStoreOptions.Value.CacheMode.HasFlag(SnapshotCachingOptions.StoreInCache))
-					return;
-
-				var data = SerializeSnapshot(aggregate);
-				await _distributedCache.SetStringAsync(cacheKey, data, cacheEntryOptions, cancellationToken);
+				await _distributedCache.RemoveAsync(CreateCacheKey(aggregate.Id()), cancellationToken);
+				return;
 			}
+
+			if (!_eventStoreOptions.Value.CacheMode.HasFlag(SnapshotCachingOptions.StoreInCache))
+				return;
+
+			var cacheKey = CreateCacheKey(aggregate.Id());
+			cacheEntryOptions = GetCacheEntryOptions(cacheEntryOptions);
+			var data = SerializeSnapshot(aggregate);
+			await _distributedCache.SetStringAsync(cacheKey, data, cacheEntryOptions, cancellationToken);
 		}
 #pragma warning disable CA1031
 		catch (Exception ex)
@@ -196,7 +211,7 @@ public sealed partial class SqlServerEventStore<T> : ISqlServerEventStore<T>, IT
 
 			elapsedMilliseconds = sw.ElapsedMilliseconds;
 
-			if (row == null || row.EntityType != StreamVersionType)
+			if (row == null || row.Value.EntityType != StreamVersionType)
 			{
 				if (expectedToExist)
 					_eventStoreTelemetry.StreamVersionExpectedToExistButNotFound(
@@ -211,11 +226,11 @@ public sealed partial class SqlServerEventStore<T> : ISqlServerEventStore<T>, IT
 			{
 				result = new StreamVersionData
 				{
-					Id = row.Id,
-					AggregateId = row.AggregateId,
-					AggregateType = row.AggregateType,
-					Version = row.Version,
-					IsDeleted = row.IsDeleted,
+					Id = row.Value.Id,
+					AggregateId = row.Value.AggregateId,
+					AggregateType = row.Value.AggregateType,
+					Version = row.Value.Version,
+					IsDeleted = row.Value.IsDeleted,
 				};
 				_eventStoreTelemetry.StreamVersionFound(
 					aggregateId,
@@ -256,21 +271,39 @@ public sealed partial class SqlServerEventStore<T> : ISqlServerEventStore<T>, IT
 
 	string CreateStreamVersionId(string aggregateId) => $"s_{_aggregateTypeShortName}_{aggregateId}";
 
-	string CreateEventId(string aggregateId, int version) =>
-		$"e_{_aggregateTypeShortName}_{aggregateId}_{$"{version}".PadLeft(_eventStoreOptions.Value.EventSuffixLength, '0')}";
+	string CreateEventId(string aggregateId, int version)
+	{
+		var versionText = version.ToString(CultureInfo.InvariantCulture);
+		var padLength = Math.Max(0, _eventStoreOptions.Value.EventSuffixLength - versionText.Length);
+		return string.Create(
+			_eventIdPrefix.Length + aggregateId.Length + 1 + versionText.Length + padLength,
+			(_eventIdPrefix, aggregateId, versionText, padLength),
+			static (span, state) =>
+			{
+				state._eventIdPrefix.AsSpan().CopyTo(span);
+				var position = state._eventIdPrefix.Length;
+				state.aggregateId.AsSpan().CopyTo(span[position..]);
+				position += state.aggregateId.Length;
+				span[position] = '_';
+				position++;
+				span.Slice(position, state.padLength).Fill('0');
+				position += state.padLength;
+				state.versionText.AsSpan().CopyTo(span[position..]);
+			}
+		);
+	}
 
 	string CreateIdempotencyCheckId(string aggregateId, string idempotencyId) =>
-		$"i_{_aggregateTypeShortName}_{aggregateId}_{idempotencyId}";
+		string.Concat(_idempotencyCheckIdPrefix, aggregateId, "_", idempotencyId);
 
-	string CreateSnapshotId(string aggregateId) => $"snap_{_aggregateTypeShortName}_{aggregateId}";
+	string CreateSnapshotId(string aggregateId) => string.Concat(_snapshotIdPrefix, aggregateId);
 
 	/// <summary>
 	/// Creates the distributed-cache key for an aggregate.
 	/// </summary>
 	/// <param name="aggregateId">The id of the aggregate.</param>
 	/// <returns>The cache key, derived from the aggregate type's short name and id.</returns>
-	public string CreateCacheKey(string aggregateId) =>
-		$"{_aggregateTypeShortName}:{aggregateId}{AggregateSnapshotSchema.GetStorageSuffix<T>()}".ToUpperInvariant();
+	public string CreateCacheKey(string aggregateId) => $"{_cacheKeyPrefix}{aggregateId}".ToUpperInvariant();
 
 	//async Task EnsureConfiguredAsync(CancellationToken cancellationToken)
 	//{

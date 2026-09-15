@@ -64,14 +64,14 @@ public sealed class EventUpcasterRegistry : IEventUpcasterRegistry
 	}
 
 	/// <inheritdoc/>
-	public bool CanUpcast(IEvent aggregateEvent)
+	public bool CanUpcast(object aggregateEvent)
 	{
 		ArgumentNullException.ThrowIfNull(aggregateEvent);
 		return _upcastersBySourceType.ContainsKey(aggregateEvent.GetType());
 	}
 
 	/// <inheritdoc/>
-	public IEvent Upcast(IEvent aggregateEvent)
+	public object Upcast(object aggregateEvent)
 	{
 		ArgumentNullException.ThrowIfNull(aggregateEvent);
 

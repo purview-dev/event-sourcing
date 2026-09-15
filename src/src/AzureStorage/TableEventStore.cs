@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Azure.Data.Tables;
@@ -49,6 +50,8 @@ public sealed partial class TableEventStore<T> : ITableEventStore<T>, IAsyncDisp
 	readonly string _aggregateTypeFullName;
 	readonly string _aggregateTypeShortName;
 	readonly TableSaveOperation<T> _saveOperation;
+
+	static readonly ConcurrentDictionary<string, Type> EventTypeCache = new(StringComparer.Ordinal);
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="TableEventStore{T}"/> class.

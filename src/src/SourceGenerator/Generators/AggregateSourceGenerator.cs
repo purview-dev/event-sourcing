@@ -14,6 +14,16 @@ public sealed partial class AggregateSourceGenerator : IIncrementalGenerator
 			});
 
 		var generationContext = SourceGenLibrary.GetGenerationContext(context);
+
+		// Keep the compilation reference stable across identical reruns so the incremental pipeline
+		// short-circuits instead of re-executing every aggregate transform (see PreCompilationMarker).
+#pragma warning disable RSEXPERIMENTAL007 // Pre-compilation source output is intentionally used to stabilize the incremental cache.
+		context.RegisterPreCompilationSourceOutput(
+			Common.PreCompilationMarker.Provider(context),
+			static (spc, source) => spc.AddSource(Common.PreCompilationMarker.HintName, source)
+		);
+#pragma warning restore RSEXPERIMENTAL007
+
 		var aggregateTargets = SourceGenLibrary.GetAggregateTargets(context);
 
 		context.RegisterSourceOutput(

@@ -1,6 +1,5 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Purview.EventSourcing.Aggregates;
-using Purview.EventSourcing.Aggregates.Events;
 
 namespace Purview.EventSourcing.ChangeFeed;
 
@@ -82,7 +81,7 @@ sealed class AggregateChangeFeedNotifier<T>(
 		T aggregate,
 		int previousSavedVersion,
 		bool isNew,
-		IEvent[] events,
+		EventRecord[] events,
 		CancellationToken cancellationToken = default
 	)
 	{

@@ -1,4 +1,5 @@
-﻿using Purview.EventSourcing.Aggregates.Events;
+using System.Text.Json.Serialization;
+using Purview.EventSourcing.Aggregates.Events;
 
 namespace Purview.EventSourcing.Aggregates;
 
@@ -12,7 +13,11 @@ public class InvalidEventTestAggregate : AggregateBase
 	void Apply(InvalidEventType obj) { }
 }
 
-public class InvalidEventType : EventBase
+[EventContract]
+public sealed record InvalidEventType
 {
-	protected override void BuildEventHash(ref HashCode hash) { }
+	public static int SchemaVersion => 1;
+
+	[JsonIgnore]
+	public EventMetadata Metadata { get; init; }
 }

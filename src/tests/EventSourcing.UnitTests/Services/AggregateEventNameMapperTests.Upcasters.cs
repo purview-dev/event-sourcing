@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.Aggregates.Events.Upcasting;
 using Purview.EventSourcing.Services;
@@ -6,26 +7,31 @@ namespace Purview.EventSourcing;
 
 partial class AggregateEventNameMapperTests
 {
-	sealed class LegacyEventV1 : EventBase
+	[EventContract]
+	sealed record LegacyEventV1
 	{
-		public string OldField { get; set; } = default!;
+		public static int SchemaVersion => 1;
 
-		protected override void BuildEventHash(ref HashCode hash) => hash.Add(OldField);
+		[JsonIgnore]
+		public EventMetadata Metadata { get; init; }
+
+		public string OldField { get; set; } = default!;
 	}
 
-	sealed class CurrentEventV2 : EventBase
+	[EventContract]
+	sealed record CurrentEventV2
 	{
+		public static int SchemaVersion => 2;
+
+		[JsonIgnore]
+		public EventMetadata Metadata { get; init; }
+
 		public string NewField { get; set; } = default!;
-
-		public override int SchemaVersion => 2;
-
-		protected override void BuildEventHash(ref HashCode hash) => hash.Add(NewField);
 	}
 
 	sealed class LegacyEventV1ToCurrentEventV2Upcaster : IEventUpcaster<LegacyEventV1, CurrentEventV2>
 	{
-		public CurrentEventV2 Upcast(LegacyEventV1 source) =>
-			new() { Details = source.Details, NewField = source.OldField + "_upgraded" };
+		public CurrentEventV2 Upcast(LegacyEventV1 source) => new() { NewField = source.OldField + "_upgraded" };
 	}
 
 	[Test]

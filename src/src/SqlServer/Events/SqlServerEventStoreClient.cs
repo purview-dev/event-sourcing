@@ -32,6 +32,7 @@ sealed partial class SqlServerEventStoreClient
 
 	readonly SqlServerEventStoreOptions _options;
 	readonly string _tableEnsureKey;
+	readonly DbContextOptions<EventStoreDbContext> _connectionStringOptions;
 
 	public SqlServerEventStoreClient(SqlServerEventStoreOptions options)
 	{
@@ -46,6 +47,15 @@ sealed partial class SqlServerEventStoreClient
 			nameof(SqlServerEventStoreOptions.JsonIndexOptions)
 		);
 		_tableEnsureKey = $"{_options.ConnectionString}|{_options.SchemaName}|{_options.TableName}";
+		_connectionStringOptions = CreateConnectionStringOptions();
+	}
+
+	DbContextOptions<EventStoreDbContext> CreateConnectionStringOptions()
+	{
+		DbContextOptionsBuilder<EventStoreDbContext> optionsBuilder = new();
+		var commandTimeout = Math.Max(1, _options.TimeoutInSeconds ?? 60);
+		optionsBuilder.UseSqlServer(_options.ConnectionString, sql => sql.CommandTimeout(commandTimeout));
+		return optionsBuilder.Options;
 	}
 
 	public Task EnsureTableExistsAsync(CancellationToken cancellationToken = default) =>
@@ -260,6 +270,11 @@ sealed partial class SqlServerEventStoreClient
 		);
 	}
 
+	[System.Diagnostics.CodeAnalysis.SuppressMessage(
+		"Design",
+		"CA1068:CancellationToken parameters must come last",
+		Justification = "Optional internal batch parameter; CancellationToken keeps its established position."
+	)]
 	public async Task UpsertWithBatchAsync(
 		string id,
 		int entityType,
@@ -272,7 +287,10 @@ sealed partial class SqlServerEventStoreClient
 		string? idempotencyId,
 		DateTimeOffset timestamp,
 		List<RowData> additionalInserts,
-		CancellationToken cancellationToken = default
+		CancellationToken cancellationToken = default,
+		bool knownNew = false,
+		RowData? snapshotRow = null,
+		bool snapshotIsNew = false
 	)
 	{
 		await EnsureConfiguredAsync(cancellationToken);
@@ -291,14 +309,29 @@ sealed partial class SqlServerEventStoreClient
 			idempotencyId,
 			timestamp,
 			1,
-			cancellationToken
+			cancellationToken,
+			knownNew
 		);
+
+		if (snapshotRow is not null)
+			await UpsertSnapshotInBatchAsync(
+				context,
+				snapshotRow.Value,
+				snapshotIsNew,
+				additionalInserts,
+				cancellationToken
+			);
 
 		context.EventStoreEntities.AddRange(additionalInserts.Select(ToEntity));
 		await context.SaveChangesAsync(cancellationToken);
 		await transaction.CommitAsync(cancellationToken);
 	}
 
+	[System.Diagnostics.CodeAnalysis.SuppressMessage(
+		"Design",
+		"CA1068:CancellationToken parameters must come last",
+		Justification = "Optional internal batch parameter; CancellationToken keeps its established position."
+	)]
 	public async Task UpsertWithBatchAsync(
 		string id,
 		int entityType,
@@ -313,7 +346,10 @@ sealed partial class SqlServerEventStoreClient
 		List<RowData> additionalInserts,
 		SqlConnection connection,
 		SqlTransaction transaction,
-		CancellationToken cancellationToken = default
+		CancellationToken cancellationToken = default,
+		bool knownNew = false,
+		RowData? snapshotRow = null,
+		bool snapshotIsNew = false
 	)
 	{
 		ArgumentNullException.ThrowIfNull(connection);
@@ -333,11 +369,53 @@ sealed partial class SqlServerEventStoreClient
 			idempotencyId,
 			timestamp,
 			1,
-			cancellationToken
+			cancellationToken,
+			knownNew
 		);
+
+		if (snapshotRow is not null)
+			await UpsertSnapshotInBatchAsync(
+				context,
+				snapshotRow.Value,
+				snapshotIsNew,
+				additionalInserts,
+				cancellationToken
+			);
 
 		context.EventStoreEntities.AddRange(additionalInserts.Select(ToEntity));
 		await context.SaveChangesAsync(cancellationToken);
+	}
+
+	static async Task UpsertSnapshotInBatchAsync(
+		EventStoreDbContext context,
+		RowData snapshotRow,
+		bool snapshotIsNew,
+		List<RowData> additionalInserts,
+		CancellationToken cancellationToken
+	)
+	{
+		if (snapshotIsNew)
+		{
+			additionalInserts.Add(snapshotRow);
+			return;
+		}
+
+		await UpsertCoreAsync(
+			context,
+			snapshotRow.Id,
+			snapshotRow.EntityType,
+			snapshotRow.AggregateId,
+			snapshotRow.AggregateType,
+			snapshotRow.Version,
+			snapshotRow.IsDeleted,
+			snapshotRow.Payload,
+			snapshotRow.EventType,
+			snapshotRow.IdempotencyId,
+			snapshotRow.Timestamp,
+			snapshotRow.SchemaVersion,
+			cancellationToken,
+			knownNew: false
+		);
 	}
 
 	public async Task<bool> DeleteByIdAsync(string id, CancellationToken cancellationToken = default)
@@ -597,13 +675,7 @@ sealed partial class SqlServerEventStoreClient
 		}
 	}
 
-	EventStoreDbContext CreateContext()
-	{
-		DbContextOptionsBuilder<EventStoreDbContext> optionsBuilder = new();
-		var commandTimeout = Math.Max(1, _options.TimeoutInSeconds ?? 60);
-		optionsBuilder.UseSqlServer(_options.ConnectionString, sql => sql.CommandTimeout(commandTimeout));
-		return new(optionsBuilder.Options, _options.SchemaName, _options.TableName);
-	}
+	EventStoreDbContext CreateContext() => new(_connectionStringOptions, _options.SchemaName, _options.TableName);
 
 	EventStoreDbContext CreateContext(SqlConnection connection, SqlTransaction? transaction)
 	{
@@ -629,10 +701,14 @@ sealed partial class SqlServerEventStoreClient
 		string? idempotencyId,
 		DateTimeOffset timestamp,
 		int schemaVersion,
-		CancellationToken cancellationToken
+		CancellationToken cancellationToken,
+		bool knownNew = false
 	)
 	{
-		var entity = await context.EventStoreEntities.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+		EventStoreEntity? entity = null;
+		if (!knownNew)
+			entity = await context.EventStoreEntities.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+
 		if (entity is null)
 		{
 			context.EventStoreEntities.Add(
@@ -770,21 +846,23 @@ sealed partial class SqlServerEventStoreClient
 	[GeneratedRegex(@"^[\w\-\.]+$")]
 	private static partial Regex IdentifierRegex();
 
-	internal sealed class RowData
+	internal readonly record struct RowData
 	{
-		public string Id { get; set; } = default!;
-		public int EntityType { get; set; }
-		public string AggregateId { get; set; } = default!;
-		public string AggregateType { get; set; } = default!;
-		public int Version { get; set; }
-		public bool IsDeleted { get; set; }
-		public string? Payload { get; set; }
-		public string? EventType { get; set; }
-		public string? IdempotencyId { get; set; }
-		public int SchemaVersion { get; set; } = 1;
-		public string? CorrelationId { get; set; }
-		public string? CausationId { get; set; }
-		public string? UserId { get; set; }
-		public DateTimeOffset Timestamp { get; set; }
+		public RowData() { }
+
+		public string Id { get; init; } = default!;
+		public int EntityType { get; init; }
+		public string AggregateId { get; init; } = default!;
+		public string AggregateType { get; init; } = default!;
+		public int Version { get; init; }
+		public bool IsDeleted { get; init; }
+		public string? Payload { get; init; }
+		public string? EventType { get; init; }
+		public string? IdempotencyId { get; init; }
+		public int SchemaVersion { get; init; } = 1;
+		public string? CorrelationId { get; init; }
+		public string? CausationId { get; init; }
+		public string? UserId { get; init; }
+		public DateTimeOffset Timestamp { get; init; }
 	}
 }

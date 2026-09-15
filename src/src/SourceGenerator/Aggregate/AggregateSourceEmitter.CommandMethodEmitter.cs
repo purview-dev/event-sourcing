@@ -34,7 +34,14 @@ static partial class CommandMethodEmitter
 				if (!method.ComputedParameters.IsEmpty)
 					EmitOnComputingAfter(writeBody, method, hookSuffix);
 
-				EmitEventCreationAndShouldApply(writeBody, method, hookSuffix, declareVariable: false);
+				// Reflect any ref-parameter mutations the hooks made into the single event instance,
+				// then re-evaluate the guard against the post-hook values.
+				AggregateSourceEmitter.EmitEventSync(writeBody, method);
+
+				writer.IfBlock(
+					$"!ShouldApply{hookSuffix}(@event)",
+					ifBody => AggregateSourceEmitter.EmitNoChangeReturn(ifBody, method.ReturnKind)
+				);
 
 				if (!method.AllParameters.IsEmpty)
 				{

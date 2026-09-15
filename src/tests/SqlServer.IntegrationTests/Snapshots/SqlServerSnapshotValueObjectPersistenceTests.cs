@@ -1,5 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
-using Purview.EventSourcing.Aggregates.Events;
+using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Fixtures.SqlServer;
 using Purview.EventSourcing.Samples.Domain;
 using Purview.EventSourcing.Samples.ValueObjects;
@@ -40,7 +40,7 @@ public sealed class SqlServerSnapshotValueObjectPersistenceTests(SqlServerSnapsh
 		);
 		var snapshot = snapshotQuery.Results.SingleOrDefault();
 
-		List<(IEvent @event, string eventType)> events = [];
+		List<(EventRecord EventRecord, string EventType)> events = [];
 		await foreach (
 			var @event in store.GetEventRangeAsync(aggregateId, versionFrom: 1, versionTo: null, cancellationToken)
 		)
@@ -48,7 +48,7 @@ public sealed class SqlServerSnapshotValueObjectPersistenceTests(SqlServerSnapsh
 			events.Add(@event);
 		}
 
-		var eventPayload = events.Single().@event;
+		var eventPayload = events.Single().EventRecord.Event;
 		var eventUserDetails = eventPayload
 			.GetType()
 			.GetProperty(nameof(SnapshotValueObjectsAggregate.UserDetails))!

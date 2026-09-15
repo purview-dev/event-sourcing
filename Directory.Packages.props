@@ -5,9 +5,10 @@
 		<RoslynCompilerVersion>5.9.0</RoslynCompilerVersion>
 		<RoslynAnalyzersVersion>5.9.0</RoslynAnalyzersVersion>
 		<TUnitVersion>1.67.0</TUnitVersion>
-		<PurviewSGFrameworkVersion>1.0.0-prerelease.39</PurviewSGFrameworkVersion>
-		<PurviewZodSharpVersion>2.0.0-prerelease.5</PurviewZodSharpVersion>
+		<PurviewSGFrameworkVersion>1.0.0-prerelease.42</PurviewSGFrameworkVersion>
+		<PurviewZodSharpVersion>2.0.0-prerelease.6</PurviewZodSharpVersion>
 		<TestcontainersVersion>4.15.0</TestcontainersVersion>
+		<BenchmarkDotNetVersion>0.14.0</BenchmarkDotNetVersion>
 		<DotnetRuntimeVersion>10.0.12</DotnetRuntimeVersion>
 		<AspireVersion>13.5.3</AspireVersion>
 		<OTelVersion>1.18.0</OTelVersion>
@@ -15,7 +16,7 @@
 	</PropertyGroup>
 	<ItemGroup>
 		<PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="$(AspireVersion)" />
-		<PackageVersion Include="AspireC4.Hosting" Version="13.3.5" />
+		<PackageVersion Include="AspireC4.Hosting" Version="13.5.3" />
 		<PackageVersion Include="Bogus" Version="35.6.5" />
 		<PackageVersion Include="LinqKit" Version="1.3.11" />
 		<PackageVersion Include="FluentValidation" Version="12.1.1" />
@@ -38,7 +39,7 @@
 			Include="Purview.SourceGeneratorFramework.Testing.TUnit"
 			Version="$(PurviewSGFrameworkVersion)"
 		/>
-		<PackageVersion Include="Purview.Telemetry.SourceGenerator" Version="5.0.0-prerelease.7" />
+		<PackageVersion Include="Purview.Telemetry.SourceGenerator" Version="5.0.0-prerelease.8" />
 		<PackageVersion Include="Purview.ZodSharp" Version="$(PurviewZodSharpVersion)" />
 		<PackageVersion Include="Purview.ZodSharp.AspNetCore" Version="$(PurviewZodSharpVersion)" />
 		<PackageVersion Include="Purview.ZodSharp.SystemTextJson" Version="$(PurviewZodSharpVersion)" />
@@ -67,6 +68,7 @@
 		<PackageVersion Include="TUnit.Mocks" Version="$(TUnitVersion)" />
 		<PackageVersion Include="Azure.Storage.Blobs" Version="12.29.2" />
 		<PackageVersion Include="Azure.Data.Tables" Version="12.12.0" />
+		<PackageVersion Include="BenchmarkDotNet" Version="$(BenchmarkDotNetVersion)" />
 		<PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.63.0" />
 		<PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
 		<PackageVersion Include="Microsoft.Data.SqlClient" Version="7.0.3" />

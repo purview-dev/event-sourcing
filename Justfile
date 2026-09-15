@@ -6,8 +6,7 @@ test_root := root_folder + "/tests"
 
 solution_file := root_folder + "/EventSourcing.slnx"
 
-sg_perf_tests := test_root + "/SourceGenerator.PerformanceTests/SourceGenerator.PerformanceTests.csproj"
-sql_perf_tests := test_root + "/SqlServer.PerformanceTests/SqlServer.PerformanceTests.csproj"
+benchmarks_project := root_folder + "/src/Benchmarks/Benchmarks.csproj"
 
 build_configuration := "Debug"
 artifacts_folder := "./artifacts"
@@ -15,7 +14,7 @@ artifacts_folder := "./artifacts"
 pipeline_feed := "https://api.nuget.org/v3/index.json"
 pipeline_tool := ".tools/purview-build/purview-build"
 
-current_version := `node -p "require('./package.json').version"`
+current_version := `bun -p "require('./package.json').version"`
 
 [private]
 default:
@@ -75,7 +74,7 @@ vs:
 # Export the Admin API OpenAPI document to src/src/Admin.Client/OpenApi/admin.openapi.json
 [group('Utilities')]
 admin-openapi-export:
-    dotnet run --project src/tools/AdminApi.OpenApi --configuration {{ build_configuration }}
+    dotnet run --project src/tools/AdminAPI.OpenAPI --configuration {{ build_configuration }}
 
 # Regenerate the NSwag Admin API client from the committed OpenAPI document
 [group('Utilities')]
@@ -88,13 +87,13 @@ admin-client-regenerate:
     just admin-openapi-export
     just admin-client-generate
 
-# Build the solution for the specified configuration (default: Release)
+# Build the solution for the specified configuration (default: Debug; CI uses the Release pipeline)
 [group('Build and Test')]
 build *args:
     echo "==> Building {{ BLUE }}{{ solution_file }}{{ NORMAL }} ({{ GREEN }}{{ current_version }}{{ NORMAL }}) with configuration {{ YELLOW }}{{ build_configuration }}{{ NORMAL }}"
     dotnet build {{ solution_file }} --configuration {{ build_configuration }} {{ args }}
 
-# Cleans the solution for the specified configuration (default: Release)
+# Cleans the solution for the specified configuration (default: Debug)
 [group('Build and Test')]
 clean *args:
     echo "==> Cleaning {{ BLUE }}{{ solution_file }}{{ NORMAL }} ({{ GREEN }}{{ current_version }}{{ NORMAL }}) with configuration {{ YELLOW }}{{ build_configuration }}{{ NORMAL }}"
@@ -115,21 +114,36 @@ restore *args:
 current_version:
     echo "==> Current version: {{ GREEN }}{{ current_version }}{{ NORMAL }} (defined in package.json and automatically included in the build output through the Purview.DotNetProjectSdk package)"
 
-# Run source generator performance harness (pass --benchmark for larger runs)
+# Run the source-generator performance harness (pass --benchmark for larger runs; requires Release for meaningful numbers)
 [group('Performance Tests')]
 perf-source-generator *args:
-    dotnet run --project {{ sg_perf_tests }} --configuration {{ build_configuration }} -- {{ args }}
+    dotnet run --project {{ benchmarks_project }} --configuration Release -- source-generator {{ args }}
 
-# Run SQL Server event/snapshot performance harness (pass --benchmark for larger runs)
+# Run the runtime (generated-code) performance harness (pass --benchmark for larger runs; requires Release for meaningful numbers)
+[group('Performance Tests')]
+perf-runtime *args:
+    dotnet run --project {{ benchmarks_project }} --configuration Release -- runtime {{ args }}
+
+# Run the in-memory store throughput harness (the allocation-free reference; pass --benchmark for larger runs)
+[group('Performance Tests')]
+perf-inmemory *args:
+    dotnet run --project {{ benchmarks_project }} --configuration Release -- inmemory {{ args }}
+
+# Run SQL Server event/snapshot performance harness (pass --benchmark for larger runs; requires Docker/Testcontainers)
 [group('Performance Tests')]
 perf-sql-server *args:
-    dotnet run --project {{ sql_perf_tests }} --configuration {{ build_configuration }} -- {{ args }}
+    dotnet run --project {{ benchmarks_project }} --configuration Release -- sql-server {{ args }}
 
-# Run tests for a specific project with a filter (e.g., "/*/*/*/*/", or "/*/*/*/*[Category=Unit]" to run just unit tests) and configuration (e.g., "Release")
+# Run tests for a specific project with a filter (e.g., "/*/*/*/*", or "/*/*/*/*[Category=Unit]" to run just unit tests) and configuration (e.g., "Release")
 [group('Build and Test')]
-test filter="/*/*/*/*/" *args:
+test filter="/*/*/*/*" *args:
     echo "==> Testing {{ BLUE }}{{ solution_file }}{{ NORMAL }} ({{ GREEN }}{{ build_configuration }}{{ NORMAL }}) with filter {{ YELLOW }}{{ filter }}{{ NORMAL }}"
     dotnet test --project {{ solution_file }} --configuration {{ build_configuration }} --treenode-filter "{{ filter }}" --ignore-exit-code 8 {{ args }}
+
+# Run unit tests for the solution
+[group('Build and Test')]
+test-unit *args:
+    just test "/*/*/*/*[Category=Unit]" {{ args }}
 
 # Pack all packable projects
 [group('Build and Test')]

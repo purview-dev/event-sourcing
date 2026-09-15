@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Azure.Data.Tables;
+using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.AzureStorage.Entities;
 
@@ -8,7 +9,7 @@ namespace Purview.EventSourcing.AzureStorage;
 partial class TableEventStore<T>
 {
 	///<inheritdoc/>
-	public async IAsyncEnumerable<(IEvent @event, string eventType)> GetEventRangeAsync(
+	public async IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync(
 		string aggregateId,
 		int versionFrom,
 		int? versionTo,
@@ -36,7 +37,7 @@ partial class TableEventStore<T>
 		{
 			var item = await DeserializeEventAsync(entity, aggregateVersion, cancellationToken);
 			if (item != null)
-				yield return (item, entity.EventType);
+				yield return (item.Value, entity.EventType);
 
 			aggregateVersion++;
 		}
@@ -57,7 +58,7 @@ partial class TableEventStore<T>
 			yield return eventEntity;
 	}
 
-	async Task<IEvent?> DeserializeEventAsync(
+	async Task<EventRecord?> DeserializeEventAsync(
 		EventEntity eventEntity,
 		int aggregateVersion,
 		CancellationToken cancellationToken
@@ -68,18 +69,28 @@ partial class TableEventStore<T>
 		static UnknownEvent ReturnUnknownEvent(EventEntity eventEntity, int aggregateVersion) =>
 			new()
 			{
-				Details =
-				{
-					When = eventEntity.Timestamp!.Value,
-					SchemaVersion = eventEntity.SchemaVersion,
-					AggregateVersion = aggregateVersion,
-					IdempotencyId = eventEntity.IdempotencyId,
-					CorrelationId = eventEntity.CorrelationId,
-					CausationId = eventEntity.CausationId,
-					UserId = eventEntity.UserId,
-				},
+				SchemaVersion = eventEntity.SchemaVersion,
+				Metadata = new EventMetadata(
+					aggregateVersion,
+					eventEntity.Timestamp!.Value,
+					eventEntity.SchemaVersion,
+					eventEntity.IdempotencyId,
+					eventEntity.CorrelationId,
+					eventEntity.CausationId,
+					eventEntity.UserId
+				),
 				Payload = eventEntity.Payload,
 			};
+
+		EventMetadata metadata = new(
+			aggregateVersion,
+			eventEntity.Timestamp!.Value,
+			eventEntity.SchemaVersion,
+			eventEntity.IdempotencyId,
+			eventEntity.CorrelationId,
+			eventEntity.CausationId,
+			eventEntity.UserId
+		);
 
 		try
 		{
@@ -88,12 +99,15 @@ partial class TableEventStore<T>
 			{
 				_eventStoreTelemetry.MissingEventType(_aggregateTypeFullName, eventEntity.EventType);
 
-				return ReturnUnknownEvent(eventEntity, aggregateVersion);
+				return new EventRecord(ReturnUnknownEvent(eventEntity, aggregateVersion), metadata);
 			}
 
-			var runtimeEventType =
-				Type.GetType(eventType, throwOnError: false)
-				?? throw new ApplicationException($"Unable to load event type: {eventType}");
+			var runtimeEventType = EventTypeCache.GetOrAdd(
+				eventType,
+				static name =>
+					Type.GetType(name, throwOnError: false)
+					?? throw new ApplicationException($"Unable to load event type: {name}")
+			);
 			var @event = DeserializeEvent(eventEntity.Payload, runtimeEventType);
 
 			// Apply upcasting chain when a registry is available.
@@ -124,12 +138,17 @@ partial class TableEventStore<T>
 						blobPointer.SerializedEventType,
 						blobName
 					);
-					return ReturnUnknownEvent(eventEntity, aggregateVersion);
+					return new EventRecord(ReturnUnknownEvent(eventEntity, aggregateVersion), metadata);
 					//throw new ArgumentNullException($"Unable to locate blob event type name {blobPointer.SerializedEventType}");
 				}
 
-				var blobEvent = Type.GetType(blobEventTypeName, throwOnError: false);
-				if (blobEvent == null)
+				var blobEventType = EventTypeCache.GetOrAdd(
+					blobEventTypeName,
+					static name =>
+						Type.GetType(name, throwOnError: false)
+						?? throw new ApplicationException($"Unable to load event type: {name}")
+				);
+				if (blobEventType == null)
 				{
 					_eventStoreTelemetry.MissingBlobEventType(
 						_aggregateTypeFullName,
@@ -137,19 +156,28 @@ partial class TableEventStore<T>
 						blobPointer.SerializedEventType,
 						blobEventTypeName
 					);
-					return ReturnUnknownEvent(eventEntity, aggregateVersion);
+					return new EventRecord(ReturnUnknownEvent(eventEntity, aggregateVersion), metadata);
 				}
 				//throw new ArgumentNullException($"Unable to locate blob event type {blobEventTypeName}");
 
 				var eventStream = await _blobClient.GetStreamAsync(blobName, cancellationToken);
 				if (eventStream == null)
-					return ReturnUnknownEvent(eventEntity, aggregateVersion);
+					return new EventRecord(ReturnUnknownEvent(eventEntity, aggregateVersion), metadata);
 
 				using (eventStream)
-					return await DeserializeEventAsync(eventStream, blobEvent, cancellationToken);
+				{
+					var blobEvent = await DeserializeEventAsync(eventStream, blobEventType, cancellationToken);
+					if (blobEvent == null)
+						return null;
+
+					return new EventRecord(blobEvent, metadata);
+				}
 			}
 
-			return @event;
+			if (@event == null)
+				return null;
+
+			return new EventRecord(@event, metadata);
 		}
 #pragma warning disable CA1031
 		catch (Exception ex)
@@ -157,7 +185,7 @@ partial class TableEventStore<T>
 		{
 			_eventStoreTelemetry.EventDeserializationFailed(eventEntity.PartitionKey, _aggregateTypeFullName, ex);
 
-			return ReturnUnknownEvent(eventEntity, aggregateVersion);
+			return new EventRecord(ReturnUnknownEvent(eventEntity, aggregateVersion), metadata);
 		}
 	}
 }

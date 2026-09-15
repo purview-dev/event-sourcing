@@ -1,5 +1,4 @@
 using Purview.EventSourcing.Aggregates;
-using Purview.EventSourcing.Aggregates.Events;
 
 namespace Purview.EventSourcing.Services;
 
@@ -20,7 +19,7 @@ public interface IAggregateEventNameMapper
 	/// <typeparam name="T">The aggregate type.</typeparam>
 	/// <param name="aggregateEvent">The event to name.</param>
 	/// <returns>The persisted event name.</returns>
-	string GetName<T>(IEvent aggregateEvent)
+	string GetName<T>(object aggregateEvent)
 		where T : IAggregate;
 
 	/// <summary>

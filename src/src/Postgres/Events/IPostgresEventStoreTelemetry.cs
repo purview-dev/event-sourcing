@@ -214,6 +214,15 @@ public interface IPostgresEventStoreTelemetry
 	void SnapshotDeserializationFailed(string aggregateId, string aggregateTypeFullName, Exception exception);
 
 	/// <summary>
+	/// Logs a failure while writing a best-effort snapshot after the events were committed.
+	/// </summary>
+	/// <param name="aggregateId">The id of the aggregate whose snapshot failed to be written.</param>
+	/// <param name="aggregateTypeFullName">The full name of the aggregate type whose snapshot failed to be written.</param>
+	/// <param name="exception">The exception that caused the failure.</param>
+	[Log(LogLevel.Error)]
+	void SnapshotWriteFailure(string aggregateId, string aggregateTypeFullName, Exception exception);
+
+	/// <summary>
 	/// Logs a failed cache get operation.
 	/// </summary>
 	/// <param name="aggregateId">The id of the aggregate that failed to be retrieved from cache.</param>

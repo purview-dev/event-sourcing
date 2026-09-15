@@ -2,7 +2,7 @@ namespace Purview.EventSourcing.Aggregates.Events.Upcasting;
 
 /// <summary>
 /// Maintains a registry of all registered <see cref="IEventUpcaster{TSource,TTarget}"/> instances
-/// and applies them — potentially as a chain — to an <see cref="IEvent"/> read from the store.
+/// and applies them — potentially as a chain — to an event read from the store.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -25,7 +25,7 @@ public interface IEventUpcasterRegistry
 	/// <paramref name="aggregateEvent"/>'s runtime type.
 	/// </summary>
 	/// <param name="aggregateEvent">The event to test.</param>
-	bool CanUpcast(IEvent aggregateEvent);
+	bool CanUpcast(object aggregateEvent);
 
 	/// <summary>
 	/// Applies registered upcasters to <paramref name="aggregateEvent"/> in a chain until no further
@@ -36,5 +36,5 @@ public interface IEventUpcasterRegistry
 	/// The final up-cast event. If no upcaster is registered for the runtime type of
 	/// <paramref name="aggregateEvent"/>, the original instance is returned unchanged.
 	/// </returns>
-	IEvent Upcast(IEvent aggregateEvent);
+	object Upcast(object aggregateEvent);
 }

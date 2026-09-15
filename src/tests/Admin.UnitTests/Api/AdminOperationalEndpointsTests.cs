@@ -7,7 +7,6 @@ using Purview.EventSourcing.Admin.Abstractions.Queries;
 using Purview.EventSourcing.Admin.Abstractions.Services;
 using Purview.EventSourcing.Admin.Security;
 using Purview.EventSourcing.Aggregates;
-using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.Outbox;
 using Purview.EventSourcing.Services;
 
@@ -334,7 +333,7 @@ public sealed class AdminOperationalEndpointsTests
 
 	sealed class StubEventNameMapper(HashSet<string>? known = null) : IAggregateEventNameMapper
 	{
-		public string GetName<T>(IEvent aggregateEvent)
+		public string GetName<T>(object aggregateEvent)
 			where T : IAggregate => throw new NotSupportedException();
 
 		public string GetName<T>(Type aggregateEventType)
