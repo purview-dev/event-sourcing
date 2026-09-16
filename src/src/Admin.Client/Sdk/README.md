@@ -76,6 +76,11 @@ Both the OpenAPI document and the generated client are committed, so consumers g
 - The `JsonElement` DTO carries raw event/projection JSON in its `AdditionalProperties` dictionary.
 - When `BaseUrl` is left unset, the hosting application must resolve the origin (for example `Purview.EventSourcing.Admin.Site` does this via a delegating handler that reads the current HTTP request).
 
+## Documentation
+
+- [Homepage](https://purview.dev/projects/event-sourcing/)
+- [Documentation](https://purview.dev/docs/event-sourcing/)
+
 ## Related packages
 
 - [Admin API](https://github.com/purview-dev/eventsourcing/blob/main/src/src/Admin.API/Sdk/README.md): `Purview.EventSourcing.Admin.Api`

@@ -51,6 +51,11 @@ builder.Services
 - `AdminFeatureAuthorizationHandler` enforces feature-level access; `AggregateTypeAccessHandler` additionally scopes access to the requested aggregate type when a permission is scoped.
 - `ViewEvents` grants access to event metadata. Payloads are returned as `null` unless `ViewEventPayloads` is also granted. Event export requires both `ExportEvents` and `ViewEventPayloads` so it cannot bypass payload authorization.
 
+## Documentation
+
+- [Homepage](https://purview.dev/projects/event-sourcing/)
+- [Documentation](https://purview.dev/docs/event-sourcing/)
+
 ## Related packages
 
 - [Admin abstractions](https://github.com/purview-dev/eventsourcing/blob/main/src/src/Admin.Abstractions/Sdk/README.md): `Purview.EventSourcing.Admin.Abstractions`

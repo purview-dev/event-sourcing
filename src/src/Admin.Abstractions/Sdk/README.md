@@ -34,6 +34,11 @@ Permissions are expressed as `AdminPermission` records combining an `AdminFeatur
 
 Event history uses separate `ViewEvents` and `ViewEventPayloads` permissions. Metadata remains available to event-history readers, while `EventEnvelopeResponse.Payload` is `null` for callers without payload access.
 
+## Documentation
+
+- [Homepage](https://purview.dev/projects/event-sourcing/)
+- [Documentation](https://purview.dev/docs/event-sourcing/)
+
 ## Related packages
 
 - [Admin API](https://github.com/purview-dev/eventsourcing/blob/main/src/src/Admin.API/Sdk/README.md): `Purview.EventSourcing.Admin.Api`

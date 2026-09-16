@@ -50,6 +50,11 @@ if (order is null)
 - The stores are not distributed or durable; do not use them in production workloads.
 - Snapshot-backed reads and event persistence are not transactional across processes.
 
+## Documentation
+
+- [Homepage](https://purview.dev/projects/event-sourcing/)
+- [Documentation](https://purview.dev/docs/event-sourcing/)
+
 ## Related packages
 
 - [Core package](https://github.com/purview-dev/eventsourcing/blob/main/src/src/EventSourcing/Sdk/README.md): `Purview.EventSourcing`

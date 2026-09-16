@@ -59,6 +59,11 @@ await store.SaveAsync(order, cancellationToken);
 - This package is optional. The core package never acquires a mandatory ZodSharp dependency.
 - Validation is invoked by the event store when an aggregate is saved; failing validations produce a non-saved save result.
 
+## Documentation
+
+- [Homepage](https://purview.dev/projects/event-sourcing/)
+- [Documentation](https://purview.dev/docs/event-sourcing/)
+
 ## Related packages
 
 - [Core package](https://github.com/purview-dev/eventsourcing/blob/main/src/src/EventSourcing/Sdk/README.md): `Purview.EventSourcing`

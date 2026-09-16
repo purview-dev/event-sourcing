@@ -112,6 +112,11 @@ You must also register:
 
 Request validation uses [ZodSharp](https://github.com/RemiBou/ZodSharp); `ZodSharp`, `ZodSharp.AspNetCore`, and `ZodSharp.SystemTextJson` are direct dependencies of this package.
 
+## Documentation
+
+- [Homepage](https://purview.dev/projects/event-sourcing/)
+- [Documentation](https://purview.dev/docs/event-sourcing/)
+
 ## Related packages
 
 - [Admin abstractions](https://github.com/purview-dev/eventsourcing/blob/main/src/src/Admin.Abstractions/Sdk/README.md): `Purview.EventSourcing.Admin.Abstractions`
