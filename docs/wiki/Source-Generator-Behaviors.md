@@ -83,7 +83,11 @@ Typical generated types:
 - `Testing.OrderEvents.OrderCreatedEvent` (default namespace/name)
 - `Testing.Custom.Events.OrderRegistered` (explicit namespace/name)
 
-> An explicit `EventName` is used verbatim: the generator does **not** append the `Event` suffix when a name is provided. Include the suffix in the explicit name (for example `EventName = "OrderRegisteredEvent"`) if you want the generated type to end in `Event`. The `Event` suffix is only appended to inferred names.
+> [!NOTE]
+> An explicit `EventName` is used verbatim: the generator does **not** append the `Event` suffix when
+> a name is provided. Include the suffix in the explicit name (for example `EventName =
+> "OrderRegisteredEvent"`) if you want the generated type to end in `Event`. The `Event` suffix is
+> only appended to inferred names.
 
 ## Hook behavior semantics
 
@@ -149,7 +153,7 @@ or interface:
 public sealed record OrderCreatedEvent
 {
     public static int SchemaVersion => 1;
-    [JsonIgnore] public EventMetadata Metadata { get; init; }
+    [JsonIgnore] public EventMetadata Metadata { get; set; }
     public string CustomerId { get; set; }
 }
 ```
@@ -191,12 +195,17 @@ public partial class ReportAggregate : AggregateBase
 
 ### Parameter nullability and required guards
 
-The generator honors two standard attributes on event parameters to tighten command-time validation and the shape of the generated event class:
+The generator honors two standard attributes on event parameters to tighten command-time validation and the shape of the
+generated event class:
 
-- `[NotNull]` (`System.Diagnostics.CodeAnalysis`) on a nullable parameter generates an `ArgumentNullException` guard and emits the event property as non-nullable.
-- `[Required]` (`System.ComponentModel.DataAnnotations`) on a nullable `string` parameter generates an `ArgumentException` guard for null or whitespace and emits the event property as non-nullable.
+- `[NotNull]` (`System.Diagnostics.CodeAnalysis`) on a nullable parameter generates an `ArgumentNullException` guard and
+  emits the event property as non-nullable.
+- `[Required]` (`System.ComponentModel.DataAnnotations`) on a nullable `string` parameter generates an
+  `ArgumentException` guard for null or whitespace and emits the event property as non-nullable.
 
-Both attributes also cause the generator to use a local copy of the parameter value when calling `On...Changing` hooks and when creating the event. This keeps the original parameter unmodified so the compiler does not require it to be assigned after a `throw` path.
+Both attributes also cause the generator to use a local copy of the parameter value when calling `On...Changing` hooks
+and when creating the event. This keeps the original parameter unmodified so the compiler does not require it to be
+assigned after a `throw` path.
 
 ```csharp
 [Aggregate]
@@ -209,10 +218,13 @@ public partial class ProfileAggregate : AggregateBase
 }
 ```
 
-For the event above, the generator produces a property typed as `string` rather than `string?`:
+For the event above, the generator produces a property typed as `string` rather than `string?`. The
+generated record carries the `[EventContract]` attribute and the usual `Metadata`/`SchemaVersion`
+members (see the event-contract shape above); it has **no base class**:
 
 ```csharp
-public sealed class BioUpdatedEvent : global::Purview.EventSourcing.Aggregates.Events.EventBase
+[EventContract]
+public sealed record BioUpdatedEvent
 {
     public string Bio { get; set; } = default!;
 }
@@ -223,11 +235,17 @@ public sealed class BioUpdatedEvent : global::Purview.EventSourcing.Aggregates.E
 - Generated mapping paths use `Create(...)` semantics for strict command-time conversion/validation.
 - Contextual `Create(TValue, in ValueObjectContext<TAggregate>)` is used when available.
 - Replay/hydration paths apply event payloads through generated `Apply(...)` logic.
-- Snapshot-query translation depends on how the provider maps the resulting property graph, not only on the value-object generator behavior.
-- Projects compiled with the SQL Server or PostgreSQL EF analyzer can mark a property `[EfOpaque]`. The EF-only generator emits this internal marker into the consuming compilation; it does not add a runtime attribute API.
-- `EVENTSTOREEF001` reports dictionary-like members reachable from an aggregate unless they are explicitly opaque. Prefer a collection of domain entry objects when structural querying is required; the generator does not synthesize those domain types.
-- `EVENTSTOREEF002` reports uses of an opaque member in recognized snapshot query expressions. Opaque values round-trip through JSON but their contents are not part of EF's queryable complex model.
-- A `[Scalar]` value object that wraps a complex CLR type may serialize correctly while still requiring a separate directly mapped complex mirror property for deep SQL predicates.
+- Snapshot-query translation depends on how the provider maps the resulting property graph, not only on the value-object
+  generator behavior.
+- Projects compiled with the SQL Server or PostgreSQL EF analyzer can mark a property `[EfOpaque]`. The EF-only
+  generator emits this internal marker into the consuming compilation; it does not add a runtime attribute API.
+- `EVENTSTOREEF001` reports dictionary-like members reachable from an aggregate unless they are explicitly opaque.
+  Prefer a collection of domain entry objects when structural querying is required; the generator does not synthesize
+  those domain types.
+- `EVENTSTOREEF002` reports uses of an opaque member in recognized snapshot query expressions. Opaque values round-trip
+  through JSON but their contents are not part of EF's queryable complex model.
+- A `[Scalar]` value object that wraps a complex CLR type may serialize correctly while still requiring a separate
+  directly mapped complex mirror property for deep SQL predicates.
 
 ### Value-object conversion examples
 
@@ -259,11 +277,16 @@ public readonly partial record struct OrderStatus
 
 ## Diagnostics to expect
 
-Validation diagnostics are produced by `Purview.EventSourcing.SourceGenerator` analyzers
-(`AggregateDiagnosticAnalyzer`, `ValueObjectDiagnosticAnalyzer`, and `EventStoreAnalyzer`), not by the
-source generators themselves. The generators consume the same validation internally to decide whether to
-emit source, but they never report diagnostics. Analyzer diagnostics can be suppressed or configured
-through the usual `#pragma warning` / `.editorconfig` mechanisms.
+Model-validation diagnostics are produced by `Purview.EventSourcing.SourceGenerator` analyzers
+(`AggregateDiagnosticAnalyzer`, `ValueObjectDiagnosticAnalyzer`, and `EventStoreAnalyzer`), not by
+the source generators themselves. The generators consume the same validation internally to decide
+whether to emit source, but they do not report these validation diagnostics. Analyzer diagnostics
+can be suppressed or configured through the usual `#pragma warning` / `.editorconfig` mechanisms.
+
+The exception is the event-contract manifest baseline comparison: the generator itself reports
+`EVENTSTORE030`–`EVENTSTORE036` when the current contracts differ from the committed baseline (see
+[Event Contract Manifest](Event-Contract-Manifest.md)). Those diagnostics are emitted from the
+generator's output stage, so they always surface on a build regardless of analyzer configuration.
 
 Common aggregate diagnostic IDs:
 
@@ -292,8 +315,9 @@ Common value-object diagnostic IDs:
 The analyzer and the generator share the same validation rules (the model builders are the single source
 of truth). When validation fails, the generator skips generation entirely — it never emits an invalid
 partial type — while the analyzer reports the diagnostic. A generator-only run therefore produces no
-output and no exception for invalid input; the diagnostics are always surfaced by the analyzer assets that
-ship in the same package.
+output and no exception for invalid input; the validation diagnostics are always surfaced by the analyzer
+assets that ship in the same package. The manifest-compatibility diagnostics (`EVENTSTORE030`–`036`), by
+contrast, are reported by the generator itself.
 
 ## Testing generated output
 
@@ -305,7 +329,9 @@ Generator unit tests assert on the generated structure with the `CodeQuery` API 
   `HasConstructor`, and `TypeReference`-based parameter matching for member signatures.
 - Keep string assertions only for method-body statements that `CodeQuery` does not model (for example
   `RecordAndApply(@event);`), scoped to the returned syntax node's body.
-- Operator declarations are `OperatorDeclarationSyntax`, not methods; assert them via `CodeQuery.GetOperator`/`HasOperator`/`TryGetOperator` (optionally scoped with `CodeQuery.In(type)`), or `GetConversionOperator` for `implicit`/`explicit` conversions.
+- Operator declarations are `OperatorDeclarationSyntax`, not methods; assert them via
+  `CodeQuery.GetOperator`/`HasOperator`/`TryGetOperator` (optionally scoped with
+  `CodeQuery.In(type)`), or `GetConversionOperator` for `implicit`/`explicit` conversions.
 
 Incremental caching is tested with the framework's `GenerateIncrementalAsync`/`RunIncrementalAsync`, which
 reuse one driver and compilation across identical runs. The framework-named stages

@@ -45,7 +45,8 @@ await store.SaveAsync(order, cancellationToken);
 
 ## Documentation
 
-- [Repository README](https://github.com/purview-dev/eventsourcing/blob/main/README.md)
+- [Homepage](https://purview.dev/projects/event-sourcing/)
+- [Documentation](https://purview.dev/docs/event-sourcing/)
 - [SQL Server guide](https://github.com/purview-dev/eventsourcing/blob/main/docs/wiki/SQL-Server-Guide.md)
 - [Provider feature matrix](https://github.com/purview-dev/eventsourcing/blob/main/docs/wiki/Provider-Feature-Matrix.md)
 

@@ -85,6 +85,11 @@ The UI consumes the Admin API through `Purview.EventSourcing.Admin.Client`, so t
 
 Authorization is enforced at the API layer using the policies defined in `Purview.EventSourcing.Admin.Security`. Ensure the policies are registered and your `IAdminPermissionProvider` grants the relevant `AdminFeature` permissions (search, aggregate view, event view, projection, export). The UI's HTTP calls to the API are authorized the same way as any other caller.
 
+## Documentation
+
+- [Homepage](https://purview.dev/projects/event-sourcing/)
+- [Documentation](https://purview.dev/docs/event-sourcing/)
+
 ## Related packages
 
 - [Admin abstractions](https://github.com/purview-dev/eventsourcing/blob/main/src/src/Admin.Abstractions/Sdk/README.md): `Purview.EventSourcing.Admin.Abstractions`

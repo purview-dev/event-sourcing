@@ -32,6 +32,11 @@ builder.Services.AddPurviewEventSourcingAdminAzureStorage();
 - `AzureStorageAdminEventQueryService` - event-range queries
 - `AzureStorageAdminProjectionService` - point-in-time projection at a version or timestamp
 
+## Documentation
+
+- [Homepage](https://purview.dev/projects/event-sourcing/)
+- [Documentation](https://purview.dev/docs/event-sourcing/)
+
 ## Related packages
 
 - [Admin abstractions](https://github.com/purview-dev/eventsourcing/blob/main/src/src/Admin.Abstractions/Sdk/README.md): `Purview.EventSourcing.Admin.Abstractions`

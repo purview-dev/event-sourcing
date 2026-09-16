@@ -2,15 +2,20 @@
 
 Purview Event Sourcing ships separate SQL Server-backed event and snapshot implementations in a single NuGet package:
 
-- `Purview.EventSourcing.SqlServer` + `SqlServerEventStore<T>`: pure event-sourced store where events remain the source of truth.
-- `Purview.EventSourcing.SqlServer` + `SqlServerSnapshotEventStore<T>`: queryable snapshot store optimized for query/list/count over snapshots.
+- `Purview.EventSourcing.SqlServer` + `SqlServerEventStore<T>`: pure event-sourced store where events remain the source
+  of truth.
+- `Purview.EventSourcing.SqlServer` + `SqlServerSnapshotEventStore<T>`: queryable snapshot store optimized for
+  query/list/count over snapshots.
 
 These two concepts are related but **not interchangeable**:
 
-- the SQL Server **event store** keeps internal stream snapshots in its event table to speed aggregate rehydration and event-based operations,
-- the **queryable snapshot store** is an optional LINQ/query-optimized store that can be omitted entirely or implemented by a different provider.
+- the SQL Server **event store** keeps internal stream snapshots in its event table to speed aggregate rehydration and
+  event-based operations,
+- the **queryable snapshot store** is an optional LINQ/query-optimized store that can be omitted entirely or implemented
+  by a different provider.
 
-Both stores create their tables automatically on first use (configurable) and use a **single shared table** for all aggregate types.
+Both stores create their tables automatically on first use (configurable) and use a **single shared table** for all
+aggregate types.
 
 ---
 
@@ -57,7 +62,8 @@ builder.Services.AddSqlServerEventStore();
 }
 ```
 
-Inject `IEventStore` for the provider-agnostic facade, or `ISqlServerEventStore<T>` when you need the typed SQL Server implementation directly:
+Inject `IEventStore` for the provider-agnostic facade, or `ISqlServerEventStore<T>` when you need the typed SQL Server
+implementation directly:
 
 ```csharp
 public class OrderService(IEventStore store)
@@ -89,7 +95,8 @@ var response = await store.GetEventHistoryAsync<OrderAggregate>(
     cancellationToken);
 ```
 
-The response is a `ContinuationResponse<AggregateEventHistoryItem>` so callers can page using the returned `ContinuationToken`.
+The response is a `ContinuationResponse<AggregateEventHistoryItem>` so callers can page using the returned
+`ContinuationToken`.
 
 ### Snapshot Store
 
@@ -162,7 +169,8 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON [dbo].[Snapshots]  TO [app_login];
 
 ### Auto-Create Permissions (`AutoCreateTable = true`)
 
-When `AutoCreateTable` is enabled (the default), the application also needs DDL rights at startup to create the table, computed columns, and indices:
+When `AutoCreateTable` is enabled (the default), the application also needs DDL rights at startup to create the table,
+computed columns, and indices:
 
 ```sql
 -- Required to create tables and indices in the schema:
@@ -170,7 +178,9 @@ GRANT CREATE TABLE TO [app_login];
 GRANT ALTER  ON SCHEMA::[dbo] TO [app_login];
 ```
 
-> **Tip:** Use a separate migration user or initialisation step in CI/CD with elevated permissions, then set `AutoCreateTable = false` in production to avoid granting DDL rights to the runtime user.
+> [!TIP]
+> Use a separate migration user or initialisation step in CI/CD with elevated permissions, then set
+> `AutoCreateTable = false` in production to avoid granting DDL rights to the runtime user.
 
 ### Minimal Role-Based Setup (SQL Server)
 
@@ -205,14 +215,17 @@ GRANT ALTER ON SCHEMA::[dbo] TO [my-app-service];
 
 ## Single-Table Design
 
-Both stores use a **single shared table** by default. All aggregate types are stored in the same table and distinguished by the `AggregateType` column.
+Both stores use a **single shared table** by default. All aggregate types are stored in the same table and distinguished
+by the `AggregateType` column.
 
 For clarity:
 
-- `SqlServerEventStore<T>` stores stream metadata, events, idempotency markers, and **internal replay snapshots** in its event table.
+- `SqlServerEventStore<T>` stores stream metadata, events, idempotency markers, and **internal replay snapshots** in its
+  event table.
 - `SqlServerSnapshotEventStore<T>` stores **queryable snapshots** in a separate snapshot table for LINQ-based reads.
 
-The internal replay snapshots in the event table are part of the event-store implementation and should not be treated as redundant copies of the optional queryable snapshot store.
+The internal replay snapshots in the event table are part of the event-store implementation and should not be treated as
+redundant copies of the optional queryable snapshot store.
 
 ### Events table schema
 
@@ -220,16 +233,17 @@ The internal replay snapshots in the event table are part of the event-store imp
 [Id]            NVARCHAR(450)     PK
 [EntityType]    INT               0=StreamVersion, 1=Event, 2=IdempotencyMarker, 3=Snapshot
 [AggregateId]   NVARCHAR(450)     The aggregate's id
-[AggregateType] NVARCHAR(450)     Short name of the aggregate (e.g. "Order")
+[AggregateType] NVARCHAR(450)     Kebab-case aggregate type (e.g. "order")
 [Version]       INT               Aggregate version at time of event
 [IsDeleted]     BIT               Soft-delete flag on the stream-version row
 [Payload]       JSON / NVARCHAR(MAX)  JSON payload (events and snapshots)
-[EventType]     NVARCHAR(450)     Mapped event type name (e.g. "Order.CreateOrder")
+[EventType]     NVARCHAR(450)     Mapped event type name (e.g. "order.order-created")
 [IdempotencyId] NVARCHAR(450)     Idempotency marker id
 [Timestamp]     DATETIMEOFFSET    UTC timestamp of the operation
 ```
 
-Three covering indices are created automatically (named with the configured table name, so `IX_EventStoreEvents_*` with the default table):
+Three covering indices are created automatically (named with the configured table name, so `IX_EventStoreEvents_*` with
+the default table):
 
 | Index | Columns | Purpose |
 | --- | --- | --- |
@@ -237,17 +251,25 @@ Three covering indices are created automatically (named with the configured tabl
 | `IX_{table}_EventRange` | `(AggregateId, AggregateType, Version)` WHERE EntityType=1 INCLUDE `(Payload, EventType, IdempotencyId, SchemaVersion, CorrelationId, CausationId, UserId, Timestamp)` | Event replay |
 | `IX_{table}_AggregateType_EntityType` | `(AggregateType, EntityType, IsDeleted)` INCLUDE `AggregateId` | Aggregate ID enumeration |
 
-> The single-table design minimises DDL surface area and allows aggregates from different bounded contexts to share a connection pool and database.
+> [!NOTE]
+> The single-table design minimises DDL surface area and allows aggregates from different bounded
+> contexts to share a connection pool and database.
 >
-> **Aggregate ID vs type scoping:** when multiple aggregate types share the same schema/table, event-stream read/delete queries scope by both `AggregateId` and `AggregateType`. If you isolate aggregate types by schema/table via `AggregateTableOverrides`, that physical separation provides the same isolation boundary.
+> **Aggregate ID vs type scoping:** when multiple aggregate types share the same schema/table,
+> event-stream read/delete queries scope by both `AggregateId` and `AggregateType`. If you isolate
+> aggregate types by schema/table via `AggregateTableOverrides`, that physical separation provides
+> the same isolation boundary.
 
 ---
 
 ## Per-Aggregate Schema and Table Routing
 
-Use `AggregateTableOverrides` to route specific aggregate types to a dedicated schema or table. This is useful when you want bounded-context isolation at the database level while still sharing a connection string.
+Use `AggregateTableOverrides` to route specific aggregate types to a dedicated schema or table. This is useful when you
+want bounded-context isolation at the database level while still sharing a connection string.
 
-The dictionary key is the aggregate's **`AggregateType`** value — by convention, the class name with any trailing `Aggregate` suffix stripped (e.g. `"Order"` for `OrderAggregate`). Keys are **case-insensitive**.
+The dictionary key is the aggregate's **`AggregateType`** value — the kebab-case type name derived
+from the class (e.g. `"order"` for `OrderAggregate`). Keys are **case-insensitive**, so
+`"Order"` also matches.
 
 ### Code-based configuration
 
@@ -258,14 +280,14 @@ builder.Services.Configure<SqlServerEventStoreOptions>(options =>
     options.ConnectionString = "Server=.;Database=MyApp;Trusted_Connection=True;";
 
     // Orders aggregate uses the "orders" schema
-    options.AggregateTableOverrides["Order"] = new SqlServerAggregateTableOverride
+    options.AggregateTableOverrides["order"] = new SqlServerAggregateTableOverride
     {
         SchemaName = "orders",
         TableName  = "EventStore",   // optional — falls back to global TableName
     };
 
     // Inventory uses a completely separate table
-    options.AggregateTableOverrides["Inventory"] = new SqlServerAggregateTableOverride
+    options.AggregateTableOverrides["inventory"] = new SqlServerAggregateTableOverride
     {
         SchemaName = "inventory",
         TableName  = "DomainEvents",
@@ -282,8 +304,8 @@ builder.Services.Configure<SqlServerEventStoreOptions>(options =>
     "SchemaName": "dbo",
     "TableName": "EventStore",
     "AggregateTableOverrides": {
-      "Order":     { "SchemaName": "orders"    },
-      "Inventory": { "SchemaName": "inventory", "TableName": "DomainEvents" }
+      "order":     { "SchemaName": "orders"    },
+      "inventory": { "SchemaName": "inventory", "TableName": "DomainEvents" }
     }
   }
 }
@@ -291,7 +313,8 @@ builder.Services.Configure<SqlServerEventStoreOptions>(options =>
 
 ### How it works
 
-When `SqlServerEventStore<T>` is constructed it looks up `T`'s `AggregateType` name in `AggregateTableOverrides`. If a match is found:
+When `SqlServerEventStore<T>` is constructed it looks up `T`'s `AggregateType` name in `AggregateTableOverrides`. If a
+match is found:
 
 - `SchemaName` override (if set) replaces the global `SchemaName`
 - `TableName` override (if set) replaces the global `TableName`
@@ -299,13 +322,16 @@ When `SqlServerEventStore<T>` is constructed it looks up `T`'s `AggregateType` n
 
 Each overridden aggregate type gets its own table with its own set of automatically-created indices.
 
-> **Permissions note:** If you use per-aggregate schema routing you must grant the runtime user `SELECT/INSERT/UPDATE/DELETE` on **each** schema/table used.
+> [!NOTE]
+> **Permissions note:** If you use per-aggregate schema routing you must grant the runtime user
+> `SELECT/INSERT/UPDATE/DELETE` on **each** schema/table used.
 
 ---
 
 ## Event Schema Versioning
 
-Event classes can declare a **schema version** to track breaking changes to their properties. This allows consumers to perform version-aware deserialization or apply up-casting when replaying old events.
+Event classes can declare a **schema version** to track breaking changes to their properties. This allows consumers to
+perform version-aware deserialization or apply up-casting when replaying old events.
 
 ### With the source generator
 
@@ -328,36 +354,34 @@ public partial class OrderAggregate : AggregateBase
 }
 ```
 
-The generator emits `public override int SchemaVersion => 2;` in the `OrderCreated` class.
+The generator emits a `[EventContract]` record named `OrderCreatedEvent` with
+`public static int SchemaVersion => 2;`.
 
 ### Manually
 
-Override `SchemaVersion` on any `EventBase` subclass:
+Mark a hand-written event contract with `[EventContract]` and declare a static `SchemaVersion`:
 
 ```csharp
-public sealed class OrderCreated : EventBase
+[EventContract]
+public sealed record OrderCreatedEvent
 {
     public string CustomerId { get; set; } = default!;
     public string Currency   { get; set; } = default!;
 
-    public override int SchemaVersion => 2;
-
-    protected override void BuildEventHash(ref HashCode hash)
-    {
-        hash.Add(CustomerId);
-        hash.Add(Currency);
-    }
+    public static int SchemaVersion => 2;
 }
 ```
 
-The `SchemaVersion` value is serialized as part of the event's JSON payload. When the event is replayed from the store the version is available via `@event.SchemaVersion`, enabling conditional up-casting:
+The `SchemaVersion` is persisted as event metadata (a row column), not inside the payload. When the
+event is replayed from the store the version is rehydrated into `Metadata` and available via
+`@event.Metadata.SchemaVersion`, enabling conditional up-casting:
 
 ```csharp
-void Apply(OrderCreated e)
+void Apply(OrderCreatedEvent e)
 {
     CustomerId = e.CustomerId;
     // Up-cast: v1 events did not have Currency; default to "GBP"
-    Currency = e.SchemaVersion >= 2 ? e.Currency : "GBP";
+    Currency = e.Metadata.SchemaVersion >= 2 ? e.Currency : "GBP";
 }
 ```
 
@@ -408,7 +432,8 @@ public sealed class CheckoutService(
 - SQL-native atomic commit is available when enlisted stores share the same SQL transaction boundary.
 - Enlisting stores with different SQL transaction boundaries is rejected up front.
 - If you need cross-database/distributed coordination, implement a custom transaction coordinator strategy.
-- The SQL-specific coordinator requires at least one enlisted aggregate (the aggregate store establishes the connection/transaction boundary).
+- The SQL-specific coordinator requires at least one enlisted aggregate (the aggregate store establishes the
+  connection/transaction boundary).
 - `IEventStoreTransactionFactory` remains available and unchanged for provider-agnostic transaction orchestration.
 
 ### Integration coverage
@@ -418,20 +443,23 @@ public sealed class CheckoutService(
 - aggregate + raw SQL operation commit in one transaction,
 - aggregate + EF operation commit in one transaction,
 - rollback of both aggregate and enlisted SQL when an enlisted operation throws,
-- cross-implementation enlistment (event store + SQL snapshot event store) with additional SQL operations in one transaction.
+- cross-implementation enlistment (event store + SQL snapshot event store) with additional SQL operations in one
+  transaction.
 
 ---
 
 ## JSON Index Configuration
 
-SQL Server stores event and snapshot payloads in a JSON column named `Payload`. You can optionally configure additional runtime-managed indexes over scalar JSON paths.
+SQL Server stores event and snapshot payloads in a JSON column named `Payload`. You can optionally configure additional
+runtime-managed indexes over scalar JSON paths.
 
 The provider creates these indexes only when:
 
 - `AutoCreateTable = true`, and
 - `JsonIndexOptions.Enabled = true`.
 
-The current implementation materializes each configured path as a computed column and then creates an index over that column.
+The current implementation materializes each configured path as a computed column and then creates an index over that
+column.
 
 ### Supported configuration shape
 
@@ -542,9 +570,11 @@ Indexes help only when the predicate path is SQL-translatable.
   - `a => a.StringProperty == value`
   - `a => a.ReportSummaryScalar!.ParserDetails.FailedLines > 0`
 - Poor candidates:
-  - `a => a.ReportSummary!.Value.ParserDetails.FailedLines > 0` when `ReportSummary` is a `[Scalar]` wrapping a complex inner type
+  - `a => a.ReportSummary!.Value.ParserDetails.FailedLines > 0` when `ReportSummary` is a `[Scalar]` wrapping a complex
+    inner type
 
-If deep filtering matters, prefer directly mapped complex mirror properties on the aggregate snapshot model and test the exact predicate path.
+If deep filtering matters, prefer directly mapped complex mirror properties on the aggregate snapshot model and test the
+exact predicate path.
 
 ---
 
@@ -562,19 +592,26 @@ Supported members include:
 Important distinction for SQL translation:
 
 - A `[Scalar]` value object with a **primitive** inner value behaves like a scalar in queries.
-- A `[Scalar]` value object with a **complex** inner value is persisted correctly, but deep predicates through `.Value` are not guaranteed to translate in SQL snapshot queries.
-- If you need deep SQL predicates for a complex concept, expose the underlying complex type directly on the aggregate/query snapshot model (for example, a `ParserReportSummary` mirror property) and test the exact nested predicate you expect to support.
-- Directly mapped complex snapshot members can support deep predicates such as `ParserDetails.FailedLines > 0`, subject to the provider's supported payload-shape rules.
+- A `[Scalar]` value object with a **complex** inner value is persisted correctly, but deep predicates through `.Value`
+  are not guaranteed to translate in SQL snapshot queries.
+- If you need deep SQL predicates for a complex concept, expose the underlying complex type directly on the
+  aggregate/query snapshot model (for example, a `ParserReportSummary` mirror property) and test the exact nested
+  predicate you expect to support.
+- Directly mapped complex snapshot members can support deep predicates such as `ParserDetails.FailedLines > 0`, subject
+  to the provider's supported payload-shape rules.
 
 Unsupported members fail during model creation, including:
 
 - arrays,
-- collection types other than `EventStoreList<T>` / `EventStoreSet<T>` (for example `List<T>`, `IReadOnlyList<T>`, `IEnumerable<T>`, `HashSet<T>`, `ImmutableArray<T>`),
+- collection types other than `EventStoreList<T>` / `EventStoreSet<T>` (for example `List<T>`, `IReadOnlyList<T>`,
+  `IEnumerable<T>`, `HashSet<T>`, `ImmutableArray<T>`),
 - unsupported object types that are not explicitly mapped for JSON conversion.
 
 Read-only and `[JsonIgnore]` members are excluded from snapshot payload mapping.
 
-Some nested collection/dictionary members inside directly mapped complex graphs may be supported through provider JSON conversion rather than direct relational collection mapping. Treat those shapes as provider-specific and verify them with integration tests.
+Some nested collection/dictionary members inside directly mapped complex graphs may be supported through provider JSON
+conversion rather than direct relational collection mapping. Treat those shapes as provider-specific and verify them
+with integration tests.
 
 ### Examples
 
@@ -599,20 +636,24 @@ public sealed class CustomerSnapshot
 }
 ```
 
-For generator/framework behavior (aggregate inheritance paths, hooks, event naming/namespace, manual mode), see [Source Generator Behaviors](Source-Generator-Behaviors.md).
+For generator/framework behavior (aggregate inheritance paths, hooks, event naming/namespace, manual mode), see [Source
+Generator Behaviors](Source-Generator-Behaviors.md).
 
 ---
 
 ## Behavior Notes and Caveats
 
 - `IsDeletedAsync` throws when the aggregate does not exist (it does not return `false` for missing aggregates).
-- Event replay is tolerant by default: unknown or unappliable events are skipped, and stream version continues to advance.
+- Event replay is tolerant by default: unknown or unappliable events are skipped, and stream version continues to
+  advance.
 - Integration coverage includes replay compatibility scenarios for:
   - **Unknown events** (event type name no longer resolvable): replay skips affected records and continues.
-  - **Schema-change style evolution** (event type still deserializes but is no longer applied/registered): replay logs `CannotApplyEvent` and continues.
+  - **Schema-change style evolution** (event type still deserializes but is no longer applied/registered): replay logs
+    `CannotApplyEvent` and continues.
   - See: `src/tests/SqlServer.IntegrationTests/Guards/SqlServerEventStoreGuardTests.cs`
     and the shared contract suites in `src/tests/SharedTestingFramework/Contracts/EventStoreContractTestsBase.cs`.
-- Principal enforcement is enabled by default (`RequiresValidPrincipalIdentifier = true`), so save operations require the configured claim identifier to be present on the current principal.
+- Principal enforcement is enabled by default (`RequiresValidPrincipalIdentifier = true`), so save operations require
+  the configured claim identifier to be present on the current principal.
 
 ---
 

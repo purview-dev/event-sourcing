@@ -1,6 +1,7 @@
 # Solution Design Worksheet
 
-Use this worksheet before implementing a new aggregate, workflow, or read model. Keep the first version short. The goal is to expose modelling decisions early, not to produce perfect documentation.
+Use this worksheet before implementing a new aggregate, workflow, or read model. Keep the first version short. The goal
+is to expose modelling decisions early, not to produce perfect documentation.
 
 ## Business Capability
 

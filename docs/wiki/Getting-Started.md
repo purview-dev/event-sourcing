@@ -29,13 +29,16 @@ dotnet add package Purview.EventSourcing.Validation.ZodSharp
 
 ## Dependency guardrail for ZodSharp
 
-If your project references the `Purview.EventSourcing.Validation.ZodSharp` project directly and uses `ZodSharp` types, you must add:
+If your project references the `Purview.EventSourcing.Validation.ZodSharp` project directly and uses `ZodSharp` types,
+you must add:
 
 ```xml
 <PackageReference Include="Purview.ZodSharp" />
 ```
 
-`Purview.EventSourcing.Validation.ZodSharp` ships a build-time check (`ValidateZodSharpDirectReference`) in package `buildTransitive` assets so consumer projects fail fast with remediation guidance when this direct package reference is missing.
+`Purview.EventSourcing.Validation.ZodSharp` ships a build-time check (`ValidateZodSharpDirectReference`) in package
+`buildTransitive` assets so consumer projects fail fast with remediation guidance when this direct package reference
+is missing.
 
 ## Define an aggregate (source generator)
 
@@ -134,4 +137,5 @@ foreach (var item in history.Results)
 - [SQL Server Guide](SQL-Server-Guide.md)
 - [Release Flow](Release-Flow.md)
 
-If you plan to query snapshot JSON deeply in SQL providers, read the SQL Server guide and provider matrix before relying on nested predicates through scalar value object `.Value` members.
+If you plan to query snapshot JSON deeply in SQL providers, read the SQL Server guide and provider matrix before relying
+on nested predicates through scalar value object `.Value` members.
