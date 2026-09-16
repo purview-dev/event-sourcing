@@ -1,6 +1,8 @@
 # Solution Design Guide
 
-This guide helps application developers design an event-sourced solution before writing aggregate code. It is written for Purview EventSourcing projects that use `AggregateBase`, source-generated aggregate events, provider event stores, and optional queryable snapshots.
+This guide helps application developers design an event-sourced solution before writing aggregate code. It is written
+for Purview EventSourcing projects that use `AggregateBase`, source-generated aggregate events, provider event stores,
+and optional queryable snapshots.
 
 Use it in this order:
 
@@ -19,11 +21,15 @@ For a printable template, use [Solution Design Worksheet](Solution-Design-Worksh
 - An event is a fact that has happened, not an instruction to do something.
 - Aggregate state is derived from its ordered event stream.
 - Snapshots and query stores are optimizations/read models. The event stream remains the source of truth.
-- Cross-aggregate workflows should be coordinated by services/process managers, not by loading other aggregates inside an aggregate method.
-- Relational data belongs in query models, snapshots, projections, or referenced IDs, not as live joins inside aggregate invariants.
+- Cross-aggregate workflows should be coordinated by services/process managers, not by loading other aggregates inside
+  an aggregate method.
+- Relational data belongs in query models, snapshots, projections, or referenced IDs, not as live joins inside aggregate
+  invariants.
 - Value objects carry reusable meaning and validation across aggregates.
-- Validation should be explicit about when it runs: command-time, event creation, replay/hydration, save-time, or projection-time.
-- Correlation IDs, idempotency markers, and transaction boundaries are part of the design, not just infrastructure details.
+- Validation should be explicit about when it runs: command-time, event creation, replay/hydration, save-time, or
+  projection-time.
+- Correlation IDs, idempotency markers, and transaction boundaries are part of the design, not just infrastructure
+  details.
 
 ## Repository Rules To Design Against
 
@@ -37,7 +43,8 @@ public sealed partial class OrderAggregate : AggregateBase
 }
 ```
 
-`AggregateBase` derives the persisted aggregate type by trimming the `Aggregate` suffix and converting the remaining type name to lower kebab case:
+`AggregateBase` derives the persisted aggregate type by trimming the `Aggregate` suffix and converting the remaining
+type name to lower kebab case:
 
 | Class name | Aggregate type |
 | --- | --- |
@@ -45,7 +52,8 @@ public sealed partial class OrderAggregate : AggregateBase
 | `CustomerAggregate` | `customer` |
 | `LearningHTMLTestAggregate` | `learning-html-test` |
 
-The aggregate type is used by store implementations for stream grouping and lookup. Treat it as persisted data. Renaming an aggregate class or overriding the aggregate type after data exists is a migration decision.
+The aggregate type is used by store implementations for stream grouping and lookup. Treat it as persisted data. Renaming
+an aggregate class or overriding the aggregate type after data exists is a migration decision.
 
 The source generator supports aggregates that:
 
@@ -54,7 +62,9 @@ The source generator supports aggregates that:
 - directly inherit `AggregateBase`
 - transitively inherit through a custom base class
 
-If an aggregate uses a custom base class, confirm the chosen base class still inherits `AggregateBase` and does not hide event-sourcing behavior from developers. Aggregates with no declared base class get `AggregateBase` added by the generator.
+If an aggregate uses a custom base class, confirm the chosen base class still inherits `AggregateBase` and does not hide
+event-sourcing behavior from developers. Aggregates with no declared base class get `AggregateBase` added by the
+generator.
 
 ### Event Naming
 
@@ -97,7 +107,8 @@ If the generated name is not the business language you want to persist, set it e
 public partial CustomerAggregate RegisterCustomer(string name, string email);
 ```
 
-Use explicit `EventName` sparingly. It is useful for compatibility, integration contracts, or a domain term the generator cannot infer. Once persisted, event names are contracts.
+Use explicit `EventName` sparingly. It is useful for compatibility, integration contracts, or a domain term the
+generator cannot infer. Once persisted, event names are contracts.
 
 ### Event Namespace
 
@@ -107,7 +118,9 @@ By default, generated event classes are placed under:
 {AggregateNamespace}.{AggregateNameWithoutAggregateSuffix}Events
 ```
 
-For example, `Purview.EventSourcing.Samples.Domain.OrderAggregate` generates events in an `OrderEvents` namespace. You can override the namespace at aggregate or method level with `EventNamespace`, but use that only when you need stable compatibility or a shared event namespace.
+For example, `Purview.EventSourcing.Samples.Domain.OrderAggregate` generates events in an `OrderEvents` namespace. You
+can override the namespace at aggregate or method level with `EventNamespace`, but use that only when you need stable
+compatibility or a shared event namespace.
 
 ### Generated Method Shapes
 
@@ -136,7 +149,9 @@ public EventStoreSet<ProjectId> RelatedProjects { get; private set; } = [];
 public partial ReportUploadAggregate AddRelatedProject(ProjectId projectId);
 ```
 
-Use `[Computed]` for deterministic values that callers must not supply directly and that generated hooks finalize before recording the event. Use `Manual = true` when generated property mapping is not expressive enough and you will write the `Apply(...)` method yourself.
+Use `[Computed]` for deterministic values that callers must not supply directly and that generated hooks finalize before
+recording the event. Use `Manual = true` when generated property mapping is not expressive enough and you will write the
+`Apply(...)` method yourself.
 
 ## Paper-First Worksheet
 
@@ -159,7 +174,8 @@ Copy these tables into a design note or pull request before building a new featu
 | --- | --- | --- | --- | --- |
 | | | | | |
 
-Choose an aggregate when it owns rules that must be consistent in one event stream. Do not create one aggregate per relational table by default.
+Choose an aggregate when it owns rules that must be consistent in one event stream. Do not create one aggregate per
+relational table by default.
 
 ### Command And Event Sketch
 
@@ -216,16 +232,22 @@ Use query-side models for relational questions:
 - order details with customer and shipment data
 - audit pages across aggregate types
 
-The project supports queryable snapshot stores for providers such as SQL Server, MongoDB, and Cosmos DB, and a null queryable store for core-only scenarios. Design relational views as projections/snapshots that can be rebuilt from event streams when possible.
+The project supports queryable snapshot stores for providers such as SQL Server, MongoDB, and Cosmos DB, and a null
+queryable store for core-only scenarios. Design relational views as projections/snapshots that can be rebuilt from event
+streams when possible.
 
 When designing snapshot-backed SQL queries, distinguish between:
 
-- provider-converted scalar value objects, which are ideal for invariants and serialization but may not support deep translation through `.Value`, and
-- directly mapped complex snapshot members, which can support deep JSON-path predicates when the payload shape is explicitly supported and covered by integration tests.
+- provider-converted scalar value objects, which are ideal for invariants and serialization but may not support deep
+  translation through `.Value`, and
+- directly mapped complex snapshot members, which can support deep JSON-path predicates when the payload shape is
+  explicitly supported and covered by integration tests.
 
-If deep snapshot filtering is a hard requirement for a complex concept, model that query-facing shape deliberately instead of assuming a scalar wrapper will remain queryable.
+If deep snapshot filtering is a hard requirement for a complex concept, model that query-facing shape deliberately
+instead of assuming a scalar wrapper will remain queryable.
 
-The current repository also includes an in-memory provider and quick-start sample. Treat in-memory storage as a development/testing convenience unless a production use case has explicitly accepted its durability limits.
+The current repository also includes an in-memory provider and quick-start sample. Treat in-memory storage as a
+development/testing convenience unless a production use case has explicitly accepted its durability limits.
 
 ### Cross-Aggregate Rules
 
@@ -252,7 +274,8 @@ public sealed class CartCheckoutService(IEventStore eventStore)
 }
 ```
 
-If several aggregates must be saved together, use the transaction support provided by the selected store where available. Still design each aggregate as if it can replay independently.
+If several aggregates must be saved together, use the transaction support provided by the selected store where
+available. Still design each aggregate as if it can replay independently.
 
 `EventStoreTransaction` chooses the strongest compatible coordinator available:
 
@@ -260,7 +283,8 @@ If several aggregates must be saved together, use the transaction support provid
 - If no shared native boundary exists, commits are sequential under a shared correlation ID.
 - Sequential fallback does not roll back aggregates that were already persisted.
 
-Design cross-aggregate workflows with this distinction in mind. For mixed stores or unsupported transaction boundaries, use idempotent commands, compensating events, and retry-safe process managers.
+Design cross-aggregate workflows with this distinction in mind. For mixed stores or unsupported transaction boundaries,
+use idempotent commands, compensating events, and retry-safe process managers.
 
 ## Value Objects
 
@@ -293,18 +317,21 @@ public readonly partial record struct EmailAddress
 }
 ```
 
-Use scalar value objects when one primitive value carries the meaning. Use full value objects when the concept has multiple fields, such as `Money` with `Amount` and `Currency`.
+Use scalar value objects when one primitive value carries the meaning. Use full value objects when the concept has
+multiple fields, such as `Money` with `Amount` and `Currency`.
 
 Generated value objects distinguish strict creation from hydration:
 
 - `Create(...)` normalizes and validates command-time input.
 - `Hydrate(...)` rebuilds persisted state and should be replay-safe.
 - `[Scalar]` and `[ValueObject]` default to hydration-oriented deserialization.
-- `GenerateEmpty`, implicit primitive conversion, comparison operators, JSON converters, and constructor generation are configurable.
+- `GenerateEmpty`, implicit primitive conversion, comparison operators, JSON converters, and constructor generation are
+  configurable.
 
 ### Contextual Value Objects
 
-Use contextual value objects when validity depends on the current aggregate state. The sample `OrderStatus` validates allowed transitions against the current `OrderAggregate`.
+Use contextual value objects when validity depends on the current aggregate state. The sample `OrderStatus` validates
+allowed transitions against the current `OrderAggregate`.
 
 This is useful for:
 
@@ -365,9 +392,14 @@ Because `On<Property>Changed` runs during replay, keep it deterministic and free
 
 ### Save-Time Validation
 
-Stores run aggregate validation before persistence. With no custom validator, the current implementation uses `DefaultAggregateValidator<TAggregate>`, which validates standard DataAnnotations such as `[Range]`. Store constructors accept `IAggregateValidator<TAggregate>?` — when null, the default DataAnnotations validator is used.
+Stores run aggregate validation before persistence. With no custom validator, the current implementation uses
+`DefaultAggregateValidator<TAggregate>`, which validates standard DataAnnotations such as `[Range]`. Store
+constructors accept `IAggregateValidator<TAggregate>?` — when null, the default DataAnnotations validator is used.
 
-FluentValidation integration is available in the separate `Purview.EventSourcing.FluentValidation` package, which provides `FluentValidationAggregateValidator<TAggregate>` to adapt `FluentValidation.IValidator<T>` to `IAggregateValidator<T>`. Register it via `AddFluentValidationAdapter<TAggregate, TValidator>()` or `AddFluentValidationAdapter<TAggregate>()` DI extensions.
+FluentValidation integration is available in the separate `Purview.EventSourcing.Validation.FluentValidation` package,
+which provides `FluentValidationAggregateValidator<TAggregate>` to adapt `FluentValidation.IValidator<T>` to
+`IAggregateValidator<T>`. Register it via
+`AddFluentValidationAdapter<TAggregate, TValidator>()` or `AddFluentValidationAdapter<TAggregate>()` DI extensions.
 
 Use save-time validation for aggregate-wide consistency checks that should pass before persistence:
 
@@ -379,9 +411,11 @@ public sealed class OrderAggregate : AggregateBase
 }
 ```
 
-Do not rely only on save-time validation for user-facing command errors. Put business guard clauses near the command method as well so invalid operations fail before an event is created.
+Do not rely only on save-time validation for user-facing command errors. Put business guard clauses near the command
+method as well so invalid operations fail before an event is created.
 
-`SaveResult<TAggregate>` carries `Saved`, `Skipped`, and `ValidationResult`. Check `IsValid` or call `EnsureValid()` when callers need validation failures surfaced as exceptions.
+`SaveResult<TAggregate>` carries `Saved`, `Skipped`, and `ValidationResult`. Check `IsValid` or call `EnsureValid()`
+when callers need validation failures surfaced as exceptions.
 
 ## Implementation Pattern
 
@@ -431,7 +465,8 @@ The pattern is:
 4. Value objects normalize and validate reusable concepts.
 5. Services coordinate multiple aggregates.
 
-When a state change should only be recorded if a property actually changes, a manual aggregate can use `CompareRecordAndApply(...)`; generated aggregate methods already provide the higher-level convention for most cases.
+When a state change should only be recorded if a property actually changes, a manual aggregate can use
+`CompareRecordAndApply(...)`; generated aggregate methods already provide the higher-level convention for most cases.
 
 ## Event Payload Design
 
@@ -452,7 +487,8 @@ Be careful with:
 - fields copied from another aggregate that may become stale
 - values that can be calculated deterministically from event payload
 
-For metadata parameters that should be stored on generated events but not mapped to aggregate properties, use `[Metadata]`.
+For metadata parameters that should be stored on generated events but not mapped to aggregate properties, use
+`[Metadata]`.
 
 ```csharp
 [Event]
@@ -479,7 +515,9 @@ Events are persisted facts. Changing them is a compatibility decision.
 - Avoid changing the meaning of an existing property.
 - Use `[Event(Version = N)]` for breaking schema versions.
 - Add upcasters when old events need to hydrate into newer event shapes.
-- Do not change generated event/aggregate naming conventions after data exists unless you plan a migration. (`EventSuffixLength` is a provider option that controls the zero-padded numeric suffix on event row IDs, not a naming convention.)
+- Do not change generated event/aggregate naming conventions after data exists unless you plan a migration.
+  (`EventSuffixLength` is a provider option that controls the zero-padded numeric suffix on event row IDs,
+  not a naming convention.)
 - Treat aggregate type names and event names as persisted contracts.
 
 ## Operation Semantics

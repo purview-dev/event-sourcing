@@ -13,47 +13,40 @@ This guide provides practical examples of implementing event versioning in Purvi
 
 ## Additive Changes
 
-When you add a new optional field to an event, no versioning is needed. Old events will deserialize successfully with the new field set to its default value.
+When you add a new optional field to an event, no versioning is needed. Old events will deserialize
+successfully with the new field set to its default value.
 
 ### Example: Adding an Optional Phone Number
 
-**Initial event (v1, implicit SchemaVersion = 1):**
+**Initial event (v1, implicit `SchemaVersion = 1`):**
+
 ```csharp
-public sealed class CustomerRegistered : EventBase
+[EventContract]
+public sealed record CustomerRegisteredEvent
 {
     public string CustomerId { get; set; } = default!;
     public string Email { get; set; } = default!;
-    
-    protected override void BuildEventHash(ref HashCode hash)
-    {
-        hash.Add(CustomerId);
-        hash.Add(Email);
-    }
 }
 ```
 
 **After adding an optional field (still v1, no SchemaVersion bump needed):**
+
 ```csharp
-public sealed class CustomerRegistered : EventBase
+[EventContract]
+public sealed record CustomerRegisteredEvent
 {
     public string CustomerId { get; set; } = default!;
     public string Email { get; set; } = default!;
     public string? PhoneNumber { get; set; }  // Optional, new field
-    
-    protected override void BuildEventHash(ref HashCode hash)
-    {
-        hash.Add(CustomerId);
-        hash.Add(Email);
-        // Note: Don't hash optional fields that might be null
-    }
 }
 ```
 
 **Aggregate apply logic:**
+
 ```csharp
 protected override void RegisterEvents()
 {
-    Register<CustomerRegistered>(cr =>
+    Register<CustomerRegisteredEvent>(cr =>
     {
         CustomerId = cr.CustomerId;
         Email = cr.Email;
@@ -68,61 +61,53 @@ Old events will deserialize with `PhoneNumber = null`, and the aggregate handles
 
 ## Versioning with SchemaVersion
 
-When you make a **breaking change** to an event's payload (required field added, meaning changed, property removed), bump the `SchemaVersion`.
+When you make a **breaking change** to an event's payload (required field added, meaning changed,
+property removed), bump the `SchemaVersion`.
 
 ### Example: Making Phone Number Required
 
 **Old event (v1):**
+
 ```csharp
-public sealed class CustomerRegistered : EventBase
+[EventContract]
+public sealed record CustomerRegisteredEvent
 {
     public string CustomerId { get; set; } = default!;
     public string Email { get; set; } = default!;
     public string? PhoneNumber { get; set; }  // Was optional
-    
-    protected override void BuildEventHash(ref HashCode hash)
-    {
-        hash.Add(CustomerId);
-        hash.Add(Email);
-    }
 }
 ```
 
 **New event (v2, breaking change):**
+
 ```csharp
-public sealed class CustomerRegistered : EventBase
+[EventContract]
+public sealed record CustomerRegisteredEvent
 {
     public string CustomerId { get; set; } = default!;
     public string Email { get; set; } = default!;
     public string PhoneNumber { get; set; } = default!;  // Now required
-    
-    public override int SchemaVersion => 2;
-    
-    protected override void BuildEventHash(ref HashCode hash)
-    {
-        hash.Add(CustomerId);
-        hash.Add(Email);
-        hash.Add(PhoneNumber);  // Now included in hash
-    }
+
+    public static int SchemaVersion => 2;
 }
 ```
 
 ### Defining the Upcaster
 
+A same-type upcaster transforms the payload in place. The store re-attaches `EventMetadata` after
+upcasting, so the upcaster only maps payload fields.
+
 ```csharp
 public sealed class CustomerRegisteredV1ToV2Upcaster
-    : IEventUpcaster<CustomerRegistered, CustomerRegistered>
+    : IEventUpcaster<CustomerRegisteredEvent, CustomerRegisteredEvent>
 {
-    public CustomerRegistered Upcast(CustomerRegistered source)
-    {
-        return new()
+    public CustomerRegisteredEvent Upcast(CustomerRegisteredEvent source) =>
+        new()
         {
-            Details = source.Details,  // Always preserve metadata
             CustomerId = source.CustomerId,
             Email = source.Email,
             PhoneNumber = source.PhoneNumber ?? "UNKNOWN",  // Default for old events
         };
-    }
 }
 ```
 
@@ -138,33 +123,22 @@ Single-hop upcasting converts v1 events directly to v2 during replay.
 
 ```csharp
 // Order event v1 (no currency)
-public sealed class OrderCreatedV1 : EventBase
+[EventContract]
+public sealed record OrderCreatedEventV1
 {
     public string OrderId { get; set; } = default!;
     public decimal Amount { get; set; }
-    
-    protected override void BuildEventHash(ref HashCode hash)
-    {
-        hash.Add(OrderId);
-        hash.Add(Amount);
-    }
 }
 
 // Order event v2 (with currency, breaking change)
-public sealed class OrderCreated : EventBase
+[EventContract]
+public sealed record OrderCreatedEvent
 {
     public string OrderId { get; set; } = default!;
     public decimal Amount { get; set; }
     public string Currency { get; set; } = default!;
-    
-    public override int SchemaVersion => 2;
-    
-    protected override void BuildEventHash(ref HashCode hash)
-    {
-        hash.Add(OrderId);
-        hash.Add(Amount);
-        hash.Add(Currency);
-    }
+
+    public static int SchemaVersion => 2;
 }
 ```
 
@@ -172,25 +146,22 @@ public sealed class OrderCreated : EventBase
 
 ```csharp
 public sealed class OrderCreatedV1ToV2Upcaster
-    : IEventUpcaster<OrderCreatedV1, OrderCreated>
+    : IEventUpcaster<OrderCreatedEventV1, OrderCreatedEvent>
 {
-    public OrderCreated Upcast(OrderCreatedV1 source)
-    {
-        return new()
+    public OrderCreatedEvent Upcast(OrderCreatedEventV1 source) =>
+        new()
         {
-            Details = source.Details,
             OrderId = source.OrderId,
             Amount = source.Amount,
             Currency = "USD",  // Default currency for old events
         };
-    }
 }
 ```
 
 **Step 3: Register the upcaster in DI**
 
 ```csharp
-services.AddEventUpcaster<OrderCreatedV1, OrderCreated, OrderCreatedV1ToV2Upcaster>();
+services.AddEventUpcaster<OrderCreatedEventV1, OrderCreatedEvent, OrderCreatedV1ToV2Upcaster>();
 ```
 
 **Step 4: Use in the aggregate**
@@ -204,8 +175,8 @@ public sealed class OrderAggregate : AggregateBase
 
     protected override void RegisterEvents()
     {
-        // Old event type (will be upcast to OrderCreated)
-        Register<OrderCreatedV1>(v1 =>
+        // Old event type (will be upcast to OrderCreatedEvent)
+        Register<OrderCreatedEventV1>(v1 =>
         {
             OrderId = v1.OrderId;
             Amount = v1.Amount;
@@ -213,7 +184,7 @@ public sealed class OrderAggregate : AggregateBase
         });
 
         // New event type (v2)
-        Register<OrderCreated>(oc =>
+        Register<OrderCreatedEvent>(oc =>
         {
             OrderId = oc.OrderId;
             Amount = oc.Amount;
@@ -234,53 +205,35 @@ Multi-hop chains (v1 → v2 → v3) are automatically applied during replay.
 **Step 1: Define the events**
 
 ```csharp
-// v1: OrderCreatedV1
-public sealed class OrderCreatedV1 : EventBase
+// v1: OrderCreatedEventV1
+[EventContract]
+public sealed record OrderCreatedEventV1
 {
     public string OrderId { get; set; } = default!;
     public decimal Amount { get; set; }
-    
-    protected override void BuildEventHash(ref HashCode hash)
-    {
-        hash.Add(OrderId);
-        hash.Add(Amount);
-    }
 }
 
-// v2: OrderCreatedV2 (added currency)
-public sealed class OrderCreatedV2 : EventBase
+// v2: OrderCreatedEventV2 (added currency)
+[EventContract]
+public sealed record OrderCreatedEventV2
 {
     public string OrderId { get; set; } = default!;
     public decimal Amount { get; set; }
     public string Currency { get; set; } = default!;
-    
-    public override int SchemaVersion => 2;
-    
-    protected override void BuildEventHash(ref HashCode hash)
-    {
-        hash.Add(OrderId);
-        hash.Add(Amount);
-        hash.Add(Currency);
-    }
+
+    public static int SchemaVersion => 2;
 }
 
-// v3: OrderCreated (added tax info)
-public sealed class OrderCreated : EventBase
+// v3: OrderCreatedEvent (added tax info)
+[EventContract]
+public sealed record OrderCreatedEvent
 {
     public string OrderId { get; set; } = default!;
     public decimal Amount { get; set; }
     public string Currency { get; set; } = default!;
     public decimal TaxAmount { get; set; }
-    
-    public override int SchemaVersion => 3;
-    
-    protected override void BuildEventHash(ref HashCode hash)
-    {
-        hash.Add(OrderId);
-        hash.Add(Amount);
-        hash.Add(Currency);
-        hash.Add(TaxAmount);
-    }
+
+    public static int SchemaVersion => 3;
 }
 ```
 
@@ -288,34 +241,28 @@ public sealed class OrderCreated : EventBase
 
 ```csharp
 public sealed class OrderCreatedV1ToV2Upcaster
-    : IEventUpcaster<OrderCreatedV1, OrderCreatedV2>
+    : IEventUpcaster<OrderCreatedEventV1, OrderCreatedEventV2>
 {
-    public OrderCreatedV2 Upcast(OrderCreatedV1 source)
-    {
-        return new()
+    public OrderCreatedEventV2 Upcast(OrderCreatedEventV1 source) =>
+        new()
         {
-            Details = source.Details,
             OrderId = source.OrderId,
             Amount = source.Amount,
             Currency = "USD",
         };
-    }
 }
 
 public sealed class OrderCreatedV2ToV3Upcaster
-    : IEventUpcaster<OrderCreatedV2, OrderCreated>
+    : IEventUpcaster<OrderCreatedEventV2, OrderCreatedEvent>
 {
-    public OrderCreated Upcast(OrderCreatedV2 source)
-    {
-        return new()
+    public OrderCreatedEvent Upcast(OrderCreatedEventV2 source) =>
+        new()
         {
-            Details = source.Details,
             OrderId = source.OrderId,
             Amount = source.Amount,
             Currency = source.Currency,
             TaxAmount = source.Amount * 0.1m,  // 10% tax on amount
         };
-    }
 }
 ```
 
@@ -323,8 +270,8 @@ public sealed class OrderCreatedV2ToV3Upcaster
 
 ```csharp
 // Order matters: register from earliest to latest version
-services.AddEventUpcaster<OrderCreatedV1, OrderCreatedV2, OrderCreatedV1ToV2Upcaster>();
-services.AddEventUpcaster<OrderCreatedV2, OrderCreated, OrderCreatedV2ToV3Upcaster>();
+services.AddEventUpcaster<OrderCreatedEventV1, OrderCreatedEventV2, OrderCreatedV1ToV2Upcaster>();
+services.AddEventUpcaster<OrderCreatedEventV2, OrderCreatedEvent, OrderCreatedV2ToV3Upcaster>();
 ```
 
 **Step 4: Aggregate receives the final upcast event**
@@ -340,8 +287,8 @@ public sealed class OrderAggregate : AggregateBase
     protected override void RegisterEvents()
     {
         // The upcaster chain is applied before the aggregate applies the event.
-        // Old v1 and v2 events arrive as OrderCreated (v3) after upcasting.
-        Register<OrderCreated>(oc =>
+        // Old v1 and v2 events arrive as OrderCreatedEvent (v3) after upcasting.
+        Register<OrderCreatedEvent>(oc =>
         {
             OrderId = oc.OrderId;
             Amount = oc.Amount;
@@ -353,90 +300,100 @@ public sealed class OrderAggregate : AggregateBase
 ```
 
 During replay:
-- V1 events → upcast by OrderCreatedV1ToV2Upcaster → upcast by OrderCreatedV2ToV3Upcaster → arrive as OrderCreated
-- V2 events → upcast by OrderCreatedV2ToV3Upcaster → arrive as OrderCreated
+
+- V1 events → upcast by `OrderCreatedV1ToV2Upcaster` → upcast by `OrderCreatedV2ToV3Upcaster` →
+  arrive as `OrderCreatedEvent`
+- V2 events → upcast by `OrderCreatedV2ToV3Upcaster` → arrive as `OrderCreatedEvent`
 - V3 events → arrive as-is (no upcasting needed)
 
 ---
 
 ## Common Mistakes
 
-### ❌ Mistake 1: Forgetting to Copy EventDetails
+### ❌ Mistake 1: Copying Metadata in the Upcaster
+
+Metadata (`EventMetadata`: idempotency, correlation, user, timestamp, schema version) is carried by
+the framework and re-attached by the store, so it should **not** be copied by the upcaster.
 
 **Wrong:**
+
 ```csharp
-public OrderCreated Upcast(OrderCreatedV1 source)
+public OrderCreatedEvent Upcast(OrderCreatedEventV1 source)
 {
     return new()
     {
-        // Forgot to copy Details!
+        Metadata = source.Metadata,  // Metadata is framework-managed; do not copy it
         OrderId = source.OrderId,
         Amount = source.Amount,
         Currency = "USD",
     };
 }
 ```
-
-This breaks idempotency, correlation, and audit trails.
 
 **Correct:**
+
 ```csharp
-public OrderCreated Upcast(OrderCreatedV1 source)
+public OrderCreatedEvent Upcast(OrderCreatedEventV1 source)
 {
     return new()
     {
-        Details = source.Details,  // Always copy
         OrderId = source.OrderId,
         Amount = source.Amount,
         Currency = "USD",
     };
 }
 ```
+
+The store attaches the source event's `EventMetadata` (idempotency, correlation, user) to the upcast
+event automatically.
 
 ### ❌ Mistake 2: Creating a New Event Type Instead of Versioning
 
-If the semantic meaning changes (e.g., "registration" → "registration with email verification"), create a **new event type**, not a new version.
+If the semantic meaning changes (e.g., "registration" → "registration with email verification"),
+create a **new event type**, not a new version.
 
 **Wrong (semantic change, not a versioning scenario):**
+
 ```csharp
-public sealed class UserRegistered : EventBase
+[EventContract]
+public sealed record UserRegisteredEvent
 {
-    // v1: just email
     public string Email { get; set; } = default!;
-    
-    // v2: now requires email verification
-    public string Email { get; set; } = default!;
+
+    public static int SchemaVersion => 2;
     public bool EmailVerified { get; set; }  // Required, breaking change
-    
-    public override int SchemaVersion => 2;
 }
 ```
 
 This conflates two different processes.
 
 **Correct (introduce a new event type):**
+
 ```csharp
-public sealed class UserRegistered : EventBase
+[EventContract]
+public sealed record UserRegisteredEvent
 {
     public string Email { get; set; } = default!;
 }
 
-public sealed class UserRegisteredWithEmailVerification : EventBase
+[EventContract]
+public sealed record UserRegisteredWithEmailVerificationEvent
 {
     public string Email { get; set; } = default!;
     public bool EmailVerified { get; set; }
 }
+```
 
-// Use in the aggregate:
+```csharp
 protected override void RegisterEvents()
 {
-    Register<UserRegistered>(ur =>
+    Register<UserRegisteredEvent>(ur =>
     {
         Email = ur.Email;
         EmailVerified = false;
     });
 
-    Register<UserRegisteredWithEmailVerification>(urwv =>
+    Register<UserRegisteredWithEmailVerificationEvent>(urwv =>
     {
         Email = urwv.Email;
         EmailVerified = urwv.EmailVerified;
@@ -444,51 +401,58 @@ protected override void RegisterEvents()
 }
 ```
 
-### ❌ Mistake 3: Not Hashing All Required Fields in SchemaVersion >= 2
+### ❌ Mistake 3: Forgetting a Safe Default for Legacy Values
 
-When you increment SchemaVersion, all non-optional fields must be included in the hash.
+When a breaking change adds a field, the upcaster must provide a deterministic default for old
+events. Otherwise the aggregate applies a meaningless value.
 
 **Wrong:**
-```csharp
-public override int SchemaVersion => 2;
 
-protected override void BuildEventHash(ref HashCode hash)
+```csharp
+public OrderCreatedEvent Upcast(OrderCreatedEventV1 source)
 {
-    hash.Add(OrderId);
-    // Forgot to hash Currency even though it's now required
+    return new()
+    {
+        OrderId = source.OrderId,
+        Amount = source.Amount,
+        // Currency omitted — old events would hydrate Currency = null
+    };
 }
 ```
 
-This creates hash collisions and violates the event's integrity.
-
 **Correct:**
-```csharp
-public override int SchemaVersion => 2;
 
-protected override void BuildEventHash(ref HashCode hash)
+```csharp
+public OrderCreatedEvent Upcast(OrderCreatedEventV1 source)
 {
-    hash.Add(OrderId);
-    hash.Add(Amount);
-    hash.Add(Currency);  // Include all required fields
+    return new()
+    {
+        OrderId = source.OrderId,
+        Amount = source.Amount,
+        Currency = "USD",  // Deterministic default for legacy events
+    };
 }
 ```
 
 ### ❌ Mistake 4: Circular Upcaster Chains
 
-The registry detects circular chains and throws an exception at registration time, but you can prevent this by registering upcasters in order (v1 → v2 → v3).
+The registry detects circular chains and throws an exception when it is constructed, but you can
+prevent this by registering upcasters in order (v1 → v2 → v3).
 
 **Wrong:**
+
 ```csharp
 // This will throw at runtime
-services.AddEventUpcaster<OrderCreatedV1, OrderCreatedV2, ...>();
-services.AddEventUpcaster<OrderCreatedV2, OrderCreatedV1, ...>();  // Creates a cycle!
+services.AddEventUpcaster<OrderCreatedEventV1, OrderCreatedEventV2, ...>();
+services.AddEventUpcaster<OrderCreatedEventV2, OrderCreatedEventV1, ...>();  // Creates a cycle!
 ```
 
 **Correct:**
+
 ```csharp
 // Always register from earlier to later versions
-services.AddEventUpcaster<OrderCreatedV1, OrderCreatedV2, ...>();
-services.AddEventUpcaster<OrderCreatedV2, OrderCreatedV3, ...>();
+services.AddEventUpcaster<OrderCreatedEventV1, OrderCreatedEventV2, ...>();
+services.AddEventUpcaster<OrderCreatedEventV2, OrderCreatedEventV3, ...>();
 ```
 
 ---
@@ -502,11 +466,10 @@ services.AddEventUpcaster<OrderCreatedV2, OrderCreatedV3, ...>();
 public async Task Upcast_V1ToV2_PreservesDataAndDefaults()
 {
     var upcaster = new OrderCreatedV1ToV2Upcaster();
-    var v1Event = new OrderCreatedV1
+    var v1Event = new OrderCreatedEventV1
     {
         OrderId = "123",
         Amount = 99.99m,
-        Details = { IdempotencyId = "idempotency-123" },
     };
 
     var v2Event = upcaster.Upcast(v1Event);
@@ -514,25 +477,26 @@ public async Task Upcast_V1ToV2_PreservesDataAndDefaults()
     await Assert.That(v2Event.OrderId).IsEqualTo("123");
     await Assert.That(v2Event.Amount).IsEqualTo(99.99m);
     await Assert.That(v2Event.Currency).IsEqualTo("USD");
-    await Assert.That(v2Event.Details.IdempotencyId).IsEqualTo("idempotency-123");
 }
 ```
 
 ### Integration Test: Replay with Upcasting
+
+Legacy v1 rows are produced by an older deployment; the test seeds one directly in storage, then
+loads the aggregate so the upcaster runs during replay.
 
 ```csharp
 [Test]
 public async Task Replay_WithV1Events_UpcastsToV2AndAppliesCorrectly()
 {
     // 1. Register upcaster
-    services.AddEventUpcaster<OrderCreatedV1, OrderCreated, ...>();
+    services.AddEventUpcaster<OrderCreatedEventV1, OrderCreatedEvent, OrderCreatedV1ToV2Upcaster>();
 
-    // 2. Save a V1 event directly to storage
-    var v1Event = new OrderCreatedV1 { OrderId = "123", Amount = 99.99m };
-    await eventStore.SaveAsync(aggregateId, [v1Event], ...);
+    // 2. Seed a V1 event row directly in storage (provider-specific), for example
+    //    write an OrderCreatedEventV1 payload under the aggregate's stream.
 
     // 3. Load the aggregate (triggers replay with upcasting)
-    var aggregate = await eventStore.GetAsync(aggregateId);
+    var aggregate = await eventStore.GetAsync<OrderAggregate>("123", cancellationToken);
 
     // 4. Verify the aggregate state matches the upcast event
     await Assert.That(aggregate.OrderId).IsEqualTo("123");
@@ -547,17 +511,17 @@ public async Task Replay_WithV1Events_UpcastsToV2AndAppliesCorrectly()
 [Test]
 public async Task Replay_WithUnknownEventType_ReturnsUnknownEventAndContinues()
 {
-    // 1. Save an event with a type that doesn't exist
-    var unknownEvent = new CustomEvent { ... };
+    // 1. Seed an event whose persisted type name does not resolve to a registered event type
 
     // 2. Load the aggregate
-    var aggregate = await eventStore.GetAsync(aggregateId);
+    var aggregate = await eventStore.GetAsync<OrderAggregate>("123", cancellationToken);
 
     // 3. Verify replay continues without throwing
     await Assert.That(aggregate).IsNotNull();
+    await Assert.That(aggregate.SkippedEvents).IsNotEmpty();
 
     // 4. In a real test, you'd have a mixture of known and unknown events
-    // to verify partial replay works correctly
+    //    to verify partial replay works correctly
 }
 ```
 
@@ -568,9 +532,10 @@ public async Task Replay_WithUnknownEventType_ReturnsUnknownEventAndContinues()
 - **Additive changes (optional fields)** → No versioning needed
 - **Breaking changes (required fields, removed fields, semantic changes)** → Increment SchemaVersion
 - **Semantic meaning changes** → Create a new event type
-- **Always copy EventDetails** in upcasters
+- **Do not copy metadata in upcasters** — the store re-attaches `EventMetadata`
 - **Register upcasters in order** (v1 → v2 → v3 → …)
 - **Test multi-hop chains** and unknown event handling
-- **All providers apply upcasting during replay** (SQL Server, Azure Storage, MongoDB)
+- **Stream-backed providers apply upcasting during replay** (SQL Server, PostgreSQL, Azure Storage,
+  MongoDB)
 
 For more information, see [Event-Versioning-Strategy.md](Event-Versioning-Strategy.md).
