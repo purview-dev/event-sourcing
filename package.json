@@ -1,6 +1,6 @@
 {
-	"name": "purview-eventsourcing",
-	"version": "2.0.0-prerelease.32",
+	"name": "purview-event-sourcing",
+	"version": "2.0.0-prerelease.33",
 	"license": "MIT",
 	"author": {
 		"name": "Kieron Lanning",
@@ -8,10 +8,10 @@
 	},
 	"homepage": "https://purview.dev/projects/event-sourcing/",
 	"bugs": {
-		"url": "https://github.com/purview-dev/eventsourcing/issues"
+		"url": "https://github.com/purview-dev/event-sourcing/issues"
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/purview-dev/eventsourcing.git"
+		"url": "git+https://github.com/purview-dev/event-sourcing.git"
 	}
 }

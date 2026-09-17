@@ -6,7 +6,7 @@ using Purview.EventSourcing.Benchmarks;
 
 // The suites run with the in-process toolchain: benchmarks execute directly in this process, which
 // avoids BenchmarkDotNet generating an out-of-process boilerplate project. The repository's
-// Purview.DotNetProjectSdk cannot build under BenchmarkDotNet's generated project layout, and an
+// Purview.BuildSdk cannot build under BenchmarkDotNet's generated project layout, and an
 // in-process run keeps the harness self-contained and fast to invoke.
 
 var mode = args.Length > 0 ? args[0].ToLowerInvariant() : "all";

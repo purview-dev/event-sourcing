@@ -13,7 +13,7 @@ built on **BenchmarkDotNet**. Three suites measure the framework's high-impact a
 
 Each run uses the **in-process toolchain** (`InProcessEmitToolchain`), so the benchmarks execute in
 the current process. This avoids BenchmarkDotNet generating an out-of-process boilerplate project,
-which the repository's `Purview.DotNetProjectSdk` cannot build under. In-process runs are slightly
+which the repository's `Purview.BuildSdk` cannot build under. In-process runs are slightly
 less isolated than out-of-process runs, but they keep the harness self-contained and fast to invoke,
 and allocation measurements use `GC.GetAllocatedBytesForCurrentThread` so they remain meaningful.
 

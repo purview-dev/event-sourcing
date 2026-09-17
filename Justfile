@@ -112,7 +112,7 @@ restore *args:
 # Displays the current package version from package.json
 [group('Build and Test')]
 current_version:
-    echo "==> Current version: {{ GREEN }}{{ current_version }}{{ NORMAL }} (defined in package.json and automatically included in the build output through the Purview.DotNetProjectSdk package)"
+    echo "==> Current version: {{ GREEN }}{{ current_version }}{{ NORMAL }} (defined in package.json and automatically included in the build output through the Purview.BuildSdk package)"
 
 # Run the source-generator performance harness (pass --benchmark for larger runs; requires Release for meaningful numbers)
 [group('Performance Tests')]

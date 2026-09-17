@@ -21,7 +21,7 @@ and releases. Consuming repositories own configuration (through `purview-build.j
 Integration tests are never discovered in CI: `purview-build.json` sets `Build:TestPatterns` to `*Tests.csproj`,
 `Build:TestProjects` to `*UnitTests.csproj`, and `Build:TestFilter` to
 `/*/*/*/*[Category=Unit]`, so only unit-test
-projects (tagged `[Category=Unit]` by the `Purview.DotNetProjectSdk`) are executed; provider integration tests
+projects (tagged `[Category=Unit]` by the `Purview.BuildSdk`) are executed; provider integration tests
 (which require Docker/Testcontainers) run only locally via `just test`.
 The performance harnesses live under `src/src/Benchmarks` (a single non-test `Benchmarks.csproj`) and run locally
 via `just perf-source-generator` / `just perf-runtime` / `just perf-sql-server`.
