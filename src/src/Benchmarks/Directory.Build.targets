@@ -3,7 +3,7 @@
 		Deliberately empty: shadows src/Directory.Build.targets for this subtree.
 
 		See Directory.Build.props in this folder for the full rationale. Importing
-		Purview.DotNetProjectSdk Sdk.targets without its Sdk.props (which is what
+		Purview.BuildSdk Sdk.targets without its Sdk.props (which is what
 		src/Directory.Build.targets does) is not valid for this project, so this
 		subtree opts out of both.
 	-->

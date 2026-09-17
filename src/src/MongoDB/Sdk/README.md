@@ -26,6 +26,6 @@ builder.Services.AddMongoDBSnapshotQueryableEventStore();
 
 - [Homepage](https://purview.dev/projects/event-sourcing/)
 - [Documentation](https://purview.dev/docs/event-sourcing/)
-- [Provider feature matrix](https://github.com/purview-dev/eventsourcing/blob/main/docs/wiki/Provider-Feature-Matrix.md)
+- [Provider feature matrix](https://github.com/purview-dev/event-sourcing/blob/main/docs/wiki/Provider-Feature-Matrix.md)
 
 Snapshot query translation capabilities differ by provider; consult the provider matrix and provider-specific guides before relying on deep nested predicates for complex value-object shapes.

@@ -47,14 +47,14 @@ await store.SaveAsync(order, cancellationToken);
 
 - [Homepage](https://purview.dev/projects/event-sourcing/)
 - [Documentation](https://purview.dev/docs/event-sourcing/)
-- [SQL Server guide](https://github.com/purview-dev/eventsourcing/blob/main/docs/wiki/SQL-Server-Guide.md)
-- [Provider feature matrix](https://github.com/purview-dev/eventsourcing/blob/main/docs/wiki/Provider-Feature-Matrix.md)
+- [SQL Server guide](https://github.com/purview-dev/event-sourcing/blob/main/docs/wiki/SQL-Server-Guide.md)
+- [Provider feature matrix](https://github.com/purview-dev/event-sourcing/blob/main/docs/wiki/Provider-Feature-Matrix.md)
 
 When using snapshot-backed providers, especially SQL Server, read the provider docs before assuming deep predicates through complex scalar value object `.Value` members will translate.
 
 ## Agent skill integration
 
-When installed from NuGet, `Purview.EventSourcing` ships bundled agent skills. Consuming repositories that use `Purview.DotNetProjectSdk` get those skills copied into `.agents\skills\` before build so supported coding agents can discover framework-specific guidance automatically.
+When installed from NuGet, `Purview.EventSourcing` ships bundled agent skills. Consuming repositories that use `Purview.BuildSdk` get those skills copied into `.agents\skills\` before build so supported coding agents can discover framework-specific guidance automatically.
 
 To opt out, set:
 

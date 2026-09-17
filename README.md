@@ -1,7 +1,7 @@
 # Purview EventSourcing
 
 [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.svg)](https://www.nuget.org/packages/Purview.EventSourcing)
-[![Release](https://github.com/purview-dev/eventsourcing/actions/workflows/release.yml/badge.svg)](https://github.com/purview-dev/eventsourcing/actions/workflows/release.yml)
+[![Release](https://github.com/purview-dev/event-sourcing/actions/workflows/release.yml/badge.svg)](https://github.com/purview-dev/event-sourcing/actions/workflows/release.yml)
 
 Purview EventSourcing is a .NET event sourcing framework for building aggregate-based applications with provider-agnostic store facades, source-generated aggregates, transaction coordination, and storage packages for SQL Server, PostgreSQL, MongoDB, Azure Storage, Azure Cosmos DB, and in-memory.
 

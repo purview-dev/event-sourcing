@@ -119,8 +119,8 @@ Request validation uses [ZodSharp](https://github.com/RemiBou/ZodSharp); `ZodSha
 
 ## Related packages
 
-- [Admin abstractions](https://github.com/purview-dev/eventsourcing/blob/main/src/src/Admin.Abstractions/Sdk/README.md): `Purview.EventSourcing.Admin.Abstractions`
-- [Admin client](https://github.com/purview-dev/eventsourcing/blob/main/src/src/Admin.Client/Sdk/README.md): `Purview.EventSourcing.Admin.Client`
-- [Admin security](https://github.com/purview-dev/eventsourcing/blob/main/src/src/Admin.Security/Sdk/README.md): `Purview.EventSourcing.Admin.Security`
-- [Admin UI](https://github.com/purview-dev/eventsourcing/blob/main/src/src/Admin.Site/Sdk/README.md): `Purview.EventSourcing.Admin.Site`
+- [Admin abstractions](https://github.com/purview-dev/event-sourcing/blob/main/src/src/Admin.Abstractions/Sdk/README.md): `Purview.EventSourcing.Admin.Abstractions`
+- [Admin client](https://github.com/purview-dev/event-sourcing/blob/main/src/src/Admin.Client/Sdk/README.md): `Purview.EventSourcing.Admin.Client`
+- [Admin security](https://github.com/purview-dev/event-sourcing/blob/main/src/src/Admin.Security/Sdk/README.md): `Purview.EventSourcing.Admin.Security`
+- [Admin UI](https://github.com/purview-dev/event-sourcing/blob/main/src/src/Admin.Site/Sdk/README.md): `Purview.EventSourcing.Admin.Site`
 - Storage adapters: `Purview.EventSourcing.Admin.SqlServer`, `Purview.EventSourcing.Admin.MongoDB`, `Purview.EventSourcing.Admin.Postgres`, `Purview.EventSourcing.Admin.AzureStorage`

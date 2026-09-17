@@ -92,7 +92,7 @@ Authorization is enforced at the API layer using the policies defined in `Purvie
 
 ## Related packages
 
-- [Admin abstractions](https://github.com/purview-dev/eventsourcing/blob/main/src/src/Admin.Abstractions/Sdk/README.md): `Purview.EventSourcing.Admin.Abstractions`
-- [Admin API](https://github.com/purview-dev/eventsourcing/blob/main/src/src/Admin.API/Sdk/README.md): `Purview.EventSourcing.Admin.Api`
-- [Admin client](https://github.com/purview-dev/eventsourcing/blob/main/src/src/Admin.Client/Sdk/README.md): `Purview.EventSourcing.Admin.Client`
-- [Admin security](https://github.com/purview-dev/eventsourcing/blob/main/src/src/Admin.Security/Sdk/README.md): `Purview.EventSourcing.Admin.Security`
+- [Admin abstractions](https://github.com/purview-dev/event-sourcing/blob/main/src/src/Admin.Abstractions/Sdk/README.md): `Purview.EventSourcing.Admin.Abstractions`
+- [Admin API](https://github.com/purview-dev/event-sourcing/blob/main/src/src/Admin.API/Sdk/README.md): `Purview.EventSourcing.Admin.Api`
+- [Admin client](https://github.com/purview-dev/event-sourcing/blob/main/src/src/Admin.Client/Sdk/README.md): `Purview.EventSourcing.Admin.Client`
+- [Admin security](https://github.com/purview-dev/event-sourcing/blob/main/src/src/Admin.Security/Sdk/README.md): `Purview.EventSourcing.Admin.Security`

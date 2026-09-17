@@ -83,5 +83,5 @@ Both the OpenAPI document and the generated client are committed, so consumers g
 
 ## Related packages
 
-- [Admin API](https://github.com/purview-dev/eventsourcing/blob/main/src/src/Admin.API/Sdk/README.md): `Purview.EventSourcing.Admin.Api`
-- [Admin site](https://github.com/purview-dev/eventsourcing/blob/main/src/src/Admin.Site/Sdk/README.md): `Purview.EventSourcing.Admin.Site`
+- [Admin API](https://github.com/purview-dev/event-sourcing/blob/main/src/src/Admin.API/Sdk/README.md): `Purview.EventSourcing.Admin.Api`
+- [Admin site](https://github.com/purview-dev/event-sourcing/blob/main/src/src/Admin.Site/Sdk/README.md): `Purview.EventSourcing.Admin.Site`

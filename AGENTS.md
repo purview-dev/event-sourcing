@@ -7,7 +7,7 @@ This repository contains the `Purview.EventSourcing` framework, its incremental 
 - This file is the repository-wide source of truth for AI agents. More-specific `AGENTS.md` files, if added later, take precedence for their subtrees.
 - `.github/copilot-instructions.md` bootstraps GitHub Copilot into this file; keep it aligned if instruction locations change.
 - Follow explicit user instructions first, then the nearest applicable repository instructions, then established code patterns.
-- Operate only in this repository unless the user explicitly expands the scope. `P:\GitHub\purview-dev\purview-sourcegeneratorframework` may be inspected as read-only reference material, but do not edit it or assume its conventions override this repository.
+- Operate only in this repository unless the user explicitly expands the scope. `P:\GitHub\purview-dev\sourcegenerator-framework` may be inspected as read-only reference material, but do not edit it or assume its conventions override this repository.
 - Never read, copy, log, or commit secrets from excluded files, environment variables, user profiles, local configuration, test output, or provider credentials.
 
 ## Repository boundaries and working tree safety
@@ -56,7 +56,7 @@ Do not introduce a second version source, dependency-version location, or parall
 Use repository-local skills when their trigger applies:
 
 - `dotnet-tunit` for writing TUnit tests and `tunit-test-runner` for executing or filtering them.
-- `project-placement-defaults`, `sdk-configuration-reference`, and `sdk-project-behavior-and-detection` for project layout or `Purview.DotNetProjectSdk` behavior.
+- `project-placement-defaults`, `sdk-configuration-reference`, and `sdk-project-behavior-and-detection` for project layout or `Purview.BuildSdk` behavior.
 - `git-conventional-commits` for commit work and `lefthook-integration` for Git-hook changes.
 
 ## Architecture and domain invariants
@@ -127,7 +127,7 @@ Use repository-local skills when their trigger applies:
 - Prefer backward-compatible additions. Do not rename, remove, narrow accessibility, or alter semantics without explicit approval and corresponding migration/release documentation.
 - Centralize package versions in `Directory.Packages.props`; project files should normally contain versionless `PackageReference` entries.
 - Reuse existing dependencies when practical. New dependencies require a clear need, compatible target frameworks, acceptable licensing/security posture, and correct public/private asset flow.
-- Respect `Purview.DotNetProjectSdk` inference before adding manual properties or references. Repository-wide bootstrap properties that affect `Sdk.props` belong before the SDK import in `src/Directory.Build.props`.
+- Respect `Purview.BuildSdk` inference before adding manual properties or references. Repository-wide bootstrap properties that affect `Sdk.props` belong before the SDK import in `src/Directory.Build.props`.
 - Place source projects under `src/src` and test projects under `src/tests`, beside the closest peer. Follow established suffixes such as `.UnitTests`, `.IntegrationTests`, and `.PerformanceTests`. Performance harnesses are console projects consolidated under `src/src/Benchmarks` (`Benchmarks.csproj`), not test projects.
 - Keep packability explicit and package metadata consistent. Verify package contents when changing build assets, analyzers, transitive targets, README files, or project-reference packing.
 
@@ -151,7 +151,7 @@ Use repository-local skills when their trigger applies:
   dotnet test --project src/EventSourcing.slnx --configuration Debug --treenode-filter "/*/*/*/*" --ignore-exit-code 8
   ```
 
-- PR validation restores and builds the Release solution, then runs the unit-test tree filter `/*/*/*/*[Category=Unit]` (the `Purview.DotNetProjectSdk` applies `[assembly: TUnit.Core.Category("Unit")]` to unit-test projects) and emits TRX results.
+- PR validation restores and builds the Release solution, then runs the unit-test tree filter `/*/*/*/*[Category=Unit]` (the `Purview.BuildSdk` applies `[assembly: TUnit.Core.Category("Unit")]` to unit-test projects) and emits TRX results.
 - Unit tests should cover domain logic, contracts, failure behavior, and regressions without external infrastructure.
 - Source-generator tests should assert generated code and diagnostics using the existing testing framework.
 - Provider integration tests use `src/tests/SharedTestingFramework` and Testcontainers or provider infrastructure. Run affected-provider tests for translation, persistence, concurrency, or serialization changes when infrastructure is available.

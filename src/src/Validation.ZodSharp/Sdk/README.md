@@ -66,5 +66,5 @@ await store.SaveAsync(order, cancellationToken);
 
 ## Related packages
 
-- [Core package](https://github.com/purview-dev/eventsourcing/blob/main/src/src/EventSourcing/Sdk/README.md): `Purview.EventSourcing`
-- [FluentValidation integration](https://github.com/purview-dev/eventsourcing/blob/main/src/src/FluentValidationImpl/Sdk/README.md): `Purview.EventSourcing.FluentValidation`
+- [Core package](https://github.com/purview-dev/event-sourcing/blob/main/src/src/EventSourcing/Sdk/README.md): `Purview.EventSourcing`
+- [FluentValidation integration](https://github.com/purview-dev/event-sourcing/blob/main/src/src/FluentValidationImpl/Sdk/README.md): `Purview.EventSourcing.FluentValidation`

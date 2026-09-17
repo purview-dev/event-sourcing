@@ -92,6 +92,6 @@ Unsupported shapes fail during model creation, including arrays and collection t
 
 - [Homepage](https://purview.dev/projects/event-sourcing/)
 - [Documentation](https://purview.dev/docs/event-sourcing/)
-- [Provider feature matrix](https://github.com/purview-dev/eventsourcing/blob/main/docs/wiki/Provider-Feature-Matrix.md)
+- [Provider feature matrix](https://github.com/purview-dev/event-sourcing/blob/main/docs/wiki/Provider-Feature-Matrix.md)
   - Includes behavior notes/caveats (`IsDeletedAsync` missing behavior, tolerant replay, principal requirements)
   - Includes snapshot payload/query-translation guidance for scalar value objects vs directly mapped complex mirrors

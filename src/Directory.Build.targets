@@ -1,5 +1,5 @@
 <Project>
-	<Import Sdk="Purview.DotNetProjectSdk" Project="Sdk.targets" />
+	<Import Sdk="Purview.BuildSdk" Project="Sdk.targets" />
 
 	<!-- Enforce XML documentation on public API for packable projects. IsPackable is only known after the
 	     project body has been evaluated, so this cannot live in Directory.Build.props. The SDK re-adds CS1591

@@ -3,7 +3,7 @@
 		<NamespacePrefix>Purview.EventSourcing</NamespacePrefix>
 	</PropertyGroup>
 
-	<Import Sdk="Purview.DotNetProjectSdk" Project="Sdk.props" />
+	<Import Sdk="Purview.BuildSdk" Project="Sdk.props" />
 
 	<PropertyGroup>
 		<TargetsForTfmSpecificBuildOutput>
@@ -40,7 +40,7 @@
 		<Authors>Kieron Lanning</Authors>
 		<Company>Purview-Dev</Company>
 		<Copyright>Copyright © $(CurrentYear) Purview-Dev</Copyright>
-		<RepositoryUrl>https://github.com/purview-dev/eventsourcing.git</RepositoryUrl>
+		<RepositoryUrl>https://github.com/purview-dev/event-sourcing.git</RepositoryUrl>
 		<PackageProjectUrl>$(PurviewProjectUrl)</PackageProjectUrl>
 		<RepositoryType>git</RepositoryType>
 		<PackageIcon>purview-logo.png</PackageIcon>
