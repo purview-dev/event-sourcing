@@ -44,7 +44,7 @@ This wiki is the project documentation hub for framework features, provider capa
   - MongoDB: event streams plus an optional MongoDB query snapshot store.
   - Cosmos DB: optional query snapshot store.
   - In-memory provider: non-persistent event/snapshot store for local/test scenarios.
-  - Validation adapters: FluentValidation and ZodSharp adapters for `IAggregateValidator<T>`.
+  - Validation adapters: FluentValidation and Purview.ZodSharp adapters for `IAggregateValidator<T>`.
   - SQL snapshot translation distinguishes between provider-converted scalar value objects and directly mapped complex
     snapshot graphs; see the provider matrix and SQL guide for details.
 - **Generator behavior**

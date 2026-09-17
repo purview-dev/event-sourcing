@@ -84,7 +84,7 @@ before the shared pipeline runs; the shared workflow itself does not perform the
 | `Build:TestFilter` | `/*/*/*/*[Category=Unit]` | TUnit tree-node filter (unit-only) |
 | `PackValidation:RequireSymbolPackage` | `true` | Every `.nupkg` needs a matching `.snupkg` |
 | `PackValidation:RequireSymbolFiles` | `true` | Every `.snupkg` must contain PDBs |
-| `PackValidation:RequiredContent` | Expected package contents | Asserts each package ships its expected output — README/logo, `buildTransitive/Purview.EventSourcing.targets` in the core package, `buildTransitive/Purview.EventSourcing.Validation.ZodSharp.targets` in the ZodSharp package, the analyzer assemblies in the core/EF-Core-enabled packages, and the provider/admin `lib` assemblies |
+| `PackValidation:RequiredContent` | Expected package contents | Asserts each package ships its expected output — README/logo, `buildTransitive/Purview.EventSourcing.targets` in the core package, `buildTransitive/Purview.EventSourcing.Validation.ZodSharp.targets` in the Purview.ZodSharp package, the analyzer assemblies in the core/EF-Core-enabled packages, and the provider/admin `lib` assemblies |
 | `Release:Mode` | `None` | Publishing is enabled only by the release workflow |
 
 Configuration precedence is command line, environment variables, `purview-build.json`, then the tool's built-in
