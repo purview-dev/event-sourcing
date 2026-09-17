@@ -1,18 +1,18 @@
-# Purview.EventSourcing.ZodSharp
+# Purview.EventSourcing.Validation.ZodSharp
 
-`Purview.EventSourcing.ZodSharp` adapts [ZodSharp](https://github.com/RemiBou/ZodSharp) schema validators to the Purview EventSourcing aggregate validation contract (`IAggregateValidator<TAggregate>`).
+`Purview.EventSourcing.Validation.ZodSharp` adapts [Purview.ZodSharp](https://github.com/purview-dev/zodsharp) schema validators to the Purview EventSourcing aggregate validation contract (`IAggregateValidator<TAggregate>`).
 
 ## Install
 
 ```bash
-dotnet add package Purview.EventSourcing.ZodSharp
+dotnet add package Purview.EventSourcing.Validation.ZodSharp
 ```
 
 ## Register the adapter
 
 ### With an explicit schema validator implementation
 
-Registers both the ZodSharp schema validator and the aggregate-validator adapter:
+Registers both the Purview.ZodSharp schema validator and the aggregate-validator adapter:
 
 ```csharp
 builder.Services.AddZodSharpAdapter<OrderAggregate, OrderSchema>();
@@ -28,14 +28,14 @@ builder.Services.AddZodSharpAdapter<OrderAggregate>();
 
 Both overloads accept an optional `ServiceLifetime` (defaults to `Singleton`).
 
-## Important: reference ZodSharp directly
+## Important: reference Purview.ZodSharp directly
 
-The adapter's public surface exposes `ZodSharp.Core.IZodSchemaValidator<TAggregate>`, so the consuming project **must** include a direct `PackageReference` to `ZodSharp`. The package enforces this with a build-time guardrail: the build fails with a clear error if you reference this package without also referencing `ZodSharp`.
+The adapter's public surface exposes `ZodSharp.Core.IZodSchemaValidator<TAggregate>`, so the consuming project **must** include a direct `PackageReference` to `Purview.ZodSharp`. The package enforces this with a build-time guardrail: the build fails with a clear error if you reference this package without also referencing `Purview.ZodSharp`.
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="Purview.EventSourcing.ZodSharp" Version="..." />
-  <PackageReference Include="ZodSharp" Version="..." />
+  <PackageReference Include="Purview.EventSourcing.Validation.ZodSharp" Version="..." />
+  <PackageReference Include="Purview.ZodSharp" Version="..." />
 </ItemGroup>
 ```
 
@@ -50,13 +50,13 @@ await store.SaveAsync(order, cancellationToken);
 
 ## What it provides
 
-- `ZodSharpAggregateValidator<TAggregate>` - converts ZodSharp validation results into the framework's `Purview.EventSourcing.Validation.ValidationResult`
+- `ZodSharpAggregateValidator<TAggregate>` - converts Purview.ZodSharp validation results into the framework's `Purview.EventSourcing.Validation.ValidationResult`
 - `IAggregateValidator<TAggregate>` registration consumed by the event store during save
-- A `buildTransitive` target that validates the direct `ZodSharp` reference
+- A `buildTransitive` target that validates the direct `Purview.ZodSharp` reference
 
 ## Notes
 
-- This package is optional. The core package never acquires a mandatory ZodSharp dependency.
+- This package is optional. The core package never acquires a mandatory Purview.ZodSharp dependency.
 - Validation is invoked by the event store when an aggregate is saved; failing validations produce a non-saved save result.
 
 ## Documentation

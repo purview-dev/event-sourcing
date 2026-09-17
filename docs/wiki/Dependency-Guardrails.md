@@ -2,13 +2,13 @@
 
 This page documents repository guardrails that prevent known dependency/runtime pitfalls.
 
-## ZodSharp direct-reference guardrail
+## Purview.ZodSharp direct-reference guardrail
 
 ### Problem
 
-When a consumer project directly references the `Purview.EventSourcing.Validation.ZodSharp` project and uses `ZodSharp`
+When a consumer project directly references the `Purview.EventSourcing.Validation.ZodSharp` project and uses `Purview.ZodSharp`
 types, relying on transitive package flow can lead to runtime assembly load failures (for example,
-`FileNotFoundException` for `ZodSharp`).
+`FileNotFoundException` for `Purview.ZodSharp`).
 
 ### Required fix in consuming project
 
@@ -41,16 +41,16 @@ The reusable pack workflow also validates the generated `.nupkg` and fails if
 
 - `Purview.EventSourcing.Validation.FluentValidation`: adapter for `FluentValidation.IValidator<T>` to
   `IAggregateValidator<T>`.
-- `Purview.EventSourcing.Validation.ZodSharp`: adapter for `ZodSharp` schema validation to `IAggregateValidator<T>`.
+- `Purview.EventSourcing.Validation.ZodSharp`: adapter for `Purview.ZodSharp` schema validation to `IAggregateValidator<T>`.
 
 When using either adapter package directly from source projects, keep direct package references explicit for external
 runtime dependencies used by the adapter.
 
 ## Admin API validation and OpenAPI dependencies
 
-`Purview.EventSourcing.Admin.API` validates its request contracts and options with ZodSharp source-generated schemas and
+`Purview.EventSourcing.Admin.API` validates its request contracts and options with Purview.ZodSharp source-generated schemas and
 ships the Admin API OpenAPI document (`/openapi/admin.json`) used to generate `Purview.EventSourcing.Admin.Client`. As a
-result `ZodSharp`, `ZodSharp.AspNetCore`, and `ZodSharp.SystemTextJson` are direct dependencies of the Admin API
+result `Purview.ZodSharp`, `Purview.ZodSharp.AspNetCore`, and `Purview.ZodSharp.SystemTextJson` are direct dependencies of the Admin API
 package.
 
 ### OpenAPI XML-comment source generator is disabled in Admin.API

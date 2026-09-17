@@ -82,7 +82,7 @@ All endpoints are grouped under `RoutePrefix` and require authorization:
 
 ### Request validation
 
-Request contracts (`AggregateSearchRequest`, `EventRangeRequest`) are validated with source-generated ZodSharp schemas driven by DataAnnotations. Invalid requests return RFC 7807 `application/problem+json` with `400 Bad Request`. Validation covers:
+Request contracts (`AggregateSearchRequest`, `EventRangeRequest`) are validated with source-generated Purview.ZodSharp schemas driven by DataAnnotations. Invalid requests return RFC 7807 `application/problem+json` with `400 Bad Request`. Validation covers:
 
 - `Page` and `PageSize` must be positive; `PageSize` is clamped to `AdminPagingOptions.MaxPageSize`
 - `VersionFrom`/`VersionTo` must be positive and `VersionFrom <= VersionTo` when both are present
@@ -110,7 +110,7 @@ You must also register:
 - An admin storage adapter (for example `Purview.EventSourcing.Admin.SqlServer`) that provides the `IAdminAggregateQueryService`, `IAdminEventQueryService`, and `IAdminProjectionService` implementations.
 - The authorization policies defined in `Purview.EventSourcing.Admin.Security`.
 
-Request validation uses [ZodSharp](https://github.com/RemiBou/ZodSharp); `ZodSharp`, `ZodSharp.AspNetCore`, and `ZodSharp.SystemTextJson` are direct dependencies of this package.
+Request validation uses [Purview.ZodSharp](https://github.com/purview-dev/zodsharp); `Purview.ZodSharp`, `Purview.ZodSharp.AspNetCore`, and `Purview.ZodSharp.SystemTextJson` are direct dependencies of this package.
 
 ## Documentation
 

@@ -85,8 +85,8 @@ Use repository-local skills when their trigger applies:
 - Prefer existing value-object generation and conversion patterns over handwritten duplication.
 - Keep value objects immutable, validation deterministic, and equality/hash behavior aligned with every value that defines identity.
 - Changes to generated value-object conversions require generator tests and runtime/provider coverage where serialization or query translation is affected.
-- Validation adapters must remain optional. Core APIs must not acquire mandatory FluentValidation or ZodSharp dependencies.
-- Preserve the documented ZodSharp direct-reference guardrail and its build-time enforcement; update `docs/wiki/Dependency-Guardrails.md` if it changes.
+- Validation adapters must remain optional. Core APIs must not acquire mandatory FluentValidation or Purview.ZodSharp dependencies.
+- Preserve the documented Purview.ZodSharp direct-reference guardrail and its build-time enforcement; update `docs/wiki/Dependency-Guardrails.md` if it changes.
 - Use the repository's configured serializers and provider converters. Do not silently change property names, casing, enum representation, null handling, or stored JSON shape.
 - When introducing polymorphic or versioned serialization, cover old payload deserialization as well as new payload round trips.
 
