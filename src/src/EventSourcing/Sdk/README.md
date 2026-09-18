@@ -1,6 +1,6 @@
 # Purview.EventSourcing
 
-`Purview.EventSourcing` is the core Purview EventSourcing package. It provides aggregate base types, event metadata, provider-agnostic store facades, transaction coordination, and dependency injection extensions for event-sourced .NET applications.
+`Purview.EventSourcing` is the core Purview Event Sourcing package. It provides aggregate base types, event metadata, provider-agnostic store facades, transaction coordination, and dependency injection extensions for event-sourced .NET applications.
 
 ## Install
 

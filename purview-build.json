@@ -12,7 +12,7 @@
 		"RequiredContent": {
 			"purview.eventsourcing": [
 				"README.md",
-				"purview-logo.png",
+				"purview-logo-light.png",
 				"buildTransitive/Purview.EventSourcing.targets",
 				"analyzers/dotnet/cs/Purview.EventSourcing.SourceGenerator.dll",
 				"analyzers/dotnet/cs/Purview.EventSourcing.SourceGenerator.CodeFixes.dll"

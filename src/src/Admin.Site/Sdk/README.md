@@ -1,6 +1,6 @@
 # Purview.EventSourcing.Admin.Site
 
-`Purview.EventSourcing.Admin.Site` is an optional Razor Class Library that provides a ready-to-use web UI for the Purview EventSourcing admin portal. It lets you browse aggregates, inspect event streams, and explore point-in-time projections through Razor Pages.
+`Purview.EventSourcing.Admin.Site` is an optional Razor Class Library that provides a ready-to-use web UI for the Purview Event Sourcing admin portal. It lets you browse aggregates, inspect event streams, and explore point-in-time projections through Razor Pages.
 
 The pages talk to the Admin API through the generated typed client (`Purview.EventSourcing.Admin.Client`), so the UI is a real consumer of the Admin API contract.
 

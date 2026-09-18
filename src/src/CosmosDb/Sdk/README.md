@@ -1,6 +1,6 @@
 # Purview.EventSourcing.CosmosDb
 
-`Purview.EventSourcing.CosmosDb` adds Azure Cosmos DB queryable snapshot persistence to Purview EventSourcing.
+`Purview.EventSourcing.CosmosDb` adds Azure Cosmos DB queryable snapshot persistence to Purview Event Sourcing.
 
 ## Install
 

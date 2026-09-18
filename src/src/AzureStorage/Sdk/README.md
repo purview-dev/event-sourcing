@@ -1,6 +1,6 @@
 # Purview.EventSourcing.AzureStorage
 
-`Purview.EventSourcing.AzureStorage` adds Azure Table Storage and Blob Storage persistence to Purview EventSourcing.
+`Purview.EventSourcing.AzureStorage` adds Azure Table Storage and Blob Storage persistence to Purview Event Sourcing.
 
 ## Install
 

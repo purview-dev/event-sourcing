@@ -1,6 +1,6 @@
-# Purview EventSourcing Benchmarks
+# Purview Event Sourcing Benchmarks
 
-Performance harnesses for Purview EventSourcing, hosted in a single `net10.0` console application
+Performance harnesses for Purview Event Sourcing, hosted in a single `net10.0` console application
 built on **BenchmarkDotNet**. Three suites measure the framework's high-impact areas:
 
 - **`source-generator`** — how fast the aggregate and value-object generators run and how well the

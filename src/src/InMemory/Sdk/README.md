@@ -1,6 +1,6 @@
 # Purview.EventSourcing.InMemory
 
-`Purview.EventSourcing.InMemory` provides in-memory event and snapshot stores for Purview EventSourcing. It is intended for development, testing, and prototyping; data is not persisted across process restarts.
+`Purview.EventSourcing.InMemory` provides in-memory event and snapshot stores for Purview Event Sourcing. It is intended for development, testing, and prototyping; data is not persisted across process restarts.
 
 ## Install
 

@@ -1,6 +1,6 @@
 # Purview.EventSourcing.SqlServer
 
-`Purview.EventSourcing.SqlServer` provides both SQL Server/Azure SQL event-stream persistence and SQL-backed queryable snapshot persistence for Purview EventSourcing.
+`Purview.EventSourcing.SqlServer` provides both SQL Server/Azure SQL event-stream persistence and SQL-backed queryable snapshot persistence for Purview Event Sourcing.
 
 ## Install
 

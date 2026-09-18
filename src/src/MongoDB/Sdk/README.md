@@ -1,6 +1,6 @@
 # Purview.EventSourcing.MongoDB
 
-`Purview.EventSourcing.MongoDB` provides both MongoDB event-stream persistence and MongoDB queryable snapshot persistence for Purview EventSourcing.
+`Purview.EventSourcing.MongoDB` provides both MongoDB event-stream persistence and MongoDB queryable snapshot persistence for Purview Event Sourcing.
 
 ## Install
 

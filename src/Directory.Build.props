@@ -43,7 +43,7 @@
 		<RepositoryUrl>https://github.com/purview-dev/event-sourcing.git</RepositoryUrl>
 		<PackageProjectUrl>$(PurviewProjectUrl)</PackageProjectUrl>
 		<RepositoryType>git</RepositoryType>
-		<PackageIcon>purview-logo.png</PackageIcon>
+		<PackageIcon>purview-logo-light.png</PackageIcon>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
@@ -51,7 +51,10 @@
 	</PropertyGroup>
 
 	<ItemGroup Label="NuGet package assets" Condition="'$(IsPackable)' == 'true'">
-		<None Include="$(MSBuildThisFileDirectory)../assets/images/purview-logo.png" Link="Sdk\purview-logo.png" />
+		<None
+			Include="$(MSBuildThisFileDirectory)../assets/images/purview-logo-light.png"
+			Link="Sdk\purview-logo-light.png"
+		/>
 	</ItemGroup>
 
 	<PropertyGroup Condition="'$(IsTestProject)' != 'true' AND '$(IsSharedTestingProject)' != 'true'">

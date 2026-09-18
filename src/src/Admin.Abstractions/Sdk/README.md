@@ -1,6 +1,6 @@
 # Purview.EventSourcing.Admin.Abstractions
 
-`Purview.EventSourcing.Admin.Abstractions` defines the provider-neutral contracts and response models shared by the Purview EventSourcing admin portal packages. Storage adapters (SQL Server, MongoDB, Postgres, Azure Storage) and the API/UI layers depend on this package.
+`Purview.EventSourcing.Admin.Abstractions` defines the provider-neutral contracts and response models shared by the Purview Event Sourcing admin portal packages. Storage adapters (SQL Server, MongoDB, Postgres, Azure Storage) and the API/UI layers depend on this package.
 
 ## Install
 
