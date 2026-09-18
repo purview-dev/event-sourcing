@@ -6,7 +6,7 @@
 		<RoslynAnalyzersVersion>5.9.0</RoslynAnalyzersVersion>
 		<TUnitVersion>1.68.4</TUnitVersion>
 		<PurviewSGFrameworkVersion>1.0.0-prerelease.44</PurviewSGFrameworkVersion>
-		<PurviewValueObjectsVersion>1.0.0-prerelease.1</PurviewValueObjectsVersion>
+		<PurviewValueObjectsVersion>1.0.0-prerelease.2</PurviewValueObjectsVersion>
 		<PurviewZodSharpVersion>2.0.0-prerelease.9</PurviewZodSharpVersion>
 		<TestcontainersVersion>4.15.0</TestcontainersVersion>
 		<BenchmarkDotNetVersion>0.14.0</BenchmarkDotNetVersion>
