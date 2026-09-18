@@ -17,13 +17,15 @@ public sealed record AppendToReadOnlyDictionaryEvent
 
 	public override int GetHashCode()
 	{
-		var hash = new HashCode();
+		HashCode hash = new();
 		hash.Add(Key);
+
 		if (Values is not null)
 		{
 			foreach (var value in Values)
 				hash.Add(value);
 		}
+
 		return hash.ToHashCode();
 	}
 }
