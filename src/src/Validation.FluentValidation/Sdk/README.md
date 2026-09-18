@@ -1,6 +1,6 @@
 # Purview.EventSourcing.FluentValidation
 
-`Purview.EventSourcing.FluentValidation` adapts [FluentValidation](https://docs.fluentvalidation.net/) validators to the Purview EventSourcing aggregate validation contract (`IAggregateValidator<TAggregate>`).
+`Purview.EventSourcing.FluentValidation` adapts [FluentValidation](https://docs.fluentvalidation.net/) validators to the Purview Event Sourcing aggregate validation contract (`IAggregateValidator<TAggregate>`).
 
 ## Install
 

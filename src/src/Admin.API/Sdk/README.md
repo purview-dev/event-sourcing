@@ -1,6 +1,6 @@
 # Purview.EventSourcing.Admin.API
 
-`Purview.EventSourcing.Admin.API` provides minimal-API endpoints for the Purview EventSourcing admin portal: aggregate search, aggregate details, event-history inspection, point-in-time projection, and event export.
+`Purview.EventSourcing.Admin.API` provides minimal-API endpoints for the Purview Event Sourcing admin portal: aggregate search, aggregate details, event-history inspection, point-in-time projection, and event export.
 
 ## Install
 

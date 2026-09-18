@@ -1,6 +1,6 @@
 # Purview.EventSourcing.Admin.Security
 
-`Purview.EventSourcing.Admin.Security` provides the authorization policies and handlers that protect the Purview EventSourcing admin portal endpoints.
+`Purview.EventSourcing.Admin.Security` provides the authorization policies and handlers that protect the Purview Event Sourcing admin portal endpoints.
 
 ## Install
 

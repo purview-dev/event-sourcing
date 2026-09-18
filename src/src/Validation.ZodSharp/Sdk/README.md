@@ -1,6 +1,6 @@
 # Purview.EventSourcing.ZodSharp
 
-`Purview.EventSourcing.ZodSharp` adapts [ZodSharp](https://github.com/RemiBou/ZodSharp) schema validators to the Purview EventSourcing aggregate validation contract (`IAggregateValidator<TAggregate>`).
+`Purview.EventSourcing.ZodSharp` adapts [ZodSharp](https://github.com/RemiBou/ZodSharp) schema validators to the Purview Event Sourcing aggregate validation contract (`IAggregateValidator<TAggregate>`).
 
 ## Install
 

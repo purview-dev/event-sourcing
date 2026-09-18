@@ -1,6 +1,6 @@
 # Purview.EventSourcing.Postgres
 
-`Purview.EventSourcing.Postgres` provides PostgreSQL event-stream persistence and an optional PostgreSQL queryable snapshot store for Purview EventSourcing.
+`Purview.EventSourcing.Postgres` provides PostgreSQL event-stream persistence and an optional PostgreSQL queryable snapshot store for Purview Event Sourcing.
 
 ## Install
 
