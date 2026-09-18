@@ -6,6 +6,7 @@
 		<RoslynAnalyzersVersion>5.9.0</RoslynAnalyzersVersion>
 		<TUnitVersion>1.68.4</TUnitVersion>
 		<PurviewSGFrameworkVersion>1.0.0-prerelease.44</PurviewSGFrameworkVersion>
+		<PurviewValueObjectsVersion>1.0.0-prerelease.1</PurviewValueObjectsVersion>
 		<PurviewZodSharpVersion>2.0.0-prerelease.9</PurviewZodSharpVersion>
 		<TestcontainersVersion>4.15.0</TestcontainersVersion>
 		<BenchmarkDotNetVersion>0.14.0</BenchmarkDotNetVersion>
@@ -40,6 +41,7 @@
 			Version="$(PurviewSGFrameworkVersion)"
 		/>
 		<PackageVersion Include="Purview.Telemetry.SourceGenerator" Version="5.0.0-prerelease.11" />
+		<PackageVersion Include="Purview.ValueObjects" Version="$(PurviewValueObjectsVersion)" />
 		<PackageVersion Include="Purview.ZodSharp" Version="$(PurviewZodSharpVersion)" />
 		<PackageVersion Include="Purview.ZodSharp.AspNetCore" Version="$(PurviewZodSharpVersion)" />
 		<PackageVersion Include="Purview.ZodSharp.SystemTextJson" Version="$(PurviewZodSharpVersion)" />

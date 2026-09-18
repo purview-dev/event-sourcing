@@ -1,6 +1,6 @@
 using Purview.EventSourcing.Samples.Domain;
-using Purview.EventSourcing.Serialization;
-using Purview.EventSourcing.ValueObjects;
+using Purview.ValueObjects;
+using Purview.ValueObjects.Serialization;
 
 namespace Purview.EventSourcing.Samples.ValueObjects;
 
@@ -29,13 +29,13 @@ public readonly partial record struct OrderStatus : IContextualValueObject<Order
 	/// </summary>
 	public static OrderStatus Create(OrderStatusCode value, in ValueObjectContext<OrderAggregate> context)
 	{
-		var current = context.Aggregate.Status.Value;
+		var current = context.Owner.Status.Value;
 
 		return !IsValidTransition(current, value)
 				? throw new InvalidOperationException($"Cannot transition order status from {current} to {value}.")
-			: value == OrderStatusCode.Confirmed && context.Aggregate.LineItems.Count == 0
+			: value == OrderStatusCode.Confirmed && context.Owner.LineItems.Count == 0
 				? throw new InvalidOperationException("Cannot confirm an order with no line items.")
-			: value == OrderStatusCode.Shipped && string.IsNullOrWhiteSpace(context.Aggregate.ShippingAddress)
+			: value == OrderStatusCode.Shipped && string.IsNullOrWhiteSpace(context.Owner.ShippingAddress)
 				? throw new InvalidOperationException("Cannot ship an order without a shipping address.")
 			: new(value);
 	}

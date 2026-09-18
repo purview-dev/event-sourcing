@@ -56,17 +56,8 @@ static partial class TypeLibrarySpec
 	[TypeRef("Purview.EventSourcing", arity: 1)]
 	static readonly TypeIdentity EventStoreSet = default;
 
-	[TypeRef("Purview.EventSourcing.Serialization")]
+	[TypeRef("Purview.ValueObjects.Serialization")]
 	static readonly TypeIdentity ScalarAttribute = default;
-
-	[TypeRef("Purview.EventSourcing.Serialization")]
-	static readonly TypeIdentity ValueObjectAttribute = default;
-
-	[TypeRef("Purview.EventSourcing.Serialization")]
-	static readonly TypeIdentity ValueObjectDefaultsAttribute = default;
-
-	[TypeRef("Purview.EventSourcing.Serialization")]
-	static readonly TypeIdentity ValueObjectDeserializationMode = default;
 
 	[TypeRef(typeof(AttributeUsageAttribute))]
 	static readonly TypeIdentity AttributeUsageAttribute = default;

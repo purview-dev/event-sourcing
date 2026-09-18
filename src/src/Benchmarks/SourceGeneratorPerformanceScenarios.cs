@@ -37,18 +37,6 @@ static class SourceGeneratorPerformanceScenarios
 			static () => new AggregateSourceGenerator(),
 			EditedSource: SharedStubs.All + Samples.AggregateMultiEdited
 		),
-		new(
-			"ScalarValueObject",
-			nameof(ValueObjectSourceGenerator),
-			SharedStubs.All + Samples.ScalarValueObject,
-			static () => new ValueObjectSourceGenerator()
-		),
-		new(
-			"ComplexValueObject",
-			nameof(ValueObjectSourceGenerator),
-			SharedStubs.All + Samples.ComplexValueObject,
-			static () => new ValueObjectSourceGenerator()
-		),
 	];
 
 	static class SharedStubs
@@ -120,13 +108,12 @@ static class SourceGeneratorPerformanceScenarios
 				public readonly record struct EventRecord(object Event, Purview.EventSourcing.Aggregates.Events.EventMetadata Metadata);
 			}
 
-			namespace Purview.EventSourcing.ValueObjects
+			namespace Purview.ValueObjects
 			{
-				public readonly record struct ValueObjectContext<TAggregate>(
-					TAggregate Aggregate,
+				public readonly record struct ValueObjectContext<TOwner>(
+					TOwner Owner,
 					string MemberName,
-					string? EventName = null,
-					string? CommandName = null
+					string? Reason = null
 				);
 
 				public interface IValueObject { }
@@ -140,7 +127,7 @@ static class SourceGeneratorPerformanceScenarios
 				}
 			}
 
-			namespace Purview.EventSourcing.Serialization
+			namespace Purview.ValueObjects.Serialization
 			{
 				public enum ValueObjectDeserializationMode
 				{
@@ -202,12 +189,12 @@ static class SourceGeneratorPerformanceScenarios
 					Confirmed = 1
 				}
 
-				[Purview.EventSourcing.Serialization.Scalar]
+				[Purview.ValueObjects.Serialization.Scalar]
 				public readonly partial record struct OrderStatus
 				{
 					public OrderStatusCode Value { get; }
 					private OrderStatus(OrderStatusCode value) => Value = value;
-					public static OrderStatus Create(OrderStatusCode value, in Purview.EventSourcing.ValueObjects.ValueObjectContext<OrderAggregate> context) => new(value);
+					public static OrderStatus Create(OrderStatusCode value, in Purview.ValueObjects.ValueObjectContext<OrderAggregate> context) => new(value);
 					public static OrderStatus Hydrate(OrderStatusCode value) => new(value);
 				}
 
@@ -332,50 +319,6 @@ static class SourceGeneratorPerformanceScenarios
 
 					[Purview.EventSourcing.Aggregates.Event]
 					public partial void RegisterShipment(string trackingCode);
-				}
-			}
-			""";
-
-		public const string ScalarValueObject = """
-			namespace Testing
-			{
-				[Purview.EventSourcing.Serialization.Scalar]
-				public readonly partial record struct EmailAddress
-				{
-					public string Value { get; }
-
-					private EmailAddress(string value) => Value = value;
-
-					static partial void OnNormalize(ref string value)
-					{
-						value = value?.Trim().ToLowerInvariant()!;
-					}
-
-					static partial void OnValidate(string value)
-					{
-						if (string.IsNullOrWhiteSpace(value))
-							throw new System.ArgumentException("Email address cannot be empty.", nameof(value));
-					}
-				}
-			}
-			""";
-
-		public const string ComplexValueObject = """
-			namespace Testing
-			{
-				[Purview.EventSourcing.Serialization.ValueObject]
-				public readonly partial record struct Money
-				{
-					public decimal Amount { get; }
-					public string Currency { get; }
-
-					private Money(decimal amount, string currency)
-					{
-						Amount = amount;
-						Currency = currency;
-					}
-
-					public static Money Hydrate(decimal amount, string currency) => new(amount, currency);
 				}
 			}
 			""";

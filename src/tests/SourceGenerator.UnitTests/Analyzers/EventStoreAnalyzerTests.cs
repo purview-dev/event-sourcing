@@ -119,7 +119,7 @@ public partial class ReportAggregate
 				// This also means we don't need to include the ensure source generator run just to get the analyser to work.
 				.WithAdditionalSources(AggregateAttributeEmitter.Emit().Select(m => m.Source))
 				// This just makes the test code cleaner, otherwise we have to include the namespaces in the source code.
-				.WithAdditionalNamespaces(TypeLibrary.AggregateNamespace, TypeLibrary.SerializationNamespace),
+				.WithAdditionalNamespaces(TypeLibrary.AggregateNamespace, "Purview.ValueObjects.Serialization"),
 			cancellationToken
 		);
 	}

@@ -249,6 +249,6 @@ public sealed class EventStoreAnalyzer : DiagnosticAnalyzer
 			type = namedType.TypeArguments[0];
 		}
 
-		return TypeHelpers.HasAttribute(type, TypeLibrary.Purview.EventSourcing.Serialization.ScalarAttribute);
+		return TypeHelpers.HasAttribute(type, TypeLibrary.Purview.ValueObjects.Serialization.ScalarAttribute);
 	}
 }

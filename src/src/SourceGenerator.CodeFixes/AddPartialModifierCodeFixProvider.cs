@@ -10,8 +10,8 @@ using Purview.EventSourcing.SourceGenerator.Common;
 namespace Purview.EventSourcing.SourceGenerator.CodeFixes;
 
 /// <summary>
-/// Adds the missing <c>partial</c> modifier to aggregate declarations (<c>EVENTSTORE001</c>),
-/// value-object declarations (<c>EVENTSTORE101</c>), and event methods (<c>EVENTSTORE007</c>).
+/// Adds the missing <c>partial</c> modifier to aggregate declarations (<c>EVENTSTORE001</c>) and
+/// event methods (<c>EVENTSTORE007</c>).
 /// The correction is unambiguous and preserves the surrounding declaration.
 /// </summary>
 [ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(AddPartialModifierCodeFixProvider)), Shared]
@@ -21,11 +21,7 @@ public sealed class AddPartialModifierCodeFixProvider : CodeFixProvider
 
 	/// <inheritdoc/>
 	public override ImmutableArray<string> FixableDiagnosticIds =>
-		[
-			DiagnosticLibrary.AggregateMustBePartial.Id,
-			DiagnosticLibrary.ValueObjectMustBePartial.Id,
-			DiagnosticLibrary.EventMethodMustBePartial.Id,
-		];
+		[DiagnosticLibrary.AggregateMustBePartial.Id, DiagnosticLibrary.EventMethodMustBePartial.Id];
 
 	/// <inheritdoc/>
 	public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;

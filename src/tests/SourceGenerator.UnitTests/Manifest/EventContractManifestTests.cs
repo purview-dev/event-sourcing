@@ -51,12 +51,12 @@ public sealed class EventContractManifestTests : AggregateSourceGeneratorTestBas
 				Confirmed = 1
 			}
 
-			[Purview.EventSourcing.Serialization.Scalar]
+			[Purview.ValueObjects.Serialization.Scalar]
 			public readonly partial record struct OrderStatus
 			{
 				public OrderStatusCode Value { get; }
 				private OrderStatus(OrderStatusCode value) => Value = value;
-				public static OrderStatus Create(OrderStatusCode value, in Purview.EventSourcing.ValueObjects.ValueObjectContext<OrderAggregate> context) => new(value);
+				public static OrderStatus Create(OrderStatusCode value, in Purview.ValueObjects.ValueObjectContext<OrderAggregate> context) => new(value);
 				public static OrderStatus Hydrate(OrderStatusCode value) => new(value);
 			}
 
@@ -77,12 +77,12 @@ public sealed class EventContractManifestTests : AggregateSourceGeneratorTestBas
 
 		namespace Billing
 		{
-			[Purview.EventSourcing.Serialization.Scalar]
+			[Purview.ValueObjects.Serialization.Scalar]
 			public readonly partial record struct Amount
 			{
 				public decimal Value { get; }
 				private Amount(decimal value) => Value = value;
-				public static Amount Create(decimal value, in Purview.EventSourcing.ValueObjects.ValueObjectContext<InvoiceAggregate> context) => new(value);
+				public static Amount Create(decimal value, in Purview.ValueObjects.ValueObjectContext<InvoiceAggregate> context) => new(value);
 				public static Amount Hydrate(decimal value) => new(value);
 			}
 

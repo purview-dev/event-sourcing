@@ -467,7 +467,7 @@ static partial class AggregateSourceEmitter
 			EventParameterConversionKind.Implicit => $"({parameter.PropertyType}){parameter.ParameterName}",
 			EventParameterConversionKind.Create => $"{parameter.PropertyType}.Create({parameter.ParameterName})",
 			EventParameterConversionKind.ContextualCreate =>
-				$"{parameter.PropertyType}.Create({parameter.ParameterName}, new global::Purview.EventSourcing.ValueObjects.ValueObjectContext<{outputContext.Aggregate.AggregateClass}>(this, MemberName: nameof({parameter.AggregatePropertyName}), EventName: nameof({method.EventType})))",
+				$"{parameter.PropertyType}.Create({parameter.ParameterName}, new global::Purview.ValueObjects.ValueObjectContext<{outputContext.Aggregate.AggregateClass}>(this, MemberName: nameof({parameter.AggregatePropertyName}), Reason: nameof({method.EventType})))",
 			_ => parameter.ParameterName,
 		};
 	}

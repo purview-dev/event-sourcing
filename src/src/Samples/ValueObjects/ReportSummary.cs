@@ -1,5 +1,5 @@
 using Purview.EventSourcing.Samples.Domain.ReportUpload;
-using Purview.EventSourcing.Serialization;
+using Purview.ValueObjects.Serialization;
 
 namespace Purview.EventSourcing.Samples.ValueObjects;
 

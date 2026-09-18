@@ -117,7 +117,6 @@ public static class CodeFixTestHarness
 		// The aggregate and value-object attributes are emitted by the source generators.
 		GeneratorDriver driver = CSharpGeneratorDriver.Create([
 			new Generators.AggregateSourceGenerator().AsSourceGenerator(),
-			new Generators.ValueObjectSourceGenerator().AsSourceGenerator(),
 		]);
 		driver.RunGeneratorsAndUpdateCompilation(compilation, out var updatedCompilation, out _);
 

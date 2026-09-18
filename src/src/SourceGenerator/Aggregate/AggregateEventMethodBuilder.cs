@@ -851,7 +851,7 @@ static class AggregateEventMethodBuilder
 		if (typeSymbol is not INamedTypeSymbol namedType)
 			return false;
 
-		if (!HasAttribute(namedType, TypeLibrary.Purview.EventSourcing.Serialization.ScalarAttribute))
+		if (!HasAttribute(namedType, TypeLibrary.Purview.ValueObjects.Serialization.ScalarAttribute))
 			return false;
 
 		var valueProperty = namedType
@@ -1165,7 +1165,7 @@ static class AggregateEventMethodBuilder
 
 		var hasScalarAttribute = HasAttribute(
 			propertyType,
-			TypeLibrary.Purview.EventSourcing.Serialization.ScalarAttribute
+			TypeLibrary.Purview.ValueObjects.Serialization.ScalarAttribute
 		);
 		var createMethods = propertyType.GetMembers("Create").OfType<IMethodSymbol>().ToArray();
 

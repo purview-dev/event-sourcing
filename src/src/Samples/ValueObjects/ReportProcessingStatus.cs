@@ -1,6 +1,6 @@
-﻿using Purview.EventSourcing.Samples.Domain.ReportUpload;
-using Purview.EventSourcing.Serialization;
-using Purview.EventSourcing.ValueObjects;
+using Purview.EventSourcing.Samples.Domain.ReportUpload;
+using Purview.ValueObjects;
+using Purview.ValueObjects.Serialization;
 
 namespace Purview.EventSourcing.Samples.ValueObjects;
 
@@ -17,7 +17,7 @@ public readonly partial record struct ReportProcessingStatus
 		in ValueObjectContext<ReportUploadAggregate> context
 	)
 	{
-		var current = context.Aggregate.Status;
+		var current = context.Owner.Status;
 		return IsValidTransition(current, value)
 			? new(value)
 			: throw new InvalidOperationException($"Invalid status transition from {current} to {value}");

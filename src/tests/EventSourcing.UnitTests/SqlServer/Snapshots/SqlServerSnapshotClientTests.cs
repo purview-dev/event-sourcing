@@ -2,8 +2,8 @@ using System.Linq.Expressions;
 using System.Reflection;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
-using Purview.EventSourcing.Serialization;
 using Purview.EventSourcing.SqlServer.Client;
+using Purview.ValueObjects.Serialization;
 
 namespace Purview.EventSourcing.SqlServer.Snapshots;
 
@@ -85,20 +85,6 @@ public sealed class SqlServerSnapshotClientTests
 		await Assert.That(binaryExpression!.NodeType).IsEqualTo(ExpressionType.Equal);
 		await Assert.That(binaryExpression.Left.Type).IsEqualTo(typeof(string));
 		await Assert.That(binaryExpression.Right.Type).IsEqualTo(typeof(string));
-	}
-
-	[Scalar]
-	readonly record struct ScalarEmail
-	{
-		public string Value { get; }
-
-		public ScalarEmail(string value) => Value = value;
-
-		public static bool operator ==(ScalarEmail left, string right) => left.Value == right;
-
-		public static bool operator !=(ScalarEmail left, string right) => !(left == right);
-
-		public static implicit operator string(ScalarEmail value) => value.Value;
 	}
 
 	sealed class ScalarHolder
@@ -209,4 +195,26 @@ public sealed class SqlServerSnapshotClientTests
 			throw ex.InnerException;
 		}
 	}
+}
+
+[Scalar(
+	GenerateJsonConverter = false,
+	GenerateComparable = false,
+	GenerateComparisonOperators = false,
+	GenerateEnumProperties = false,
+	GenerateImplicitFromPrimitive = false,
+	GenerateImplicitToPrimitive = false,
+	GenerateEmpty = false
+)]
+readonly partial record struct ScalarEmail
+{
+	public string Value { get; }
+
+	public ScalarEmail(string value) => Value = value;
+
+	public static bool operator ==(ScalarEmail left, string right) => left.Value == right;
+
+	public static bool operator !=(ScalarEmail left, string right) => !(left == right);
+
+	public static implicit operator string(ScalarEmail value) => value.Value;
 }

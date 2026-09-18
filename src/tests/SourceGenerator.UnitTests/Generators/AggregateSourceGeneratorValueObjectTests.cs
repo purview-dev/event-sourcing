@@ -17,14 +17,14 @@ public sealed class AggregateSourceGeneratorValueObjectTests : AggregateSourceGe
 				Confirmed = 1
 			}
 
-			[Purview.EventSourcing.Serialization.Scalar]
+			[Purview.ValueObjects.Serialization.Scalar]
 			public readonly partial record struct OrderStatus
 			{
 				public OrderStatusCode Value { get; }
 
 				private OrderStatus(OrderStatusCode value) => Value = value;
 
-				public static OrderStatus Create(OrderStatusCode value, in Purview.EventSourcing.ValueObjects.ValueObjectContext<OrderAggregate> context)
+				public static OrderStatus Create(OrderStatusCode value, in Purview.ValueObjects.ValueObjectContext<OrderAggregate> context)
 				{
 					return new(value);
 				}
@@ -69,7 +69,7 @@ public sealed class AggregateSourceGeneratorValueObjectTests : AggregateSourceGe
 		await Assert
 			.That(body)
 			.Contains(
-				"OrderStatus.Create(status, new global::Purview.EventSourcing.ValueObjects.ValueObjectContext<global::Testing.OrderAggregate>(this, MemberName: nameof(Status), EventName: nameof(global::Testing.OrderEvents.OrderConfirmed)))"
+				"OrderStatus.Create(status, new global::Purview.ValueObjects.ValueObjectContext<global::Testing.OrderAggregate>(this, MemberName: nameof(Status), Reason: nameof(global::Testing.OrderEvents.OrderConfirmed)))"
 			);
 		await Assert.That(body).Contains("OnStatusChanging(ref __statusValue);");
 	}
@@ -87,14 +87,14 @@ public sealed class AggregateSourceGeneratorValueObjectTests : AggregateSourceGe
 				Confirmed = 1
 			}
 
-			[Purview.EventSourcing.Serialization.Scalar]
+			[Purview.ValueObjects.Serialization.Scalar]
 			public readonly partial record struct OrderStatus
 			{
 				public OrderStatusCode Value { get; }
 
 				private OrderStatus(OrderStatusCode value) => Value = value;
 
-				public static OrderStatus Create(OrderStatusCode value, in Purview.EventSourcing.ValueObjects.ValueObjectContext<OrderAggregate> context)
+				public static OrderStatus Create(OrderStatusCode value, in Purview.ValueObjects.ValueObjectContext<OrderAggregate> context)
 				{
 					return new(value);
 				}
@@ -164,7 +164,7 @@ public sealed class AggregateSourceGeneratorValueObjectTests : AggregateSourceGe
 		const string source = """
 			namespace Testing
 			{
-			[Purview.EventSourcing.Serialization.Scalar]
+			[Purview.ValueObjects.Serialization.Scalar]
 			public readonly partial record struct EmailAddress
 			{
 				public string Value { get; }

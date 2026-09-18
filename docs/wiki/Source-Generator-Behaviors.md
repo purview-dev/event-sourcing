@@ -232,6 +232,11 @@ public sealed record BioUpdatedEvent
 
 ## Value-object conversion behavior
 
+> The `[Scalar]` / `[ValueObject]` generator and analyzer are provided by the `Purview.ValueObjects` package,
+> referenced transitively by `Purview.EventSourcing`. Value objects live in the `Purview.ValueObjects` and
+> `Purview.ValueObjects.Serialization` namespaces (previously `Purview.EventSourcing.ValueObjects` and
+> `Purview.EventSourcing.Serialization`).
+
 - Generated mapping paths use `Create(...)` semantics for strict command-time conversion/validation.
 - Contextual `Create(TValue, in ValueObjectContext<TAggregate>)` is used when available.
 - Replay/hydration paths apply event payloads through generated `Apply(...)` logic.
@@ -302,15 +307,9 @@ Common aggregate diagnostic IDs:
 - `EVENTSTORE021` event schema version must be positive
 - `EVENTSTORE022` duplicate event schema version on aggregate
 
-Common value-object diagnostic IDs:
-
-- `EVENTSTORE101` value object must be partial
-- `EVENTSTORE102` nested value objects unsupported
-- `EVENTSTORE103` generic value objects unsupported
-- `EVENTSTORE104` scalar property missing
-- `EVENTSTORE107` strict mode relies on a generated `Create`
-- `EVENTSTORE108` conflicting `[Scalar]` and `[ValueObject]` attributes
-- `EVENTSTORE109` scalar value objects should be record structs
+Value-object diagnostics are provided by the `Purview.ValueObjects` package (the `[Scalar]`/`[ValueObject]`
+generator and analyzer moved out of this repository). They use the `VO1001`–`VO1008` ID range; see the
+`Purview.ValueObjects` package documentation for the full list.
 
 The analyzer and the generator share the same validation rules (the model builders are the single source
 of truth). When validation fails, the generator skips generation entirely — it never emits an invalid
