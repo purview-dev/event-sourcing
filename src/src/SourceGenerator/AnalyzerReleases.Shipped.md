@@ -25,13 +25,4 @@
 | EVENTSTORE020 | Aggregates | Warning | Complex scalar Value paths may not translate in SQL snapshot queries |
 | EVENTSTORE021 | Aggregates | Error | Event schema version must be positive |
 | EVENTSTORE022 | Aggregates | Error | Duplicate event schema version on aggregate |
-| EVENTSTORE101 | ValueObjects | Error | Value object must be partial |
-| EVENTSTORE102 | ValueObjects | Error | Nested value objects are not supported |
-| EVENTSTORE103 | ValueObjects | Error | Generic value objects are not supported |
-| EVENTSTORE104 | ValueObjects | Error | Scalar property is missing |
-| EVENTSTORE105 | ValueObjects | Error | Scalar constructor is missing |
-| EVENTSTORE106 | ValueObjects | Error | Value object hydration constructor is missing |
-| EVENTSTORE107 | ValueObjects | Warning | Strict mode requires Create |
-| EVENTSTORE108 | ValueObjects | Error | Conflicting value object attributes |
-| EVENTSTORE109 | ValueObjects | Warning | Scalar value objects should be record structs |
 | EVENTSTORE110 | Aggregates | Error | Unable to find reference to AggregateBase |

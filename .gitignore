@@ -594,3 +594,6 @@ coverage/
 !assets/packages/*
 
 .tools/
+
+# Local NuGet feed for unpublished package consumption (Purview.ValueObjects migration)
+.local-feed/

@@ -3,7 +3,6 @@ namespace Purview.EventSourcing.SourceGenerator.Common;
 static class DiagnosticLibrary
 {
 	const string AggregateCategory = "Aggregates";
-	const string ValueObjectCategory = "ValueObjects";
 	const string EventContractCategory = "EventContracts";
 
 	/// <summary> EVENTSTORE001: Aggregate must be partial </summary>
@@ -210,87 +209,6 @@ static class DiagnosticLibrary
 		messageFormat: "Unable to infer a past-tense event name for method '{0}'. Rename the method to a verb phrase such as '{1}', or add an explicit event name override.",
 		category: AggregateCategory,
 		defaultSeverity: DiagnosticSeverity.Warning,
-		isEnabledByDefault: true
-	);
-
-	public static readonly DiagnosticDescriptor ValueObjectMustBePartial = new(
-		id: "EVENTSTORE101",
-		title: "Value object must be partial",
-		messageFormat: "Value object '{0}' must be declared partial to use [{1}]",
-		category: ValueObjectCategory,
-		defaultSeverity: DiagnosticSeverity.Error,
-		isEnabledByDefault: true
-	);
-
-	public static readonly DiagnosticDescriptor NestedValueObjectsAreNotSupported = new(
-		id: "EVENTSTORE102",
-		title: "Nested value objects are not supported",
-		messageFormat: "Value object '{0}' cannot be nested when using [{1}]",
-		category: ValueObjectCategory,
-		defaultSeverity: DiagnosticSeverity.Error,
-		isEnabledByDefault: true
-	);
-
-	public static readonly DiagnosticDescriptor GenericValueObjectsAreNotSupported = new(
-		id: "EVENTSTORE103",
-		title: "Generic value objects are not supported",
-		messageFormat: "Value object '{0}' cannot be generic when using [{1}]",
-		category: ValueObjectCategory,
-		defaultSeverity: DiagnosticSeverity.Error,
-		isEnabledByDefault: true
-	);
-
-	public static readonly DiagnosticDescriptor ScalarPropertyMissing = new(
-		id: "EVENTSTORE104",
-		title: "Scalar property is missing",
-		messageFormat: "Scalar value object '{0}' must declare readable property '{1}'",
-		category: ValueObjectCategory,
-		defaultSeverity: DiagnosticSeverity.Error,
-		isEnabledByDefault: true
-	);
-
-	public static readonly DiagnosticDescriptor ScalarConstructorMissing = new(
-		id: "EVENTSTORE105",
-		title: "Scalar constructor is missing",
-		messageFormat: "Scalar value object '{0}' must declare a constructor '{0}({1})' to support generated Create/Hydrate",
-		category: ValueObjectCategory,
-		defaultSeverity: DiagnosticSeverity.Error,
-		isEnabledByDefault: true
-	);
-
-	public static readonly DiagnosticDescriptor ScalarShouldBeRecordStruct = new(
-		id: "EVENTSTORE109",
-		title: "Scalar value objects should be record structs",
-		messageFormat: "Scalar value object '{0}' should be declared as a readonly record struct so the compiler can synthesize equality members and avoid CA1815",
-		category: ValueObjectCategory,
-		defaultSeverity: DiagnosticSeverity.Warning,
-		isEnabledByDefault: true
-	);
-
-	public static readonly DiagnosticDescriptor ComplexHydrateConstructorMissing = new(
-		id: "EVENTSTORE106",
-		title: "Value object hydration constructor is missing",
-		messageFormat: "Value object '{0}' must declare a constructor matching its generated Hydrate(...) parameter list",
-		category: ValueObjectCategory,
-		defaultSeverity: DiagnosticSeverity.Error,
-		isEnabledByDefault: true
-	);
-
-	public static readonly DiagnosticDescriptor StrictDeserializationRequiresCreate = new(
-		id: "EVENTSTORE107",
-		title: "Strict mode requires Create",
-		messageFormat: "Value object '{0}' uses strict deserialization mode but does not declare a compatible static Create(...) overload",
-		category: ValueObjectCategory,
-		defaultSeverity: DiagnosticSeverity.Warning,
-		isEnabledByDefault: true
-	);
-
-	public static readonly DiagnosticDescriptor ConflictingValueObjectAttributes = new(
-		id: "EVENTSTORE108",
-		title: "Conflicting value object attributes",
-		messageFormat: "Type '{0}' cannot be annotated with both [Scalar] and [ValueObject]",
-		category: ValueObjectCategory,
-		defaultSeverity: DiagnosticSeverity.Error,
 		isEnabledByDefault: true
 	);
 

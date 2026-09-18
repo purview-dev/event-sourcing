@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using Purview.EventSourcing.Aggregates;
-using Purview.EventSourcing.Serialization;
+using Purview.ValueObjects.Serialization;
 
 namespace Purview.EventSourcing.Postgres.Client;
 

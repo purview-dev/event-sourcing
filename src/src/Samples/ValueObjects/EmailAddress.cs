@@ -1,5 +1,5 @@
-﻿using System.Text.RegularExpressions;
-using Purview.EventSourcing.Serialization;
+using System.Text.RegularExpressions;
+using Purview.ValueObjects.Serialization;
 
 namespace Purview.EventSourcing.Samples.ValueObjects;
 

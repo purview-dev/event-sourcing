@@ -14,16 +14,6 @@ public record EventSourcingGeneratorTestOptions : SourceGeneratorTestOptions
 
 	public static readonly int AggregateExpectedFileCountPlusGen = AggregateExpectedFileCount + 1;
 
-	public static readonly string[] ValueObjectGeneratedAttributes =
-	[
-		"EmbeddedAttribute.g.cs",
-		"ValueObjectDefaultsAttribute.g.cs",
-	];
-
-	public static readonly int ValueObjectExpectedFileCount = ValueObjectGeneratedAttributes.Length + 1;
-
-	public static readonly int ValueObjectExpectedFileCountPlusGen = ValueObjectExpectedFileCount + 1;
-
 	public const int HintNameHashHexLength = 16;
 
 	public const string GeneratedSourceFileSuffix = ".g.cs";
@@ -36,22 +26,13 @@ public record EventSourcingGeneratorTestOptions : SourceGeneratorTestOptions
 		[
 			typeof(EventStoreSet<>).Namespace!,
 			typeof(Aggregates.AggregateBase).Namespace!,
-			typeof(Serialization.ScalarJsonConverterFactory).Namespace!,
-			typeof(ValueObjects.IValueObject).Namespace!,
+			typeof(Purview.ValueObjects.Serialization.ScalarJsonConverterFactory).Namespace!,
+			typeof(Purview.ValueObjects.IValueObject).Namespace!,
 		];
-		AdditionalAssemblyTypes = [typeof(Aggregates.IAggregate)];
+		AdditionalAssemblyTypes = [typeof(Aggregates.IAggregate), typeof(Purview.ValueObjects.IValueObject)];
 		AdditionalReferences = [.. TestMetadataReferences.GetAdditionalReferences()];
-		ExcludeGeneratedSourceHintNames =
-		[
-			.. AggregateGeneratedAttributes,
-			.. ValueObjectGeneratedAttributes,
-			PreCompilationMarkerHintName,
-		];
-		AnalyzerTypes =
-		[
-			typeof(Analyzers.AggregateDiagnosticAnalyzer),
-			typeof(Analyzers.ValueObjectDiagnosticAnalyzer),
-		];
+		ExcludeGeneratedSourceHintNames = [.. AggregateGeneratedAttributes, PreCompilationMarkerHintName];
+		AnalyzerTypes = [typeof(Analyzers.AggregateDiagnosticAnalyzer)];
 	}
 
 	public static new EventSourcingGeneratorTestOptions Default => new();

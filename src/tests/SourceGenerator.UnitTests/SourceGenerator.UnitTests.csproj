@@ -18,7 +18,5 @@
 		<Using Include="Purview.EventSourcing.SourceGenerator.Common" />
 		<Using Include="Purview.EventSourcing.SourceGenerator.Aggregate" />
 		<Using Include="Purview.EventSourcing.SourceGenerator.Aggregate.Models" />
-		<Using Include="Purview.EventSourcing.SourceGenerator.ValueObject" />
-		<Using Include="Purview.EventSourcing.SourceGenerator.ValueObject.Models" />
 	</ItemGroup>
 </Project>

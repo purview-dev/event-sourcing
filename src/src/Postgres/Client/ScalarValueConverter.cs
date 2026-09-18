@@ -1,7 +1,7 @@
 using System.Linq.Expressions;
 using System.Reflection;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Purview.EventSourcing.Serialization;
+using Purview.ValueObjects.Serialization;
 
 namespace Purview.EventSourcing.Postgres.Client;
 

@@ -40,9 +40,7 @@ static class AggregateInfoBuilder
 		var eventNamespaceOverride = aggregateAttribute.Exists ? aggregateAttribute.EventNamespace : null;
 		var aggregateEventSuffixOverride = aggregateAttribute.Exists ? aggregateAttribute.EventSuffix : null;
 		var assemblyEventSuffix = assemblyDefaults.Exists ? assemblyDefaults.EventSuffix : null;
-		var valueObjectContextType = compilation.GetTypeByMetadataName(
-			"Purview.EventSourcing.ValueObjects.ValueObjectContext`1"
-		);
+		var valueObjectContextType = compilation.GetTypeByMetadataName("Purview.ValueObjects.ValueObjectContext`1");
 
 		List<AggregateStatePropertyInfo> properties = [];
 		Dictionary<string, IPropertySymbol> propertySymbolsByName = new(StringComparer.Ordinal);

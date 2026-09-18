@@ -19,6 +19,11 @@ tags:
 
 Use this skill when defining value objects in `Purview.EventSourcing` with source-generator support.
 
+> The `[Scalar]` / `[ValueObject]` generator, analyzer, and runtime contracts are provided by the
+> `Purview.ValueObjects` package (a dependency of `Purview.EventSourcing`). Value objects use the
+> `Purview.ValueObjects` and `Purview.ValueObjects.Serialization` namespaces. The rules below still apply
+> to how value objects behave inside aggregates.
+
 ## Goals
 
 - Model scalar, non-scalar, and contextual value objects with strong invariants.

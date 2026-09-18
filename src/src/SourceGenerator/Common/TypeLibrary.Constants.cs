@@ -6,23 +6,9 @@ public static partial class TypeLibrary
 
 	public const string EventsNamespace = "Purview.EventSourcing.Aggregates.Events";
 
-	public const string SerializationNamespace = "Purview.EventSourcing.Serialization";
-
 	public const string CollectionsNamespace = "Purview.EventSourcing";
 
 	public const string AggregateGeneratorName = "Purview.EventSourcing.AggregateSourceGenerator";
-
-	public const string ValueObjectGeneratorName = "Purview.EventSourcing.ValueObjectSourceGenerator";
-
-	public const string ValueObjectAttributeFullTypeName = SerializationNamespace + ".ValueObjectAttribute";
-
-	public const string ValueObjectDefaultsAttributeFullTypeName =
-		SerializationNamespace + ".ValueObjectDefaultsAttribute";
-
-	public const string ScalarAttributeFullTypeName = SerializationNamespace + ".ScalarAttribute";
-
-	public const string ValueObjectDeserializationModeFullTypeName =
-		SerializationNamespace + ".ValueObjectDeserializationMode";
 
 	public const string AggregateAttributeFullTypeName = AggregateNamespace + ".AggregateAttribute";
 
