@@ -25,7 +25,7 @@ Purview Event Sourcing is a .NET event sourcing framework for building aggregate
 | `Purview.EventSourcing.CosmosDb` | Azure Cosmos DB queryable snapshot store | [`src/src/CosmosDb/Sdk/README.md`](src/src/CosmosDb/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.CosmosDb.svg)](https://www.nuget.org/packages/Purview.EventSourcing.CosmosDb) |
 | `Purview.EventSourcing.InMemory` | In-memory event/snapshot store implementation for local and test scenarios | (see package source at `src/src/InMemory`) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.InMemory.svg)](https://www.nuget.org/packages/Purview.EventSourcing.InMemory) |
 | `Purview.EventSourcing.Validation.FluentValidation` | `FluentValidation` adapter for aggregate save-time validation | (see package source at `src/src/Validation.FluentValidation`) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.Validation.FluentValidation.svg)](https://www.nuget.org/packages/Purview.EventSourcing.Validation.FluentValidation) |
-| `Purview.EventSourcing.Validation.ZodSharp` | `ZodSharp` adapter for aggregate save-time validation | (see package source at `src/src/Validation.ZodSharp`) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.Validation.ZodSharp.svg)](https://www.nuget.org/packages/Purview.EventSourcing.Validation.ZodSharp) |
+| `Purview.EventSourcing.Validation.ZodSharp` | `Purview.ZodSharp` adapter for aggregate save-time validation | (see package source at `src/src/Validation.ZodSharp`) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.Validation.ZodSharp.svg)](https://www.nuget.org/packages/Purview.EventSourcing.Validation.ZodSharp) |
 
 ## Install the packages you need
 
@@ -43,9 +43,9 @@ dotnet add package Purview.EventSourcing.Validation.FluentValidation
 dotnet add package Purview.EventSourcing.Validation.ZodSharp
 ```
 
-### ZodSharp direct-reference requirement
+### Purview.ZodSharp direct-reference requirement
 
-If your project directly references `Purview.EventSourcing.Validation.ZodSharp` (project reference) and uses types from `ZodSharp`, you must include a direct package reference:
+If your project directly references `Purview.EventSourcing.Validation.ZodSharp` (project reference) and uses types from `Purview.ZodSharp`, you must include a direct package reference:
 
 ```xml
 <PackageReference Include="Purview.ZodSharp" />

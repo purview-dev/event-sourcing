@@ -27,9 +27,9 @@ dotnet add package Purview.EventSourcing.Validation.FluentValidation
 dotnet add package Purview.EventSourcing.Validation.ZodSharp
 ```
 
-## Dependency guardrail for ZodSharp
+## Dependency guardrail for Purview.ZodSharp
 
-If your project references the `Purview.EventSourcing.Validation.ZodSharp` project directly and uses `ZodSharp` types,
+If your project references the `Purview.EventSourcing.Validation.ZodSharp` project directly and uses `Purview.ZodSharp` types,
 you must add:
 
 ```xml
