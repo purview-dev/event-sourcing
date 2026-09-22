@@ -1,7 +1,5 @@
-using System.Reflection;
 using BenchmarkDotNet.Attributes;
 using Purview.EventSourcing.Aggregates;
-using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.ChangeFeed;
 using Purview.EventSourcing.InMemory.Events;
 using Purview.EventSourcing.Samples.Domain;

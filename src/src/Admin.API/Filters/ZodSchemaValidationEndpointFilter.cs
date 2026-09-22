@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Http;
-using ZodSharp.AspNetCore;
+using ZodSharp;
 using ZodSharp.Core;
 
 namespace Purview.EventSourcing.Admin.API.Filters;

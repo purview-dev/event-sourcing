@@ -4,15 +4,17 @@
 		<!-- Keep compiler-facing Roslyn packages aligned with the minimum SDK pinned in global.json so analyser ProjectReferences load on build machines. -->
 		<RoslynCompilerVersion>5.9.0</RoslynCompilerVersion>
 		<RoslynAnalyzersVersion>5.9.0</RoslynAnalyzersVersion>
-		<TUnitVersion>1.68.4</TUnitVersion>
-		<PurviewSGFrameworkVersion>1.0.0-prerelease.44</PurviewSGFrameworkVersion>
-		<PurviewValueObjectsVersion>1.0.0-prerelease.2</PurviewValueObjectsVersion>
-		<PurviewZodSharpVersion>2.0.0-prerelease.9</PurviewZodSharpVersion>
+		<TUnitVersion>1.68.17</TUnitVersion>
+		<PurviewSGFrameworkVersion>1.0.0-prerelease.47</PurviewSGFrameworkVersion>
+		<PurviewValueObjectsVersion>1.0.0-prerelease.5</PurviewValueObjectsVersion>
+		<PurviewZodSharpVersion>2.0.0-prerelease.17</PurviewZodSharpVersion>
+		<PurviewTelemetryVersion>5.0.0-prerelease.11</PurviewTelemetryVersion>
+		<PurviewAspireResourceKitVersion>1.0.0-prerelease.33</PurviewAspireResourceKitVersion>
 		<TestcontainersVersion>4.15.0</TestcontainersVersion>
 		<BenchmarkDotNetVersion>0.14.0</BenchmarkDotNetVersion>
 		<DotnetRuntimeVersion>10.0.12</DotnetRuntimeVersion>
 		<AspireVersion>13.5.4</AspireVersion>
-		<OTelVersion>1.18.0</OTelVersion>
+		<OTelVersion>1.19.0</OTelVersion>
 		<MSExtensionVersion>10.10.0</MSExtensionVersion>
 	</PropertyGroup>
 	<ItemGroup>
@@ -34,13 +36,13 @@
 		<PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="$(DotnetRuntimeVersion)" />
 		<PackageVersion Include="Microsoft.Extensions.Options" Version="$(DotnetRuntimeVersion)" />
 		<PackageVersion Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.20.1" />
-		<PackageVersion Include="Purview.Aspire.ResourceKit" Version="1.0.0-prerelease.30" />
+		<PackageVersion Include="Purview.Aspire.ResourceKit" Version="$(PurviewAspireResourceKitVersion)" />
 		<PackageVersion Include="Purview.SourceGeneratorFramework" Version="$(PurviewSGFrameworkVersion)" />
 		<PackageVersion
 			Include="Purview.SourceGeneratorFramework.Testing.TUnit"
 			Version="$(PurviewSGFrameworkVersion)"
 		/>
-		<PackageVersion Include="Purview.Telemetry.SourceGenerator" Version="5.0.0-prerelease.11" />
+		<PackageVersion Include="Purview.Telemetry.SourceGenerator" Version="$(PurviewTelemetryVersion)" />
 		<PackageVersion Include="Purview.ValueObjects" Version="$(PurviewValueObjectsVersion)" />
 		<PackageVersion Include="Purview.ZodSharp" Version="$(PurviewZodSharpVersion)" />
 		<PackageVersion Include="Purview.ZodSharp.AspNetCore" Version="$(PurviewZodSharpVersion)" />

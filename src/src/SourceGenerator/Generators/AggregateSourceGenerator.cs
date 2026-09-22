@@ -19,8 +19,8 @@ public sealed partial class AggregateSourceGenerator : IIncrementalGenerator
 		// short-circuits instead of re-executing every aggregate transform (see PreCompilationMarker).
 #pragma warning disable RSEXPERIMENTAL007 // Pre-compilation source output is intentionally used to stabilize the incremental cache.
 		context.RegisterPreCompilationSourceOutput(
-			Common.PreCompilationMarker.Provider(context),
-			static (spc, source) => spc.AddSource(Common.PreCompilationMarker.HintName, source)
+			PreCompilationMarker.Provider(context),
+			static (spc, source) => spc.AddSource(PreCompilationMarker.HintName, source)
 		);
 #pragma warning restore RSEXPERIMENTAL007
 

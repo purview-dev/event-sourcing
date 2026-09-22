@@ -3,15 +3,13 @@ using System.Text.Json;
 
 namespace Purview.EventSourcing.Benchmarks;
 
-sealed class BenchmarkHistoryStore
+sealed class BenchmarkHistoryStore(string mode)
 {
 	static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = true };
 
-	readonly string _mode;
+	readonly string _mode = mode;
 
 	readonly string _repositoryRoot = FindRepositoryRoot();
-
-	public BenchmarkHistoryStore(string mode) => _mode = mode;
 
 	string HistoryDirectory => Path.Combine(_repositoryRoot, "artifacts", $"{_mode}-performance", "history");
 

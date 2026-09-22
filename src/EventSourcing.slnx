@@ -5,6 +5,7 @@
 		<File Path="../.editorconfig" />
 		<File Path="../Directory.Packages.props" />
 		<File Path="../package.json" />
+		<File Path="../purview-build.json" />
 		<File Path="Directory.Build.props" />
 		<File Path="Directory.Build.targets" />
 	</Folder>
@@ -58,10 +59,7 @@
 		<Project Path="tests/SourceGenerator.UnitTests/SourceGenerator.UnitTests.csproj" />
 	</Folder>
 	<Folder Name="/tests/admin/">
-		<Project
-			Path="tests/Admin.SqlServer.UnitTests/Admin.SqlServer.UnitTests.csproj"
-			DisplayName="Admin.SQLServer.UnitTests"
-		/>
+		<Project Path="tests/Admin.SqlServer.UnitTests/Admin.SqlServer.UnitTests.csproj" />
 		<Project Path="tests/Admin.UnitTests/Admin.UnitTests.csproj" />
 	</Folder>
 	<Folder Name="/tests/implementations/">
@@ -69,10 +67,7 @@
 		<Project Path="tests/CosmosDb.IntegrationTests/CosmosDb.IntegrationTests.csproj" />
 		<Project Path="tests/MongoDB.IntegrationTests/MongoDB.IntegrationTests.csproj" />
 		<Project Path="tests/Postgres.IntegrationTests/Postgres.IntegrationTests.csproj" />
-		<Project
-			Path="tests/SqlServer.IntegrationTests/SqlServer.IntegrationTests.csproj"
-			DisplayName="SQLServer.IntegrationTests"
-		/>
+		<Project Path="tests/SqlServer.IntegrationTests/SqlServer.IntegrationTests.csproj" />
 	</Folder>
 	<Folder Name="/tests/samples/">
 		<Project Path="tests/Samples.AppHost.IntegrationTests/Samples.AppHost.IntegrationTests.csproj" />

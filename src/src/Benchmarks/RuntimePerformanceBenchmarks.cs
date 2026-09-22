@@ -56,8 +56,11 @@ public class RuntimePerformanceBenchmarks
 		_moneyB = Money.Create(19.99m, CurrencyCode.Create("EUR"));
 		_moneyJson = EventStoreSerializationHelpers.Serialize(_moneyA);
 
-		_orderCreatedEvent = new OrderCreatedEvent { CustomerId = "customer-1" };
-		_orderCreatedEvent.Metadata = new EventMetadata(1, DateTimeOffset.UtcNow, 1, null, null, null, null);
+		_orderCreatedEvent = new OrderCreatedEvent
+		{
+			CustomerId = "customer-1",
+			Metadata = new EventMetadata(1, DateTimeOffset.UtcNow, 1, null, null, null, null),
+		};
 		_orderJson = EventStoreSerializationHelpers.Serialize(_orderCreatedEvent, _orderCreatedEvent.GetType());
 
 		_replayEvents = new EventRecord[100];

@@ -26,10 +26,10 @@ public record EventSourcingGeneratorTestOptions : SourceGeneratorTestOptions
 		[
 			typeof(EventStoreSet<>).Namespace!,
 			typeof(Aggregates.AggregateBase).Namespace!,
-			typeof(Purview.ValueObjects.Serialization.ScalarJsonConverterFactory).Namespace!,
-			typeof(Purview.ValueObjects.IValueObject).Namespace!,
+			typeof(ValueObjects.Serialization.ScalarJsonConverterFactory).Namespace!,
+			typeof(ValueObjects.IValueObject).Namespace!,
 		];
-		AdditionalAssemblyTypes = [typeof(Aggregates.IAggregate), typeof(Purview.ValueObjects.IValueObject)];
+		AdditionalAssemblyTypes = [typeof(Aggregates.IAggregate), typeof(ValueObjects.IValueObject)];
 		AdditionalReferences = [.. TestMetadataReferences.GetAdditionalReferences()];
 		ExcludeGeneratedSourceHintNames = [.. AggregateGeneratedAttributes, PreCompilationMarkerHintName];
 		AnalyzerTypes = [typeof(Analyzers.AggregateDiagnosticAnalyzer)];

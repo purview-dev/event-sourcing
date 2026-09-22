@@ -106,7 +106,7 @@ partial class SqlServerEventStore<T>
 		var isNew = aggregate.IsNew();
 		var changeEvents =
 			(additionalEvents?.Length ?? 0) == 0
-				? aggregate.GetUnsavedEvents().ToArray()
+				? [.. aggregate.GetUnsavedEvents()]
 				: aggregate.GetUnsavedEvents().Concat(additionalEvents!).ToArray();
 
 		if (changeEvents.Length > _eventStoreOptions.Value.MaxEventCountOnSave)
@@ -158,7 +158,7 @@ partial class SqlServerEventStore<T>
 		);
 	}
 
-	[System.Diagnostics.CodeAnalysis.SuppressMessage(
+	[SuppressMessage(
 		"Maintainability",
 		"CA1502:Avoid excessive complexity",
 		Justification = "Save orchestration handles many interleaved states; keep the flow readable."
