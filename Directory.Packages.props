@@ -9,7 +9,7 @@
 		<PurviewValueObjectsVersion>1.0.0-prerelease.5</PurviewValueObjectsVersion>
 		<PurviewZodSharpVersion>2.0.0-prerelease.18</PurviewZodSharpVersion>
 		<PurviewTelemetryVersion>5.0.0-prerelease.11</PurviewTelemetryVersion>
-		<PurviewAspireResourceKitVersion>1.0.0-prerelease.33</PurviewAspireResourceKitVersion>
+		<PurviewAspireResourceKitVersion>1.0.0-prerelease.34</PurviewAspireResourceKitVersion>
 		<TestcontainersVersion>4.15.0</TestcontainersVersion>
 		<BenchmarkDotNetVersion>0.14.0</BenchmarkDotNetVersion>
 		<DotnetRuntimeVersion>10.0.12</DotnetRuntimeVersion>
