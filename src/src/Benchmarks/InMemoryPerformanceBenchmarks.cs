@@ -55,6 +55,7 @@ public class InMemoryPerformanceBenchmarks : IDisposable
 				1.99m
 			);
 		}
+
 		_store.SaveAsync(large, _operationContext).GetAwaiter().GetResult();
 	}
 

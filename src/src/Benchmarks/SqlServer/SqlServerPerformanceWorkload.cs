@@ -1,4 +1,4 @@
-namespace Purview.EventSourcing.SqlServer;
+namespace Purview.EventSourcing.Benchmarks.SqlServer;
 
 sealed class SqlServerPerformanceWorkload
 {

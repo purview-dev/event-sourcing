@@ -1,3 +1,6 @@
+using Purview.ValueObjects;
+using Purview.ValueObjects.Serialization;
+
 namespace Purview.EventSourcing.SourceGenerator.Common;
 
 public record EventSourcingGeneratorTestOptions : SourceGeneratorTestOptions
@@ -26,10 +29,10 @@ public record EventSourcingGeneratorTestOptions : SourceGeneratorTestOptions
 		[
 			typeof(EventStoreSet<>).Namespace!,
 			typeof(Aggregates.AggregateBase).Namespace!,
-			typeof(ValueObjects.Serialization.ScalarJsonConverterFactory).Namespace!,
-			typeof(ValueObjects.IValueObject).Namespace!,
+			typeof(ScalarJsonConverterFactory).Namespace!,
+			typeof(IValueObject).Namespace!,
 		];
-		AdditionalAssemblyTypes = [typeof(Aggregates.IAggregate), typeof(ValueObjects.IValueObject)];
+		AdditionalAssemblyTypes = [typeof(Aggregates.IAggregate), typeof(IValueObject)];
 		AdditionalReferences = [.. TestMetadataReferences.GetAdditionalReferences()];
 		ExcludeGeneratedSourceHintNames = [.. AggregateGeneratedAttributes, PreCompilationMarkerHintName];
 		AnalyzerTypes = [typeof(Analyzers.AggregateDiagnosticAnalyzer)];

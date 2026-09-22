@@ -106,6 +106,7 @@ partial class PostgresEventStore<T>
 			if (@event == null)
 				return null;
 
+			// If the event is an UnknownEvent, we still want to return it, but we also want to log that we couldn't deserialize it.
 			return new EventRecord(@event, metadata);
 		}
 #pragma warning disable CA1031

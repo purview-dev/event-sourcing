@@ -170,6 +170,7 @@ partial class TableEventStore<T>
 					if (blobEvent == null)
 						return null;
 
+					// Apply upcasting chain when a registry is available.
 					return new EventRecord(blobEvent, metadata);
 				}
 			}
@@ -177,6 +178,7 @@ partial class TableEventStore<T>
 			if (@event == null)
 				return null;
 
+			// Apply upcasting chain when a registry is available.
 			return new EventRecord(@event, metadata);
 		}
 #pragma warning disable CA1031

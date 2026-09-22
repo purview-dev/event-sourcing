@@ -1,4 +1,4 @@
-﻿using Microsoft.Azure.Cosmos;
+using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Primitives;
 using Purview.EventSourcing.Aggregates.Persistence;
 

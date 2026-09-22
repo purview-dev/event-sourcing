@@ -1,7 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Purview.EventSourcing.SourceGenerator.Generators;
 
-namespace Purview.EventSourcing.SourceGenerator;
+namespace Purview.EventSourcing.Benchmarks.SourceGenerator;
 
 public sealed record SourceGeneratorScenario(
 	string Name,

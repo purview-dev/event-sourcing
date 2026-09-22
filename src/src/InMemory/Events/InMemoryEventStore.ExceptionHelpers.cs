@@ -1,4 +1,4 @@
-﻿namespace Purview.EventSourcing.InMemory.Events;
+namespace Purview.EventSourcing.InMemory.Events;
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0060:Remove unused parameter")]
 partial class InMemoryEventStore<T>

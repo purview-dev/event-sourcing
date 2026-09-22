@@ -5,9 +5,9 @@
 		<RoslynCompilerVersion>5.9.0</RoslynCompilerVersion>
 		<RoslynAnalyzersVersion>5.9.0</RoslynAnalyzersVersion>
 		<TUnitVersion>1.68.17</TUnitVersion>
-		<PurviewSGFrameworkVersion>1.0.0-prerelease.47</PurviewSGFrameworkVersion>
+		<PurviewSGFrameworkVersion>1.0.0-prerelease.48</PurviewSGFrameworkVersion>
 		<PurviewValueObjectsVersion>1.0.0-prerelease.5</PurviewValueObjectsVersion>
-		<PurviewZodSharpVersion>2.0.0-prerelease.17</PurviewZodSharpVersion>
+		<PurviewZodSharpVersion>2.0.0-prerelease.18</PurviewZodSharpVersion>
 		<PurviewTelemetryVersion>5.0.0-prerelease.11</PurviewTelemetryVersion>
 		<PurviewAspireResourceKitVersion>1.0.0-prerelease.33</PurviewAspireResourceKitVersion>
 		<TestcontainersVersion>4.15.0</TestcontainersVersion>

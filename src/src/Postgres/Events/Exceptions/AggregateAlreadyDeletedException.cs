@@ -1,6 +1,7 @@
+#pragma warning disable CA1032 // Implement standard exception constructors
+
 namespace Purview.EventSourcing.Postgres.Events.Exceptions;
 
-#pragma warning disable CA1032 // Implement standard exception constructors
 /// <summary>
 /// Thrown when an attempt is made to delete an aggregate that has already been deleted.
 /// </summary>
@@ -10,7 +11,6 @@ public class AggregateAlreadyDeletedException(string aggregateId, string idempot
 	: Exception(
 		$"An attempt to delete an aggregate (Id: {aggregateId}) that is already deleted was made. {nameof(idempotencyId)}: {idempotencyId}."
 	)
-#pragma warning restore CA1032 // Implement standard exception constructors
 {
 	/// <summary>
 	/// The id of the aggregate that is already deleted.
