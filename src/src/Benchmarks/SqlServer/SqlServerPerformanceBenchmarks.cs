@@ -560,7 +560,7 @@ public class SqlServerPerformanceBenchmarks
 			where T : class => DispatchProxy.Create<T, NoOpDispatchProxy>();
 	}
 
-	class NoOpDispatchProxy : DispatchProxy
+	sealed class NoOpDispatchProxy : DispatchProxy
 	{
 		protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
 		{
