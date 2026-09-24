@@ -167,7 +167,7 @@ sealed class TableSaveOperation<T>(
 		return (null, aggregate, operationContext, idempotencyId, changeEvents, isNew, idempotencyMarkerOperation);
 	}
 
-	[System.Diagnostics.CodeAnalysis.SuppressMessage(
+	[SuppressMessage(
 		"Maintainability",
 		"CA1502:Avoid excessive complexity",
 		Justification = "Save orchestration handles many interleaved states; keep the flow readable."

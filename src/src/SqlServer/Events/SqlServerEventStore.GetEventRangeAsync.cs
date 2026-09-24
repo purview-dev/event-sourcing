@@ -106,6 +106,7 @@ partial class SqlServerEventStore<T>
 			if (@event == null)
 				return null;
 
+			// If the event is an IEvent, we can return it directly. Otherwise, we wrap it in an UnknownEvent.
 			return new EventRecord(@event, metadata);
 		}
 #pragma warning disable CA1031

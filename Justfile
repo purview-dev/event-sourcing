@@ -2,7 +2,7 @@ set quiet
 
 # Variables
 root_folder := "./src"
-test_root := root_folder + "/tests"
+# test_root := root_folder + "/tests"
 
 solution_file := root_folder + "/EventSourcing.slnx"
 
@@ -65,6 +65,13 @@ pipeline-tests *args:
     just ensure-pipeline-tool
     echo "Running tests pipeline..."
     "{{ pipeline_tool }}" --Build:RunTests=true --Release:Mode=None {{ args }}
+
+# Run the pipeline through pack + validate (restore, build, lint, tests, pack, validate pack contents) without publishing/releasing
+[group('Pipeline')]
+pipeline-pack-validate *args:
+    just ensure-pipeline-tool
+    echo "Running pack + validate pipeline..."
+    "{{ pipeline_tool }}" --Build:RunPack=true --Build:ValidatePack=true --Release:Mode=None {{ args }}
 
 # Open the solution in Visual Studio/ Registered application
 [group('Utilities')]

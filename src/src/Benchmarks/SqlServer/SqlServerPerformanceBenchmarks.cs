@@ -9,13 +9,12 @@ using Purview.EventSourcing.ChangeFeed;
 using Purview.EventSourcing.Samples.Domain;
 using Purview.EventSourcing.Samples.ValueObjects;
 using Purview.EventSourcing.Services;
-using Purview.EventSourcing.SqlServer;
 using Purview.EventSourcing.SqlServer.Events;
 using Purview.EventSourcing.SqlServer.Snapshot;
 using Purview.EventSourcing.SqlServer.Snapshots;
 using Testcontainers.MsSql;
 
-namespace Purview.EventSourcing.Benchmarks;
+namespace Purview.EventSourcing.Benchmarks.SqlServer;
 
 /// <summary>
 /// Measures event-store save/get and snapshot write/query timings against a SQL Server
@@ -69,7 +68,7 @@ public class SqlServerPerformanceBenchmarks
 		_eventStore = CreateEventStore(connectionString, $"PerfEvents_{runId}");
 		_snapshotStore = CreateSnapshotStore(_eventStore, connectionString, $"PerfSnapshots_{runId}");
 
-		_seededIds = Enumerable.Range(0, _workload.AggregateCount).Select(static _ => $"{Guid.NewGuid():D}").ToArray();
+		_seededIds = [.. Enumerable.Range(0, _workload.AggregateCount).Select(static _ => $"{Guid.NewGuid():D}")];
 
 		var loaded = new List<PersistenceAggregate>(_seededIds.Length);
 		for (var i = 0; i < _seededIds.Length; i++)
@@ -158,12 +157,12 @@ public class SqlServerPerformanceBenchmarks
 	}
 
 	[GlobalCleanup]
-	public void GlobalCleanup()
+	public async Task GlobalCleanup()
 	{
 		EventStoreOperationContext.RequiresValidPrincipalIdentifierDefault = _previousRequiresPrincipal;
 
 		if (_container is not null)
-			_container.DisposeAsync().AsTask().GetAwaiter().GetResult();
+			await _container.DisposeAsync();
 	}
 
 	[Benchmark]
@@ -561,7 +560,7 @@ public class SqlServerPerformanceBenchmarks
 			where T : class => DispatchProxy.Create<T, NoOpDispatchProxy>();
 	}
 
-	class NoOpDispatchProxy : DispatchProxy
+	sealed class NoOpDispatchProxy : DispatchProxy
 	{
 		protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
 		{

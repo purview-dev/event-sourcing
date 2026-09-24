@@ -123,6 +123,7 @@ partial class MongoDBEventStore<T>
 			if (@event == null)
 				return null;
 
+			// If the upcasted event is of a different type than the original, log it.
 			return new EventRecord(@event, metadata);
 		}
 #pragma warning disable CA1031

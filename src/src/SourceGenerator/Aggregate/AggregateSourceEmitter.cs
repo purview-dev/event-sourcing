@@ -115,7 +115,7 @@ static partial class AggregateSourceEmitter
 				{
 					bodyWriter.MethodCall(
 						"RegisterGenerated",
-						System.Array.Empty<string>(),
+						Array.Empty<string>(),
 						genericArguments: [method.EventType]
 					);
 				}

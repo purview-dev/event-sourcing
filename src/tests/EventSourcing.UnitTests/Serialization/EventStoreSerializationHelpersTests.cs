@@ -60,7 +60,7 @@ public sealed class EventStoreSerializationHelpersTests
 
 		await Assert.That(roundTripped).IsNotNull();
 		await Assert.That(roundTripped!.Value).IsEqualTo("event-value");
-		await Assert.That(roundTripped.Metadata).IsEqualTo(default(EventMetadata));
+		await Assert.That(roundTripped.Metadata).IsEqualTo(default);
 
 		using var document = JsonDocument.Parse(json);
 		await Assert.That(document.RootElement.TryGetProperty("Metadata", out _)).IsFalse();

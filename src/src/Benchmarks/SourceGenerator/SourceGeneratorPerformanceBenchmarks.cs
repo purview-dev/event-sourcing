@@ -2,9 +2,8 @@ using System.Collections.Concurrent;
 using BenchmarkDotNet.Attributes;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Purview.EventSourcing.SourceGenerator;
 
-namespace Purview.EventSourcing.Benchmarks;
+namespace Purview.EventSourcing.Benchmarks.SourceGenerator;
 
 /// <summary>
 /// Measures how fast the aggregate and value-object generators run and, crucially, how well the

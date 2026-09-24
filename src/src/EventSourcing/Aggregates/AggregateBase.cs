@@ -234,6 +234,7 @@ public abstract class AggregateBase : IAggregate
 		if (_customAppliers is not null)
 			return _customAppliers.Keys;
 
+		// No events registered, return empty list.
 		return [];
 	}
 
@@ -268,6 +269,7 @@ public abstract class AggregateBase : IAggregate
 		if (_customAppliers is not null && _customAppliers.TryGetValue(eventType, out applier))
 			return applier;
 
+		// No applier found for the event type.
 		throw new UnregisteredEventException(eventType, this);
 	}
 

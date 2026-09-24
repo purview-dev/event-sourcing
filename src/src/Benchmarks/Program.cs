@@ -1,8 +1,12 @@
+#pragma warning disable format
+
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Running;
 using BenchmarkDotNet.Toolchains.InProcess.Emit;
 using Purview.EventSourcing.Benchmarks;
+using Purview.EventSourcing.Benchmarks.SourceGenerator;
+using Purview.EventSourcing.Benchmarks.SqlServer;
 
 // The suites run with the in-process toolchain: benchmarks execute directly in this process, which
 // avoids BenchmarkDotNet generating an out-of-process boilerplate project. The repository's
