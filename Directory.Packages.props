@@ -5,12 +5,12 @@
 		<RoslynCompilerVersion>5.9.0</RoslynCompilerVersion>
 		<RoslynAnalyzersVersion>5.9.0</RoslynAnalyzersVersion>
 		<TUnitVersion>1.68.17</TUnitVersion>
-		<PurviewSGFrameworkVersion>1.0.0-prerelease.49</PurviewSGFrameworkVersion>
-		<PurviewValueObjectsVersion>1.0.0-prerelease.5</PurviewValueObjectsVersion>
-		<PurviewZodSharpVersion>2.0.0-prerelease.20</PurviewZodSharpVersion>
-		<PurviewTelemetryVersion>5.0.0-prerelease.14</PurviewTelemetryVersion>
-		<PurviewAspireResourceKitVersion>1.0.0-prerelease.36</PurviewAspireResourceKitVersion>
-		<PurviewAspireC4Version>13.5.3.4</PurviewAspireC4Version>
+		<PurviewSGFrameworkVersion>1.0.0-prerelease.52</PurviewSGFrameworkVersion>
+		<PurviewValueObjectsVersion>1.0.0-prerelease.6</PurviewValueObjectsVersion>
+		<PurviewZodSharpVersion>2.0.0-prerelease.23</PurviewZodSharpVersion>
+		<PurviewTelemetryVersion>5.0.0-prerelease.17</PurviewTelemetryVersion>
+		<PurviewAspireResourceKitVersion>1.0.0-prerelease.39</PurviewAspireResourceKitVersion>
+		<PurviewAspireC4Version>13.5.3.6</PurviewAspireC4Version>
 		<TestcontainersVersion>4.15.0</TestcontainersVersion>
 		<BenchmarkDotNetVersion>0.14.0</BenchmarkDotNetVersion>
 		<DotnetRuntimeVersion>10.0.12</DotnetRuntimeVersion>
