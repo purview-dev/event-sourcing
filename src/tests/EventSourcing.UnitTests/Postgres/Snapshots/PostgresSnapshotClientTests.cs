@@ -1,6 +1,7 @@
 using System.Reflection;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
+using Purview.EventSourcing.EntityFrameworkCore;
 using Purview.EventSourcing.Postgres.Client;
 
 namespace Purview.EventSourcing.Postgres.Snapshots;
@@ -32,6 +33,64 @@ public sealed class PostgresSnapshotClientTests
 		public void ClearUnsavedEvents(int? upToVersion = null) { }
 
 		void IAggregate.ApplyEvent(object @event, EventMetadata metadata) { }
+	}
+
+	[Test]
+	public async Task ValidateAggregatePayloadShape_GivenOpaqueReadOnlyCollection_DoesNotThrow()
+	{
+		await Assert.That(() => ValidateAggregatePayloadShape(typeof(OpaqueMemberAggregate))).ThrowsNothing();
+	}
+
+	[Test]
+	public async Task ValidateAggregatePayloadShape_GivenReadOnlyComplexMemberOnValueType_Throws()
+	{
+		var exception = await Assert
+			.That(() => ValidateAggregatePayloadShape(typeof(ReadOnlyValueTypeMemberAggregate)))
+			.Throws<InvalidOperationException>();
+
+		await Assert.That(exception.Message).Contains(nameof(ReadOnlyStructHolder.Mirror));
+		await Assert.That(exception.Message).Contains("writeable");
+	}
+
+	[Test]
+	public async Task ValidateAggregatePayloadShape_GivenSettableComplexMemberOnValueType_DoesNotThrow()
+	{
+		await Assert
+			.That(() => ValidateAggregatePayloadShape(typeof(SettableValueTypeMemberAggregate)))
+			.ThrowsNothing();
+	}
+
+	sealed class OpaqueMemberAggregate
+	{
+		[EFOpaque]
+		public IReadOnlyList<int> Values { get; init; } = [];
+	}
+
+	sealed class ReadOnlyValueTypeMemberAggregate
+	{
+		public ReadOnlyStructHolder Holder { get; init; }
+	}
+
+	sealed class SettableValueTypeMemberAggregate
+	{
+		public SettableStructHolder Holder { get; init; }
+	}
+
+	readonly struct ReadOnlyStructHolder
+	{
+		ReadOnlyStructHolder(ValueTypeMemberInfo mirror) => Mirror = mirror;
+
+		public ValueTypeMemberInfo Mirror { get; }
+	}
+
+	readonly struct SettableStructHolder
+	{
+		public ValueTypeMemberInfo Mirror { get; init; }
+	}
+
+	sealed class ValueTypeMemberInfo
+	{
+		public string? Name { get; set; }
 	}
 
 	static void ValidateAggregatePayloadShape(Type aggregateType)

@@ -242,13 +242,24 @@ public sealed record BioUpdatedEvent
 - Replay/hydration paths apply event payloads through generated `Apply(...)` logic.
 - Snapshot-query translation depends on how the provider maps the resulting property graph, not only on the value-object
   generator behavior.
-- Projects compiled with the SQL Server or PostgreSQL EF analyzer can mark a property `[EfOpaque]`. The EF-only
-  generator emits this internal marker into the consuming compilation; it does not add a runtime attribute API.
+- Projects compiled with the SQL Server or PostgreSQL EF analyzer can mark a property `[EFOpaque]`. The EF-only
+  generator emits this internal marker into the consuming compilation; it does not add a runtime attribute API. The
+  providers detect the marker by full type name (`Purview.EventSourcing.EntityFrameworkCore.EFOpaqueAttribute`) and
+  persist marked members as converted JSON scalars.
 - `EVENTSTOREEF001` reports dictionary-like members reachable from an aggregate unless they are explicitly opaque.
   Prefer a collection of domain entry objects when structural querying is required; the generator does not synthesize
   those domain types.
 - `EVENTSTOREEF002` reports uses of an opaque member in recognized snapshot query expressions. Opaque values round-trip
   through JSON but their contents are not part of EF's queryable complex model.
+- `EVENTSTOREEF003` reports a snapshot complex member whose type exposes no constructor EF can bind. EF cannot bind
+  complex or collection constructor parameters while materializing JSON, so value types (and reference types without a
+  parameterless constructor) need a parameterless constructor or scalar-only constructor parameters. The
+  `Purview.ValueObjects` generator emits a parameterless constructor for `[ValueObject]` types.
+- `EVENTSTOREEF004` reports a complex member without an `init`/`set` accessor declared on a value type. EF writes
+  value-type JSON members through their backing field, and a read-only member cannot be assigned during
+  materialization. The SQL Server and PostgreSQL providers also reject the shape while building the snapshot query
+  model, so consumers that do not run the analyzer still receive an actionable error instead of EF's internal
+  `ArgumentException: Expression must be writeable`.
 - A `[Scalar]` value object that wraps a complex CLR type may serialize correctly while still requiring a separate
   directly mapped complex mirror property for deep SQL predicates.
 

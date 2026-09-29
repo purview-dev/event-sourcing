@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using ZodSharp;
-using ZodSharp.Core;
+using ZodSharp.Schemas;
 
 namespace Purview.EventSourcing.Admin.API;
 
@@ -119,7 +119,7 @@ public sealed class AdminFeatureOptions
 /// Paging constraints for Admin list and search queries.
 /// </summary>
 [ZodSchema]
-public sealed class AdminPagingOptions
+public sealed partial class AdminPagingOptions
 {
 	/// <summary>
 	/// Gets or sets the default page size.
@@ -133,11 +133,11 @@ public sealed class AdminPagingOptions
 	[Range(1, int.MaxValue)]
 	public int MaxPageSize { get; set; } = 200;
 
-	internal IEnumerable<ValidationError> Validate()
+	partial void OnZodValidate(RefineCtx<AdminPagingOptions> context)
 	{
 		if (DefaultPageSize > MaxPageSize)
 		{
-			yield return new(
+			context.AddIssue(
 				"invalid_range",
 				$"{nameof(DefaultPageSize)} must be less than or equal to {nameof(MaxPageSize)}.",
 				[nameof(DefaultPageSize), nameof(MaxPageSize)]

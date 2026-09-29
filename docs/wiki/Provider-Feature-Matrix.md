@@ -96,7 +96,7 @@ indexes, and per-type schema overrides).
   conversion for compatibility; treat nested element member filtering as non-translatable unless explicitly covered by
   tests.
 - Nested dictionary/interface-collection members cannot be structurally mapped by the SQL Server or PostgreSQL EF
-  snapshot model. Mark non-queryable values `[EfOpaque]` to persist them as a converted JSON scalar, or remodel them as
+  snapshot model. Mark non-queryable values `[EFOpaque]` to persist them as a converted JSON scalar, or remodel them as
   complex entry collections when their contents must be queried.
 - Opaque JSON currently uses EF's supported string conversion inside the outer JSON document. This preserves round-trip
   values but stores the nested value as JSON text rather than a raw nested JSON token.

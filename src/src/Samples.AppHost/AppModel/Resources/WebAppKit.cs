@@ -49,7 +49,7 @@ sealed partial class WebAppKit
 	}
 
 	[ZodSchema]
-	sealed partial class WebAppKitOptions
+	public sealed partial class WebAppKitOptions
 	{
 		[Required]
 		public Dictionary<string, VariantConfiguration> Variants { get; set; } = [];

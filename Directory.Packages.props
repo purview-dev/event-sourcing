@@ -5,12 +5,12 @@
 		<RoslynCompilerVersion>5.9.0</RoslynCompilerVersion>
 		<RoslynAnalyzersVersion>5.9.0</RoslynAnalyzersVersion>
 		<TUnitVersion>1.68.17</TUnitVersion>
-		<PurviewSGFrameworkVersion>1.0.0-prerelease.52</PurviewSGFrameworkVersion>
-		<PurviewValueObjectsVersion>1.0.0-prerelease.6</PurviewValueObjectsVersion>
-		<PurviewZodSharpVersion>2.0.0-prerelease.23</PurviewZodSharpVersion>
-		<PurviewTelemetryVersion>5.0.0-prerelease.17</PurviewTelemetryVersion>
-		<PurviewAspireResourceKitVersion>1.0.0-prerelease.39</PurviewAspireResourceKitVersion>
-		<PurviewAspireC4Version>13.5.3.6</PurviewAspireC4Version>
+		<PurviewSGFrameworkVersion>1.0.0-prerelease.54</PurviewSGFrameworkVersion>
+		<PurviewValueObjectsVersion>1.0.0-prerelease.9</PurviewValueObjectsVersion>
+		<PurviewZodSharpVersion>2.0.0-prerelease.28</PurviewZodSharpVersion>
+		<PurviewTelemetryVersion>5.0.0-prerelease.19</PurviewTelemetryVersion>
+		<PurviewAspireResourceKitVersion>1.0.0-prerelease.41</PurviewAspireResourceKitVersion>
+		<PurviewAspireC4Version>13.5.3.8</PurviewAspireC4Version>
 		<TestcontainersVersion>4.15.0</TestcontainersVersion>
 		<BenchmarkDotNetVersion>0.14.0</BenchmarkDotNetVersion>
 		<DotnetRuntimeVersion>10.0.12</DotnetRuntimeVersion>
@@ -72,11 +72,11 @@
 		<PackageVersion Include="TUnit.Core" Version="$(TUnitVersion)" />
 		<PackageVersion Include="TUnit.Mocks" Version="$(TUnitVersion)" />
 		<PackageVersion Include="Azure.Storage.Blobs" Version="12.29.2" />
-		<PackageVersion Include="Azure.Data.Tables" Version="12.12.0" />
-		<PackageVersion Include="BenchmarkDotNet" Version="$(BenchmarkDotNetVersion)" />
-		<PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.63.0" />
+		<PackageVersion Include="Azure.Data.Tables" Version="12.13.0" />
+		<PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
+		<PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.63.1" />
 		<PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
-		<PackageVersion Include="Microsoft.Data.SqlClient" Version="7.0.3" />
+		<PackageVersion Include="Microsoft.Data.SqlClient" Version="7.1.0" />
 		<PackageVersion Include="Microsoft.EntityFrameworkCore" Version="$(DotnetRuntimeVersion)" />
 		<PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="$(DotnetRuntimeVersion)" />
 		<PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="$(DotnetRuntimeVersion)" />
@@ -84,7 +84,7 @@
 		<PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
 		<PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="$(DotnetRuntimeVersion)" />
 		<PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="$(DotnetRuntimeVersion)" />
-		<PackageVersion Include="MongoDB.Driver" Version="3.11.2" />
+		<PackageVersion Include="MongoDB.Driver" Version="3.12.0" />
 		<!-- Aspire -->
 		<PackageVersion Include="Aspire.Hosting" Version="$(AspireVersion)" />
 		<PackageVersion Include="Aspire.Hosting.Testing" Version="$(AspireVersion)" />

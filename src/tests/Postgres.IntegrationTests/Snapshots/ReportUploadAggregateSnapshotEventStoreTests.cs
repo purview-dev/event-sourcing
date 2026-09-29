@@ -83,7 +83,7 @@ public sealed class ReportUploadAggregateSnapshotEventStoreTests(PostgresSnapsho
 			cancellationToken: cancellationToken
 		);
 
-		await Assert.That(translatableQuery.Results).Count().IsEqualTo(1);
+		await Assert.That(translatableQuery.Results.Length).IsEqualTo(1);
 		await Assert.That(translatableQuery.Results[0].Id()).IsEqualTo(id);
 		await Assert.That(translatableQuery.Results[0].ReportSummaryScalar).IsNotNull();
 		await Assert.That(translatableQuery.Results[0].ReportSummaryScalar!.ParserDetails.FailedLines).IsEqualTo(5);
@@ -105,7 +105,7 @@ public sealed class ReportUploadAggregateSnapshotEventStoreTests(PostgresSnapsho
 			cancellationToken: cancellationToken
 		);
 
-		await Assert.That(query.Results).Count().IsEqualTo(1);
+		await Assert.That(query.Results.Length).IsEqualTo(1);
 		await Assert.That(query.Results[0].Id()).IsEqualTo(id);
 		await Assert.That(query.Results[0].ReportSummaryScalar).IsNotNull();
 		await Assert.That(query.Results[0].ReportSummaryScalar!.ParserDetails.FailedLines).IsEqualTo(5);
@@ -132,14 +132,14 @@ public sealed class ReportUploadAggregateSnapshotEventStoreTests(PostgresSnapsho
 			cancellationToken: cancellationToken
 		);
 
-		await Assert.That(canonicalQuery.Results).Count().IsEqualTo(1);
+		await Assert.That(canonicalQuery.Results.Length).IsEqualTo(1);
 
 		var supportedQuery = await store.QueryAsync(
 			a => a.ReportSummaryScalar!.ParserDetails.FailedLines > 0,
 			cancellationToken: cancellationToken
 		);
 
-		await Assert.That(supportedQuery.Results).Count().IsEqualTo(1);
+		await Assert.That(supportedQuery.Results.Length).IsEqualTo(1);
 		await Assert.That(supportedQuery.Results[0].Id()).IsEqualTo(id);
 	}
 }
