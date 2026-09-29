@@ -600,6 +600,20 @@ Important distinction for SQL translation:
 - Directly mapped complex snapshot members can support deep predicates such as `ParserDetails.FailedLines > 0`, subject
   to the provider's supported payload-shape rules.
 
+Value-type (struct) value objects mapped into the payload must be materializable by EF:
+
+- Declare a parameterless constructor (the `Purview.ValueObjects` generator emits one for `[ValueObject]` structs) or
+  use only scalar constructor parameters. EF cannot bind complex or collection constructor parameters during JSON
+  materialization and would otherwise fail snapshot query compilation (`EVENTSTOREEF003`).
+- Give every complex member declared on a value type an `init` or `set` accessor. EF cannot assign a read-only member
+  of a value type (`EVENTSTOREEF004`). The provider rejects the shape while building the snapshot query model, so a
+  read-only complex member on a value type fails with `InvalidOperationException` naming the member instead of EF's
+  internal `ArgumentException: Expression must be writeable` at query time.
+
+The snapshot query model writes members through their property accessors (`PropertyAccessMode.PreferProperty`), so
+`readonly record struct` value objects — including value objects nested inside other value objects — round-trip and
+remain queryable.
+
 Unsupported members fail during model creation, including:
 
 - arrays,
@@ -607,7 +621,7 @@ Unsupported members fail during model creation, including:
   `IEnumerable<T>`, `HashSet<T>`, `ImmutableArray<T>`),
 - unsupported object types that are not explicitly mapped for JSON conversion.
 
-Read-only and `[JsonIgnore]` members are excluded from snapshot payload mapping.
+Read-only and `[JsonIgnore]` members are excluded from snapshot payload mapping, and `[EFOpaque]` members are persisted as converted JSON scalars that are excluded from the queryable complex graph.
 
 Some nested collection/dictionary members inside directly mapped complex graphs may be supported through provider JSON
 conversion rather than direct relational collection mapping. Treat those shapes as provider-specific and verify them

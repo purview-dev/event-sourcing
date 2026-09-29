@@ -3,7 +3,7 @@ using Purview.ValueObjects.Serialization;
 namespace Purview.EventSourcing.Samples.ValueObjects;
 
 [ValueObject]
-public partial record struct UserDetails(Guid Id, string? DisplayName, bool IsActive = true)
+public readonly partial record struct UserDetails(Guid Id, string? DisplayName, bool IsActive = true)
 {
 	public static readonly Guid LocalUserId = Guid.Parse("10000000-0000-0000-0000-000000000000");
 

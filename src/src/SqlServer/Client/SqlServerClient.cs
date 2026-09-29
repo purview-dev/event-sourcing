@@ -18,6 +18,10 @@ sealed partial class SqlServerClient
 	static readonly ConcurrentDictionary<string, byte> EnsuredTables = new(StringComparer.Ordinal);
 	static readonly HashSet<string> SupportedSnapshotIncludeColumns = ["Id", "AggregateType", "Payload"];
 
+	// Must match the attribute emitted by Purview.EventSourcing.EntityFrameworkCore.SourceGenerator
+	// (TypeLibrary.EFOpaqueAttribute) and applied by consumers as [EFOpaque].
+	const string EFOpaqueAttributeFullName = "Purview.EventSourcing.EntityFrameworkCore.EFOpaqueAttribute";
+
 	readonly SqlServerClientOptions _options;
 	readonly string _tableEnsureKey;
 
@@ -306,6 +310,15 @@ sealed partial class SqlServerClient
 
 		protected override void OnModelCreating(ModelBuilder modelBuilder)
 		{
+			// Snapshot payloads are value-object graphs whose members are init-only (or value-object
+			// struct members). EF's default PreferField access mode writes those members through their
+			// backing fields - readonly for readonly structs - and the JSON complex-type materializer
+			// cannot rebuild such an assignment while fixing up a value-type member, which fails snapshot
+			// query compilation with "Expression must be writeable".
+			// PreferProperty writes members through their accessors (init included) and only falls back
+			// to the backing field when no setter exists.
+			modelBuilder.UsePropertyAccessMode(PropertyAccessMode.PreferProperty);
+
 			var entity = modelBuilder.Entity<SnapshotQueryRow<TAggregate>>();
 			entity.ToTable(_options.TableName, _options.SchemaName);
 			entity.HasKey(static x => x.Id);
@@ -632,6 +645,7 @@ sealed partial class SqlServerClient
 					if (!ShouldInspectType(elementType))
 						throw CreateUnsupportedShapeException(type, property);
 
+					EnsureValueTypeMemberIsWritable(type, property);
 					ValidateAggregatePayloadShapeRecursive(elementType, visited);
 				}
 
@@ -649,6 +663,7 @@ sealed partial class SqlServerClient
 
 			if (ShouldOwnType(propertyType))
 			{
+				EnsureValueTypeMemberIsWritable(type, property);
 				ValidateAggregatePayloadShapeRecursive(propertyType, visited);
 				continue;
 			}
@@ -661,10 +676,17 @@ sealed partial class SqlServerClient
 	static bool IsStructValueObjectType(Type type) =>
 		type.IsValueType && type.GetCustomAttribute<ValueObjectAttribute>() is not null;
 
+	// EF materializes value-type JSON members through their backing field, and it cannot rebuild an assignment to a
+	// read-only member while fixing up a value type, which fails snapshot query compilation with
+	// "Expression must be writeable" (analyzer diagnostic EVENTSTOREEF004).
+	static void EnsureValueTypeMemberIsWritable(Type type, PropertyInfo property)
+	{
+		if (type.IsValueType && property.GetSetMethod(nonPublic: true) is null)
+			throw CreateUnsupportedValueTypeMemberException(type, property);
+	}
+
 	static bool HasEfOpaqueAttribute(MemberInfo member) =>
-		member.CustomAttributes.Any(attribute =>
-			attribute.AttributeType.FullName == "Purview.EventSourcing.EntityFrameworkCore.EfOpaqueAttribute"
-		);
+		member.CustomAttributes.Any(attribute => attribute.AttributeType.FullName == EFOpaqueAttributeFullName);
 
 	static void MapOpaqueJsonProperty(ComplexPropertyBuilder builder, Type propertyType, string propertyName)
 	{
@@ -864,6 +886,15 @@ sealed partial class SqlServerClient
 		new(
 			$"{containingType.Name}.{member.Name} uses unsupported collection type '{collectionType.Name}'. "
 				+ "Collection and array members must use Purview.EventSourcing.EventStoreList<T> or Purview.EventSourcing.EventStoreSet<T>."
+		);
+
+	static InvalidOperationException CreateUnsupportedValueTypeMemberException(
+		Type containingType,
+		MemberInfo member
+	) =>
+		new(
+			$"{containingType.Name}.{member.Name} is a read-only complex member of value type '{containingType.Name}' and cannot be assigned during snapshot JSON materialization, which fails queries with 'Expression must be writeable'. "
+				+ "Add an 'init' or 'set' accessor, mark the member [JsonIgnore] to exclude it from the snapshot, or mark it [EFOpaque] to persist it as non-queryable JSON."
 		);
 
 	static void EnsureSupportedOrderByExpression(Expression queryExpression) =>
