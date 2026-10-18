@@ -1,8 +1,8 @@
-using System.Reflection;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.EntityFrameworkCore;
 using Purview.EventSourcing.Postgres.Client;
+using System.Reflection;
 
 namespace Purview.EventSourcing.Postgres.Snapshots;
 

@@ -1,4 +1,4 @@
-namespace Purview.EventSourcing.Admin.Abstractions.Models;
+namespace Purview.EventSourcing.Admin.Models;
 
 /// <summary>
 /// Represents a page of items returned by a paged query.

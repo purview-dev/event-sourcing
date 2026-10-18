@@ -1,6 +1,6 @@
 using System.Security.Claims;
-using Purview.EventSourcing.Admin.Abstractions.Models;
-using Purview.EventSourcing.Admin.Abstractions.Services;
+using Purview.EventSourcing.Admin.Models;
+using Purview.EventSourcing.Admin.Services;
 
 namespace Purview.EventSourcing.Samples.Web.Services;
 

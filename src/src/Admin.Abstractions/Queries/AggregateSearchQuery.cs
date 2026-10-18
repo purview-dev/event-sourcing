@@ -1,4 +1,4 @@
-namespace Purview.EventSourcing.Admin.Abstractions.Queries;
+namespace Purview.EventSourcing.Admin.Queries;
 
 /// <summary>
 /// Defines the criteria used to search for aggregates in the admin portal.

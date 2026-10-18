@@ -1,16 +1,16 @@
-using System.Linq.Expressions;
-using System.Reflection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
-using Purview.EventSourcing.Admin.Abstractions.Models;
-using Purview.EventSourcing.Admin.Abstractions.Services;
+using Purview.EventSourcing.Admin.Models;
+using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.Admin.Security;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Snapshotting;
 using Purview.EventSourcing.Services;
+using System.Linq.Expressions;
+using System.Reflection;
 
 namespace Purview.EventSourcing.Admin.API.Endpoints;
 

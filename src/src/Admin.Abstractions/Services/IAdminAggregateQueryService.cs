@@ -1,7 +1,7 @@
-using Purview.EventSourcing.Admin.Abstractions.Models;
-using Purview.EventSourcing.Admin.Abstractions.Queries;
+using Purview.EventSourcing.Admin.Models;
+using Purview.EventSourcing.Admin.Queries;
 
-namespace Purview.EventSourcing.Admin.Abstractions.Services;
+namespace Purview.EventSourcing.Admin.Services;
 
 /// <summary>
 /// Queries aggregates for the admin portal, providing search and detail retrieval.

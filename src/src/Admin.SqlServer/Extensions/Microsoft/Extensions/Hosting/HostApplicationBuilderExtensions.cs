@@ -1,5 +1,5 @@
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Purview.EventSourcing.Admin.Abstractions.Services;
+using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.Admin.SQLServer;
 
 namespace Microsoft.Extensions.Hosting;

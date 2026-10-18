@@ -55,7 +55,7 @@ public sealed class AggregateSourceGeneratorValueObjectTests : AggregateSourceGe
 			}
 			""";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var aggregate = await Assert.That(query).HasGeneratedClass(TypeRefs.Named("OrderAggregate", "Testing"));
@@ -122,7 +122,7 @@ public sealed class AggregateSourceGeneratorValueObjectTests : AggregateSourceGe
 			}
 			""";
 
-		var result = await GenerateAsync(
+		using var result = await GenerateAsync(
 			source,
 			EventSourcingGeneratorTestOptions.Default.Compile(),
 			cancellationToken
@@ -231,7 +231,7 @@ public sealed class AggregateSourceGeneratorValueObjectTests : AggregateSourceGe
 			}
 			""";
 
-		var result = await GenerateAsync(
+		using var result = await GenerateAsync(
 			source,
 			EventSourcingGeneratorTestOptions.Default.Compile(),
 			cancellationToken

@@ -2,7 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Purview.EventSourcing.Admin.Abstractions.Models;
+using Purview.EventSourcing.Admin.Models;
 using Purview.EventSourcing.Admin.API.Endpoints;
 
 namespace Microsoft.AspNetCore.Builder;

@@ -1,10 +1,10 @@
-using System.Linq.Expressions;
-using System.Reflection;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.EntityFrameworkCore;
 using Purview.EventSourcing.SqlServer.Client;
 using Purview.ValueObjects.Serialization;
+using System.Linq.Expressions;
+using System.Reflection;
 
 namespace Purview.EventSourcing.SqlServer.Snapshots;
 
@@ -101,7 +101,7 @@ public sealed class SqlServerSnapshotClientTests
 			.That(() => ValidateAggregatePayloadShape(typeof(ReadOnlyValueTypeMemberAggregate)))
 			.Throws<InvalidOperationException>();
 
-		await Assert.That(exception.Message).Contains(nameof(ReadOnlyStructHolder.Mirror));
+		await Assert.That(exception!.Message).Contains(nameof(ReadOnlyStructHolder.Mirror));
 		await Assert.That(exception.Message).Contains("writeable");
 	}
 
@@ -112,7 +112,7 @@ public sealed class SqlServerSnapshotClientTests
 			.That(() => ValidateAggregatePayloadShape(typeof(ReadOnlyValueTypeCollectionMemberAggregate)))
 			.Throws<InvalidOperationException>();
 
-		await Assert.That(exception.Message).Contains(nameof(ReadOnlyCollectionHolder.Items));
+		await Assert.That(exception!.Message).Contains(nameof(ReadOnlyCollectionHolder.Items));
 	}
 
 	[Test]

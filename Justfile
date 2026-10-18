@@ -14,6 +14,9 @@ artifacts_folder := "./artifacts"
 pipeline_feed := "https://api.nuget.org/v3/index.json"
 pipeline_tool := ".tools/purview-build/purview-build"
 
+# Vendored unreleased CSharpier that parses C# 15 unions. See .assets/csharpier/README.md.
+#csharpier := ".assets/csharpier/CSharpier.dll"
+
 current_version := `bun -p "require('./package.json').version"`
 
 [private]

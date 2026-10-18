@@ -1,9 +1,9 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Purview.EventSourcing.Admin.Abstractions.Models;
-using Purview.EventSourcing.Admin.Abstractions.Queries;
-using Purview.EventSourcing.Admin.Abstractions.Services;
+using Purview.EventSourcing.Admin.Models;
+using Purview.EventSourcing.Admin.Queries;
+using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.Admin.SQLServer.Internal;
 using Purview.EventSourcing.SqlServer.Events;
 using Purview.EventSourcing.SqlServer.Events.EntityFramework;

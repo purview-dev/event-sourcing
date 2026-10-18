@@ -1,8 +1,8 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Purview.EventSourcing.EntityFrameworkCore.SourceGenerator.Heleprs;
+using System.Collections.Immutable;
 
 namespace Purview.EventSourcing.EntityFrameworkCore.SourceGenerator;
 
@@ -298,12 +298,14 @@ public sealed class EFSnapshotShapeAnalyzer : DiagnosticAnalyzer
 			if (TypeHelpers.HasAttribute(elementType, TypeLibrary.ScalarAttribute))
 				return false;
 
+			// EF materializes collection elements through JSON conversion, so we only need to validate that the element type is constructible and not a system type.
 			return IsInspectableType(elementType);
 		}
 
 		if (ImplementsGenericEnumerable(memberType))
 			return false;
 
+		// EF materializes complex types through JSON conversion, so we only need to validate that the type is constructible and not a system type.
 		return memberType is INamedTypeSymbol named && IsInspectableType(named);
 	}
 

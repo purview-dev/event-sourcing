@@ -3,5 +3,5 @@
 // declaration must keep the generated namespace and type name.
 namespace Purview.EventSourcing.EntityFrameworkCore;
 
-[System.AttributeUsage(System.AttributeTargets.Property, Inherited = true, AllowMultiple = false)]
-public sealed class EFOpaqueAttribute : System.Attribute;
+[AttributeUsage(AttributeTargets.Property, Inherited = true, AllowMultiple = false)]
+public sealed class EFOpaqueAttribute : Attribute;

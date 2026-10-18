@@ -1,6 +1,6 @@
-using Purview.EventSourcing.Admin.Abstractions.Models;
+using Purview.EventSourcing.Admin.Models;
 
-namespace Purview.EventSourcing.Admin.Abstractions.Services;
+namespace Purview.EventSourcing.Admin.Services;
 
 /// <summary>
 /// Records privileged Admin portal operations. Applications may replace the default in-memory

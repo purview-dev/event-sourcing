@@ -1,6 +1,6 @@
-using Purview.EventSourcing.Admin.Abstractions.Models;
+using Purview.EventSourcing.Admin.Models;
 
-namespace Purview.EventSourcing.Admin.Abstractions.Services;
+namespace Purview.EventSourcing.Admin.Services;
 
 /// <summary>
 /// Projects aggregate state for the admin portal at a specific version or point in time.

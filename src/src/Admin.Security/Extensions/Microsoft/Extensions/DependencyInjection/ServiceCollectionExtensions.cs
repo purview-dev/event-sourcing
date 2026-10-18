@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Purview.EventSourcing.Admin.Abstractions.Services;
+using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.Admin.Security.Handlers;
 using Purview.EventSourcing.Admin.Security.Providers;
 

@@ -1,8 +1,9 @@
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
-using Purview.EventSourcing.Admin.Abstractions.Models;
-using Purview.EventSourcing.Admin.Abstractions.Queries;
-using Purview.EventSourcing.Admin.Abstractions.Services;
+using Purview.EventSourcing.Admin.Models;
+using Purview.EventSourcing.Admin.Queries;
+using Purview.EventSourcing.Admin.Services;
+
 
 // Exports the Admin API OpenAPI document to a file so it can be committed and used to generate a typed client
 // (for example with NSwag). Usage:

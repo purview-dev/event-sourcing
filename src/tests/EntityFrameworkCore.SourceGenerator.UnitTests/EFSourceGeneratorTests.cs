@@ -10,7 +10,7 @@ public sealed class EfSourceGeneratorTests
 	{
 		const string source = "namespace Testing { public sealed class Model { } }";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).HasNoDiagnostics();
 		await Assert.That(result).HasSymbol(TypeLibrary.EFOpaqueAttribute);
