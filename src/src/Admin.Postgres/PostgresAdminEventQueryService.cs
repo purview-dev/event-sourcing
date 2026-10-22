@@ -1,12 +1,12 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Purview.EventSourcing.Admin.Models;
+using Purview.EventSourcing.Admin.Postgres.Internal;
 using Purview.EventSourcing.Admin.Queries;
 using Purview.EventSourcing.Admin.Services;
-using Purview.EventSourcing.Admin.Postgres.Internal;
 using Purview.EventSourcing.Postgres.Events;
 using Purview.EventSourcing.Postgres.Events.EntityFramework;
+using System.Text.Json;
 
 namespace Purview.EventSourcing.Admin.Postgres;
 
@@ -97,12 +97,5 @@ public sealed class PostgresAdminEventQueryService(IOptions<PostgresEventStoreOp
 		return new EventStoreDbContext(builder.Options, table.SchemaName, table.TableName);
 	}
 
-	static JsonElement ParsePayload(string? payload)
-	{
-		if (string.IsNullOrWhiteSpace(payload))
-			return JsonDocument.Parse("null").RootElement.Clone();
-
-		using var document = JsonDocument.Parse(payload);
-		return document.RootElement.Clone();
-	}
+	static JsonElement ParsePayload(string? payload) => string.IsNullOrWhiteSpace(payload) ? JsonSerializer.SerializeToElement("null") : JsonSerializer.SerializeToElement(payload);
 }

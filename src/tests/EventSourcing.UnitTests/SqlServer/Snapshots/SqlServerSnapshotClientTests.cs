@@ -151,14 +151,18 @@ public sealed class SqlServerSnapshotClientTests
 
 	readonly struct ReadOnlyStructHolder
 	{
+#pragma warning disable IDE0051 // Remove unused private members
 		ReadOnlyStructHolder(ValueTypeMemberInfo mirror) => Mirror = mirror;
+#pragma warning restore IDE0051 // Remove unused private members
 
 		public ValueTypeMemberInfo Mirror { get; }
 	}
 
 	readonly struct ReadOnlyCollectionHolder
 	{
+#pragma warning disable IDE0051 // Remove unused private members
 		ReadOnlyCollectionHolder(EventStoreList<ValueTypeMemberInfo> items) => Items = items;
+#pragma warning restore IDE0051 // Remove unused private members
 
 		public EventStoreList<ValueTypeMemberInfo> Items { get; }
 	}

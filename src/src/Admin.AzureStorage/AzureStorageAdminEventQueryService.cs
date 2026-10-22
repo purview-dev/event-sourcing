@@ -125,7 +125,7 @@ public sealed class AzureStorageAdminEventQueryService(IOptions<AzureStorageEven
 	static JsonElement ParsePayload(string? payload)
 	{
 		if (string.IsNullOrWhiteSpace(payload))
-			return JsonDocument.Parse("null").RootElement.Clone();
+			return JsonSerializer.SerializeToElement("null");
 
 		using var document = JsonDocument.Parse(payload);
 		return document.RootElement.Clone();

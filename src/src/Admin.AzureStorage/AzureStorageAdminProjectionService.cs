@@ -1,11 +1,11 @@
-using System.Text.Json;
 using Azure;
 using Microsoft.Extensions.Options;
+using Purview.EventSourcing.Admin.AzureStorage.Internal;
 using Purview.EventSourcing.Admin.Models;
 using Purview.EventSourcing.Admin.Services;
-using Purview.EventSourcing.Admin.AzureStorage.Internal;
 using Purview.EventSourcing.AzureStorage;
 using Purview.EventSourcing.AzureStorage.Entities;
+using System.Text.Json;
 
 namespace Purview.EventSourcing.Admin.AzureStorage;
 
@@ -106,7 +106,7 @@ public sealed class AzureStorageAdminProjectionService(IOptions<AzureStorageEven
 			}
 		}
 
-		var finalState = JsonDocument.Parse(JsonSerializer.Serialize(projectedState)).RootElement.Clone();
+		var finalState = JsonSerializer.SerializeToElement(projectedState);
 		var projectedVersion = events.Max(x => x.Version);
 		var projectedAtUtc = events.OrderByDescending(x => x.Version).First().Event.Timestamp;
 

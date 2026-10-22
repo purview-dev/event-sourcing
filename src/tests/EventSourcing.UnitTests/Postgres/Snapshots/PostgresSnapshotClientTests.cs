@@ -48,7 +48,7 @@ public sealed class PostgresSnapshotClientTests
 			.That(() => ValidateAggregatePayloadShape(typeof(ReadOnlyValueTypeMemberAggregate)))
 			.Throws<InvalidOperationException>();
 
-		await Assert.That(exception.Message).Contains(nameof(ReadOnlyStructHolder.Mirror));
+		await Assert.That(exception!.Message).Contains(nameof(ReadOnlyStructHolder.Mirror));
 		await Assert.That(exception.Message).Contains("writeable");
 	}
 
@@ -78,7 +78,9 @@ public sealed class PostgresSnapshotClientTests
 
 	readonly struct ReadOnlyStructHolder
 	{
+#pragma warning disable IDE0051 // Remove unused private members
 		ReadOnlyStructHolder(ValueTypeMemberInfo mirror) => Mirror = mirror;
+#pragma warning restore IDE0051 // Remove unused private members
 
 		public ValueTypeMemberInfo Mirror { get; }
 	}

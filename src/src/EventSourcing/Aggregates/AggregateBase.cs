@@ -1,8 +1,8 @@
+using Purview.EventSourcing.Aggregates.Events;
+using Purview.EventSourcing.Aggregates.Exceptions;
 using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using Purview.EventSourcing.Aggregates.Events;
-using Purview.EventSourcing.Aggregates.Exceptions;
 
 namespace Purview.EventSourcing.Aggregates;
 
@@ -26,10 +26,10 @@ public abstract class AggregateBase : IAggregate
 	static readonly Lock ApplierBuildLock = new();
 
 	[ThreadStatic]
-	static Dictionary<Type, Action<IAggregate, object>>? s_applierBuildTarget;
+	static Dictionary<Type, Action<IAggregate, object>>? ApplierBuildTarget;
 
 	[ThreadStatic]
-	static bool s_dynamicDetected;
+	static bool DynamicDetected;
 
 	/// <summary>
 	/// The shared static applier map for this aggregate type, or <see langword="null"/> when the type
@@ -194,9 +194,9 @@ public abstract class AggregateBase : IAggregate
 	{
 		ArgumentNullException.ThrowIfNull(applier);
 
-		if (s_applierBuildTarget is not null)
+		if (ApplierBuildTarget is not null)
 		{
-			s_dynamicDetected = true;
+			DynamicDetected = true;
 			return;
 		}
 
@@ -213,9 +213,9 @@ public abstract class AggregateBase : IAggregate
 	{
 		var applier = GetGeneratedApplier(GetType(), typeof(TEvent));
 
-		if (s_applierBuildTarget is not null)
+		if (ApplierBuildTarget is not null)
 		{
-			s_applierBuildTarget[typeof(TEvent)] = applier;
+			ApplierBuildTarget[typeof(TEvent)] = applier;
 			return;
 		}
 
@@ -297,8 +297,8 @@ public abstract class AggregateBase : IAggregate
 			}
 
 			Dictionary<Type, Action<IAggregate, object>> candidate = new();
-			s_applierBuildTarget = candidate;
-			s_dynamicDetected = false;
+			ApplierBuildTarget = candidate;
+			DynamicDetected = false;
 
 			try
 			{
@@ -308,10 +308,10 @@ public abstract class AggregateBase : IAggregate
 			}
 			finally
 			{
-				s_applierBuildTarget = null;
+				ApplierBuildTarget = null;
 			}
 
-			if (s_dynamicDetected)
+			if (DynamicDetected)
 			{
 				DynamicTypes[aggregateType] = true;
 				map = null!;

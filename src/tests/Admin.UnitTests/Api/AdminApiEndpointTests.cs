@@ -1,8 +1,3 @@
-using System.Net;
-using System.Net.Http.Json;
-using System.Security.Claims;
-using System.Text.Encodings.Web;
-using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -17,6 +12,11 @@ using Microsoft.Extensions.Options;
 using Purview.EventSourcing.Admin.Models;
 using Purview.EventSourcing.Admin.Queries;
 using Purview.EventSourcing.Admin.Services;
+using System.Net;
+using System.Net.Http.Json;
+using System.Security.Claims;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 
 namespace Purview.EventSourcing.Admin.API;
 
@@ -569,7 +569,7 @@ sealed class RecordingEventQueryService : IAdminEventQueryService
 				null,
 				null
 			),
-			JsonDocument.Parse("""{"customerId":"customer-1"}""").RootElement.Clone()
+			JsonSerializer.SerializeToElement(/*lang=json,strict*/ """{"customerId":"customer-1"}""")
 		);
 		return Task.FromResult<PagedResult<EventEnvelopeResponse>?>(
 			new PagedResult<EventEnvelopeResponse>([envelope], query.Page, query.PageSize, 1)
@@ -579,9 +579,7 @@ sealed class RecordingEventQueryService : IAdminEventQueryService
 
 sealed class RecordingProjectionService : IAdminProjectionService
 {
-	static readonly JsonElement ProjectedState = JsonDocument
-		.Parse("""{"event_1":{"eventType":"OrderCreatedEvent","version":1}}""")
-		.RootElement.Clone();
+	static readonly JsonElement ProjectedState = JsonSerializer.SerializeToElement(/*lang=json,strict*/ """{"event_1":{"eventType":"OrderCreatedEvent","version":1}}""");
 
 	public Task<ProjectionResponse?> ProjectAtVersionAsync(
 		string aggregateType,

@@ -1,14 +1,14 @@
-using System.Net;
-using System.Net.Http.Json;
-using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Purview.EventSourcing.Admin.Models;
 using Purview.EventSourcing.Admin.Queries;
-using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.Admin.Security;
+using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Outbox;
 using Purview.EventSourcing.Services;
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace Purview.EventSourcing.Admin.API;
 
@@ -381,7 +381,7 @@ public sealed class AdminOperationalEndpointsTests
 							null,
 							null
 						),
-						JsonDocument.Parse("{}").RootElement.Clone()
+						JsonSerializer.SerializeToElement(/*lang=json,strict*/ """{}""")
 					)
 				);
 			}

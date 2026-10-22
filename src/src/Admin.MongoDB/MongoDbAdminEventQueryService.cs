@@ -1,9 +1,9 @@
-using System.Text.Json;
 using MongoDB.Driver;
 using Purview.EventSourcing.Admin.Models;
 using Purview.EventSourcing.Admin.Queries;
 using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.MongoDB.Events.Entities;
+using System.Text.Json;
 
 namespace Purview.EventSourcing.Admin.MongoDB;
 
@@ -101,12 +101,5 @@ public sealed class MongoDBAdminEventQueryService(IMongoClient mongoClient, stri
 		return new PagedResult<EventEnvelopeResponse>(envelopes, query.Page, pageSize, total);
 	}
 
-	static JsonElement ParsePayload(string? payload)
-	{
-		if (string.IsNullOrWhiteSpace(payload))
-			return JsonDocument.Parse("null").RootElement.Clone();
-
-		using var document = JsonDocument.Parse(payload);
-		return document.RootElement.Clone();
-	}
+	static JsonElement ParsePayload(string? payload) => string.IsNullOrWhiteSpace(payload) ? JsonSerializer.SerializeToElement("null") : JsonSerializer.SerializeToElement(payload);
 }

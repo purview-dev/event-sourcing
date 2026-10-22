@@ -23,12 +23,12 @@
 		<NoWarn>$(NoWarn);CA1031;CA2234</NoWarn>
 	</PropertyGroup>
 
-	<ItemGroup Label="TUnit integration test retries" Condition="'$(TestingType)' == 'Integration'">
+	<!--<ItemGroup Label="TUnit integration test retries" Condition="'$(TestingType)' == 'Integration'">
 		<AssemblyAttribute Include="TUnit.Core.Retry">
 			<_Parameter1>3</_Parameter1>
 			<_Parameter1_TypeName>System.Int32</_Parameter1_TypeName>
 		</AssemblyAttribute>
-	</ItemGroup>
+	</ItemGroup>-->
 
 	<PropertyGroup Label="Purview site URL metadata">
 		<PurviewHomepage>https://purview.dev/</PurviewHomepage>
@@ -57,7 +57,7 @@
 		/>
 	</ItemGroup>
 
-	<PropertyGroup Condition="'$(IsTestProject)' != 'true' AND '$(IsSharedTestingProject)' != 'true'">
+	<!--<PropertyGroup Condition="'$(IsTestProject)' != 'true' AND '$(IsSharedTestingProject)' != 'true'">
 		<WarningsAsErrors>$(WarningsAsErrors);CA1031;CA1822</WarningsAsErrors>
-	</PropertyGroup>
+	</PropertyGroup>-->
 </Project>

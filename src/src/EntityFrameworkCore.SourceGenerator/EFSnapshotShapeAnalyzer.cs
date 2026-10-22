@@ -214,7 +214,7 @@ public sealed class EFSnapshotShapeAnalyzer : DiagnosticAnalyzer
 	}
 
 	static IPropertySymbol[] GetMappedMembers(INamedTypeSymbol type) =>
-		type.GetMembers().OfType<IPropertySymbol>().Where(property => IsMappedMember(type, property)).ToArray();
+		[.. type.GetMembers().OfType<IPropertySymbol>().Where(property => IsMappedMember(type, property))];
 
 	static bool IsMappedMember(INamedTypeSymbol declaringType, IPropertySymbol property) =>
 		!property.IsStatic

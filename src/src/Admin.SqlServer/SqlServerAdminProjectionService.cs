@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Purview.EventSourcing.Admin.Models;
@@ -6,6 +5,7 @@ using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.Admin.SQLServer.Internal;
 using Purview.EventSourcing.SqlServer.Events;
 using Purview.EventSourcing.SqlServer.Events.EntityFramework;
+using System.Text.Json;
 
 namespace Purview.EventSourcing.Admin.SQLServer;
 
@@ -83,7 +83,7 @@ public sealed class SqlServerAdminProjectionService(IOptions<SqlServerEventStore
 				? $"Events projected up to available version {rowList.Last().Version} (target was {targetVersion})"
 				: $"Events projected up to version {targetVersion}";
 
-		var finalState = JsonDocument.Parse(JsonSerializer.Serialize(projectedState)).RootElement.Clone();
+		var finalState = JsonSerializer.SerializeToElement(projectedState);
 
 		return new ProjectionResponse(
 			aggregateType,
@@ -166,7 +166,7 @@ public sealed class SqlServerAdminProjectionService(IOptions<SqlServerEventStore
 				? $"Events projected up to available timestamp {latestTimestamp:O} (target was {targetUtc:O})"
 				: $"Events projected up to timestamp {targetUtc:O}";
 
-		var finalState = JsonDocument.Parse(JsonSerializer.Serialize(projectedState)).RootElement.Clone();
+		var finalState = JsonSerializer.SerializeToElement(projectedState);
 
 		return new ProjectionResponse(
 			aggregateType,

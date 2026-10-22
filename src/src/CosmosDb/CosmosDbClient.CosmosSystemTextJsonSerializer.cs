@@ -7,7 +7,7 @@ partial class CosmosDbClient
 {
 	public sealed class CosmosSystemTextJsonSerializer : CosmosSerializer
 	{
-		static readonly System.Text.Json.JsonSerializerOptions _jsonSerializerOptions =
+		static readonly System.Text.Json.JsonSerializerOptions JsonSerializerOptions =
 			EventStoreSerializationHelpers.CreateJsonSerializerOptions();
 
 		public override T FromStream<T>(Stream stream)
@@ -16,13 +16,13 @@ partial class CosmosDbClient
 				return (T)(object)stream;
 
 			using (stream)
-				return System.Text.Json.JsonSerializer.Deserialize<T>(stream, _jsonSerializerOptions)!;
+				return System.Text.Json.JsonSerializer.Deserialize<T>(stream, JsonSerializerOptions)!;
 		}
 
 		public override Stream ToStream<T>(T input)
 		{
 			MemoryStream streamPayload = new();
-			System.Text.Json.JsonSerializer.Serialize(streamPayload, input, _jsonSerializerOptions);
+			System.Text.Json.JsonSerializer.Serialize(streamPayload, input, JsonSerializerOptions);
 
 			streamPayload.Position = 0;
 			return streamPayload;

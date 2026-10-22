@@ -9,8 +9,8 @@ public sealed partial class AggregateSourceGenerator : IIncrementalGenerator
 			.RegisterEmbeddedAttribute<AggregateSourceGenerator>()
 			.RegisterPostInitializationOutput(ctx =>
 			{
-				foreach (var (HintName, Source) in AggregateAttributeEmitter.Emit())
-					ctx.AddSource(HintName, Source);
+				foreach (var (hintName, source) in AggregateAttributeEmitter.Emit())
+					ctx.AddSource(hintName, source);
 			});
 
 		var generationContext = SourceGenLibrary.GetGenerationContext(context);
@@ -20,7 +20,7 @@ public sealed partial class AggregateSourceGenerator : IIncrementalGenerator
 #pragma warning disable RSEXPERIMENTAL007 // Pre-compilation source output is intentionally used to stabilize the incremental cache.
 		context.RegisterPreCompilationSourceOutput(
 			PreCompilationMarker.Provider(context),
-			static (spc, source) => spc.AddSource(PreCompilationMarker.HintName, source)
+			static (spc, _) => spc.AddSource(PreCompilationMarker.HintName, PreCompilationMarker.Source)
 		);
 #pragma warning restore RSEXPERIMENTAL007
 

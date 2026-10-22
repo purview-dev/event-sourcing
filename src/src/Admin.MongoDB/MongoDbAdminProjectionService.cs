@@ -1,8 +1,8 @@
-using System.Text.Json;
 using MongoDB.Driver;
 using Purview.EventSourcing.Admin.Models;
 using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.MongoDB.Events.Entities;
+using System.Text.Json;
 
 namespace Purview.EventSourcing.Admin.MongoDB;
 
@@ -83,8 +83,7 @@ public sealed class MongoDBAdminProjectionService(IMongoClient mongoClient, stri
 				? $"Events projected up to available version {lastEvent.Version} (target was {targetVersion})"
 				: $"Events projected up to version {targetVersion}";
 
-		var finalState = JsonDocument.Parse(JsonSerializer.Serialize(projectedState)).RootElement.Clone();
-
+		var finalState = JsonSerializer.SerializeToElement(projectedState);
 		return new ProjectionResponse(
 			aggregateType,
 			aggregateId,
@@ -165,7 +164,7 @@ public sealed class MongoDBAdminProjectionService(IMongoClient mongoClient, stri
 				? $"Events projected up to available timestamp {lastEvent.Timestamp:O} (target was {targetUtc:O})"
 				: $"Events projected up to timestamp {targetUtc:O}";
 
-		var finalState = JsonDocument.Parse(JsonSerializer.Serialize(projectedState)).RootElement.Clone();
+		var finalState = JsonSerializer.SerializeToElement(projectedState);
 
 		return new ProjectionResponse(
 			aggregateType,

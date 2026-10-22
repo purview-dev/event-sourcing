@@ -1,8 +1,3 @@
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Net;
-using System.Security.Claims;
-using System.Text;
 using Azure;
 using Microsoft.Extensions.Options;
 using Purview.EventSourcing.Aggregates;
@@ -16,6 +11,11 @@ using Purview.EventSourcing.Serialization;
 using Purview.EventSourcing.Services;
 using Purview.EventSourcing.Storage;
 using Purview.EventSourcing.Validation;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Net;
+using System.Security.Claims;
+using System.Text;
 
 namespace Purview.EventSourcing.AzureStorage;
 
@@ -51,17 +51,17 @@ sealed class TableSaveOperation<T>(
 		params EventRecord[] additionalEvents
 	)
 	{
-		var (Terminal, Aggregate, OperationContext, IdempotencyId, ChangeEvents, IsNew, Marker) =
+		var (saveResult, preparedAggregate, preparedOperationContext, idempotencyId, changeEvents, isNew, marker) =
 			await PrepareSaveAsync(aggregate, operationContext, additionalEvents, cancellationToken);
 
-		return Terminal
+		return saveResult
 			?? await PersistAndNotifyAsync(
-				Aggregate,
-				OperationContext,
-				IdempotencyId,
-				ChangeEvents,
-				IsNew,
-				Marker!,
+				preparedAggregate,
+				preparedOperationContext,
+				idempotencyId,
+				changeEvents,
+				isNew,
+				marker!,
 				cancellationToken
 			);
 	}
