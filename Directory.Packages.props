@@ -1,10 +1,5 @@
 <Project>
-  <PropertyGroup>
-	<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-	<CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
-  </PropertyGroup>
   <ItemGroup Label="Transitive Pinning">
-	<PackageVersion Include="MessagePack" Version="2.5.307" />
 	<PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
   </ItemGroup>
 
@@ -12,18 +7,18 @@
 		<!-- Keep compiler-facing Roslyn packages aligned with the minimum SDK pinned in global.json so analyser ProjectReferences load on build machines. -->
 		<RoslynCompilerVersion>5.9.0</RoslynCompilerVersion>
 		<RoslynAnalyzersVersion>5.9.0</RoslynAnalyzersVersion>
-		<TUnitVersion>1.75.0</TUnitVersion>
-		<PurviewSGFrameworkVersion>1.1.1</PurviewSGFrameworkVersion>
-		<PurviewValueObjectsVersion>1.1.0</PurviewValueObjectsVersion>
-		<PurviewZodSharpVersion>2.2.0</PurviewZodSharpVersion>
-		<PurviewTelemetryVersion>5.0.4</PurviewTelemetryVersion>
-		<PurviewAspireResourceKitVersion>1.0.1</PurviewAspireResourceKitVersion>
-		<PurviewAspireC4Version>13.5.3.11</PurviewAspireC4Version>
+		<TUnitVersion>1.76.0</TUnitVersion>
+		<PurviewSGFrameworkVersion>1.2.0</PurviewSGFrameworkVersion>
+		<PurviewValueObjectsVersion>1.2.0</PurviewValueObjectsVersion>
+		<PurviewZodSharpVersion>2.3.0</PurviewZodSharpVersion>
+		<PurviewTelemetryVersion>5.0.5</PurviewTelemetryVersion>
+		<PurviewAspireResourceKitVersion>1.0.2</PurviewAspireResourceKitVersion>
+		<PurviewAspireC4Version>13.6.0-preview.1</PurviewAspireC4Version>
 		<TestcontainersVersion>4.16.0</TestcontainersVersion>
 		<BenchmarkDotNetVersion>0.14.0</BenchmarkDotNetVersion>
 		<DotnetRuntimeVersion>10.0.13</DotnetRuntimeVersion>
-		<AspireVersion>13.6.1</AspireVersion>
-		<OTelVersion>1.20.0</OTelVersion>
+		<AspireVersion>13.6.3</AspireVersion>
+		<OTelVersion>1.20.1</OTelVersion>
 		<MSExtensionVersion>10.11.0</MSExtensionVersion>
 	</PropertyGroup>
 	<ItemGroup>

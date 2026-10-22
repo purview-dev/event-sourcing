@@ -3,8 +3,8 @@
 		"Solution": "src/EventSourcing.slnx",
 		"TestRoot": "src/tests",
 		"TestPatterns": "*Tests.csproj",
-		"TestProjects": "*UnitTests.csproj",
-		"TestFilter": "/*/*/*/*[Category=Unit]"
+		"TestProjects": "*Tests.csproj",
+		"TestFilter": "/*/*/*/*"
 	},
 	"PackValidation": {
 		"RequireSymbolPackage": true,

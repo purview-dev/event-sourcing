@@ -1,5 +1,5 @@
 {
-	"name": "purview-event-sourcing",
+	"name": "event-sourcing",
 	"version": "2.0.0-prerelease.39",
 	"license": "MIT",
 	"author": {
