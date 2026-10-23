@@ -12,7 +12,7 @@ public sealed class EFSourceGenerator : IIncrementalGenerator
 			.RegisterEmbeddedAttribute<EFSourceGenerator>()
 			.RegisterPostInitializationOutput(static output =>
 			{
-				foreach (var (hintName, source) in AttributeEmiiter.GetAttributeSources())
+				foreach (var (hintName, source) in AttributeEmitter.GetAttributeSources())
 					output.AddSource(hintName, source);
 			});
 	}

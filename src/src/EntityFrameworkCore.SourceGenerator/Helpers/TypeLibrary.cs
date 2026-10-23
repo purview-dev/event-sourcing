@@ -1,4 +1,4 @@
-namespace Purview.EventSourcing.EntityFrameworkCore.SourceGenerator.Heleprs;
+namespace Purview.EventSourcing.EntityFrameworkCore.SourceGenerator.Helpers;
 
 static class TypeLibrary
 {

@@ -1,9 +1,9 @@
 using Microsoft.CodeAnalysis.Text;
-using Purview.EventSourcing.EntityFrameworkCore.SourceGenerator.Heleprs;
+using Purview.EventSourcing.EntityFrameworkCore.SourceGenerator.Helpers;
 
 namespace Purview.EventSourcing.EntityFrameworkCore.SourceGenerator.Emitters;
 
-static class AttributeEmiiter
+static class AttributeEmitter
 {
 	public static IEnumerable<(string HintName, SourceText Source)> GetAttributeSources()
 	{

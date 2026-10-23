@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 
-namespace Purview.EventSourcing.EntityFrameworkCore.SourceGenerator.Heleprs;
+namespace Purview.EventSourcing.EntityFrameworkCore.SourceGenerator.Helpers;
 
 static class DiagnosticLibrary
 {

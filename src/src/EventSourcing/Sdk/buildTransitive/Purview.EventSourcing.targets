@@ -1,4 +1,10 @@
 <Project>
+	<!--
+		These are the properties the embedded aggregate source generator reads. The generator project
+		declares the same set in its own Sdk/buildTransitive/Purview.EventSourcing.SourceGenerator.targets
+		so the framework can validate it (PSGF0003); this copy is the one NuGet imports for
+		PackageReference consumers of Purview.EventSourcing. Keep both lists in step.
+	-->
 	<ItemGroup Label="Compiler Visible SDK Properties">
 		<CompilerVisibleProperty Include="DisableEventSourcingSourceGenerator">
 			<Description>Specifies whether to disable the Purview EventSourcing source generators.</Description>
