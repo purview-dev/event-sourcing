@@ -1,6 +1,7 @@
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.ChangeFeed;
 using Purview.EventSourcing.Failures;
+using Purview.EventSourcing.Tenancy;
 
 namespace Purview.EventSourcing.Contracts;
 
@@ -26,6 +27,26 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 	);
 
 	/// <summary>
+	/// Creates a store bound to a tenant scope, sharing storage with every other store created for the
+	/// same <paramref name="runId"/>.
+	/// </summary>
+	/// <param name="scope">The tenant the store runs under.</param>
+	/// <param name="runId">Identifies the storage the stores share.</param>
+	/// <remarks>
+	/// <para>
+	/// Abstract rather than virtual, so a provider cannot be added without stating how it is scoped. The
+	/// tenancy tests below are the reason: they were previously per-provider copies, and a provider that
+	/// simply never had one looked just as green as a provider that passed.
+	/// </para>
+	/// <para>
+	/// **Sharing storage is the whole point.** Two stores built with different run identifiers use
+	/// different tables, databases or containers, so "the other tenant cannot see it" passes while
+	/// proving nothing.
+	/// </para>
+	/// </remarks>
+	protected abstract IEventStoreCore<TAggregate> CreateTenantScopedEventStore(TenantScope scope, Guid runId);
+
+	/// <summary>
 	/// Rewrites the stored event-type names for a range of events so they can no longer be resolved.
 	/// Used by the unknown-event-type test to simulate schema/type evolution. Providers that cannot
 	/// rewrite stored event types should move that test to their own guard suite.
@@ -39,6 +60,88 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		CancellationToken cancellationToken
 	) => throw new NotSupportedException($"{GetType().Name} does not support marking stored event types as unknown.");
 #pragma warning restore CA1506
+
+	async Task<string> SeedForTenantAsync(Guid runId, string tenantId, CancellationToken cancellationToken)
+	{
+		var aggregateId = $"{Guid.NewGuid()}";
+		var store = CreateTenantScopedEventStore(TenantScope.For(tenantId), runId);
+
+		var aggregate = TestHelpers.Aggregate<TAggregate>(aggregateId: aggregateId);
+		aggregate.IncrementInt32Value();
+
+		var saved = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
+
+		await Assert.That(saved.IsSuccess).IsTrue();
+
+		return aggregateId;
+	}
+
+	[Test]
+	public async Task GetAsync_GivenAnotherTenantsAggregate_DoesNotReturnIt(CancellationToken cancellationToken)
+	{
+		var runId = Guid.NewGuid();
+		var aggregateId = await SeedForTenantAsync(runId, "acme", cancellationToken);
+
+		var owner = CreateTenantScopedEventStore(TenantScope.For("acme"), runId);
+		var other = CreateTenantScopedEventStore(TenantScope.For("globex"), runId);
+
+		await Assert.That((await owner.GetAsync(aggregateId, cancellationToken: cancellationToken)).IsSuccess).IsTrue();
+		await Assert.That((await other.GetAsync(aggregateId, cancellationToken: cancellationToken)).IsFailure).IsTrue();
+	}
+
+	[Test]
+	public async Task GetAsync_GivenSystemScope_ReadsAcrossTenants(CancellationToken cancellationToken)
+	{
+		var runId = Guid.NewGuid();
+		var aggregateId = await SeedForTenantAsync(runId, "acme", cancellationToken);
+
+		var system = CreateTenantScopedEventStore(TenantScope.System, runId);
+
+		await Assert
+			.That((await system.GetAsync(aggregateId, cancellationToken: cancellationToken)).IsSuccess)
+			.IsTrue();
+	}
+
+	// The distributed cache is read before the tenant-filtered storage lookup, so an unqualified cache
+	// key serves one tenant's aggregate to another ahead of every storage filter. Reading twice as the
+	// owner guarantees the entry is cached before the other tenant asks for it.
+	[Test]
+	public async Task GetAsync_GivenACachedAggregate_DoesNotServeItToAnotherTenant(CancellationToken cancellationToken)
+	{
+		var runId = Guid.NewGuid();
+		var aggregateId = await SeedForTenantAsync(runId, "acme", cancellationToken);
+
+		var owner = CreateTenantScopedEventStore(TenantScope.For("acme"), runId);
+		await owner.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		await Assert.That((await owner.GetAsync(aggregateId, cancellationToken: cancellationToken)).IsSuccess).IsTrue();
+
+		var other = CreateTenantScopedEventStore(TenantScope.For("globex"), runId);
+
+		await Assert.That((await other.GetAsync(aggregateId, cancellationToken: cancellationToken)).IsFailure).IsTrue();
+	}
+
+	// An unowned row - written tenant-less, or by a write path that missed the stamp - must not become
+	// visible to every tenant. Failing closed turns a stamping bug into absent data, not a leak.
+	[Test]
+	public async Task GetAsync_GivenAnUnownedAggregate_IsNotVisibleToATenant(CancellationToken cancellationToken)
+	{
+		var runId = Guid.NewGuid();
+		var aggregateId = $"{Guid.NewGuid()}";
+
+		var system = CreateTenantScopedEventStore(TenantScope.System, runId);
+		var aggregate = TestHelpers.Aggregate<TAggregate>(aggregateId: aggregateId);
+		aggregate.IncrementInt32Value();
+		await system.SaveAsync(aggregate, cancellationToken: cancellationToken);
+
+		var tenant = CreateTenantScopedEventStore(TenantScope.For("acme"), runId);
+
+		await Assert
+			.That((await tenant.GetAsync(aggregateId, cancellationToken: cancellationToken)).IsFailure)
+			.IsTrue();
+		await Assert
+			.That((await system.GetAsync(aggregateId, cancellationToken: cancellationToken)).IsSuccess)
+			.IsTrue();
+	}
 
 	[Test]
 	public async Task SaveAsync_GivenAggregateLoadedBeforeAnotherWriterSaved_ReturnsConcurrencyConflict(

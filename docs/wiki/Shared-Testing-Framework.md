@@ -67,6 +67,9 @@ public sealed class EventStoreContractTests<TAggregate>(SqlServerEventStoreFixtu
         fixture.CreateEventStore(aggregateChangeNotifier: notifier);
 
     protected override Task MarkEventTypesAsUnknownAsync(...) => /* provider-specific event rewrite */;
+
+    protected override IEventStoreCore<TAggregate> CreateTenantScopedEventStore(TenantScope scope, Guid runId) =>
+        fixture.CreateEventStore<TAggregate>(runId: runId, currentTenant: new EventStoreTenantScopeStub(scope));
 }
 ```
 
@@ -74,6 +77,52 @@ The shared base classes only exercise the public contracts (`IEventStoreCore<T>`
 `IQueryableEventStoreCore<T>`), observable state (save results, rehydrated aggregates, change-feed
 notifications, event ranges, query results) and shared aggregates (`PersistenceAggregate`,
 `ComplexTestType`). Provider internals are deliberately out of scope for the shared suites.
+
+## Tenant isolation is part of the contract
+
+The event-store contract suite owns the tenancy tests: one tenant cannot read another's aggregate,
+the owning tenant can, the system scope reads across all of them, a cached aggregate is not served
+across tenants, and an unowned aggregate is invisible to a tenant.
+
+The seam those tests use is **abstract**, not virtual:
+
+```csharp
+protected abstract IEventStoreCore<TAggregate> CreateTenantScopedEventStore(TenantScope scope, Guid runId);
+```
+
+A provider cannot be added without stating how it is scoped — there is no default that quietly opts
+out. `runId` is shared across the two scopes in a test on purpose: both stores must address the
+**same** physical storage, because sharing storage is what the isolation is protecting. A provider
+that returns an isolated store per scope will pass the tests while proving nothing.
+
+`EventStoreTenantScopeStub` (an `ICurrentTenant` fixed to one scope) is named to match the
+`Contracts\EventStore*.cs` link glob, so it travels with the contract suite.
+
+## Acceptance suite
+
+`src/tests/EventSourcing.AcceptanceTests` states the guarantees the framework makes as
+[BDTest](https://github.com/thomhurst/BDTest) scenarios, in domain language:
+
+```csharp
+await Given(() => Steps.AnAggregateExistsForTenant("acme", 5))
+    .And(() => Steps.TheTenantReadsTheAggregateTwice("acme"))
+    .When(() => Steps.TheTenantReadsTheAggregate("globex"))
+    .Then(() => Expect.TheAggregateIsReportedAsAbsent())
+    .WithScenarioText("A cached aggregate is not served to another tenant");
+```
+
+Steps live in `Steps/EventStoreSteps.cs` (actions) and `Steps/EventStoreAssertions.cs` (outcomes),
+each carrying `[StepText]` so a scenario reads as prose in the BDTest report. They are reusable: a
+new scenario is assembled from existing steps rather than written from scratch.
+
+The suite runs against the **in-memory** store, so a scenario describing a guarantee needs no
+container. That store enforces the same tenant isolation and returns the same result cases as the
+persistent providers. Behaviour that depends on real storage — query translation, crypto-shredding,
+transactions — belongs in the provider integration suites instead.
+
+The project's `AcceptanceTests` suffix gives it `PurviewTestType=AcceptanceTests` and the TUnit
+category `Acceptance`, so PR validation's `[Category=Unit]` filter excludes it. Run it with
+`just test '/*/*/*/*[Category=Acceptance]'`.
 
 ## Where each suite runs
 
@@ -91,8 +140,9 @@ notifications, event ranges, query results) and shared aggregates (`PersistenceA
    links in the existing provider test projects.
 2. Add an `EventStoreContractTests` (and/or `SnapshotStoreContractTests`) derived class wired to the
    provider fixture.
-3. Implement the provider-specific seams (`MarkEventTypesAsUnknownAsync` for the unknown-event test,
-   `SnapshotAsync` for the snapshot suite).
+3. Implement the provider-specific seams (`CreateTenantScopedEventStore` for the tenancy tests,
+   `MarkEventTypesAsUnknownAsync` for the unknown-event test, `SnapshotAsync` for the snapshot
+   suite). Only `CreateTenantScopedEventStore` is abstract; the compiler will ask for it.
 4. Add guard tests for capabilities that are not part of the shared contract.
 
 ## Adding a shared test

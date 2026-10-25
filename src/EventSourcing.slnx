@@ -55,6 +55,7 @@
 	<Folder Name="/tests/">
 		<Project Path="tests/Capabilities.UnitTests/Capabilities.UnitTests.csproj" />
 		<Project Path="tests/EntityFrameworkCore.SourceGenerator.UnitTests/EntityFrameworkCore.SourceGenerator.UnitTests.csproj" />
+		<Project Path="tests/EventSourcing.AcceptanceTests/EventSourcing.AcceptanceTests.csproj" />
 		<Project Path="tests/EventSourcing.UnitTests/EventSourcing.UnitTests.csproj" />
 		<Project Path="tests/SharedTestingFramework/SharedTestingFramework.csproj" />
 		<Project Path="tests/SourceGenerator.CodeFixes.UnitTests/SourceGenerator.CodeFixes.UnitTests.csproj" />
