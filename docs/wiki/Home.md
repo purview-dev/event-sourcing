@@ -11,6 +11,7 @@ This wiki is the project documentation hub for framework features, provider capa
 - [Provider Feature Matrix](Provider-Feature-Matrix.md)
 - [Provider Capabilities](Provider-Capabilities.md)
 - [Transactional Outbox](Transactional-Outbox.md)
+- [Subscriptions](Subscriptions.md)
 - [Transaction Guarantees](Transaction-Guarantees.md)
 - [Result and Failure Model](Result-And-Failure-Model.md)
 - [Event Contract Manifest](Event-Contract-Manifest.md)
@@ -27,14 +28,17 @@ This wiki is the project documentation hub for framework features, provider capa
 
 ## Proposals
 
-Designs under discussion. **Not implemented** — nothing described on these pages exists yet.
+Designs under discussion. Check each page's status banner before relying on it.
 
-- [Subscriptions and Retention](Subscriptions-And-Retention-Design.md)
+- [Subscriptions and Retention](Subscriptions-And-Retention-Design.md) — subscriptions shipped; the
+  retention half and the ordered live tail remain proposals
 
 ## Feature highlights
 
 - **Core framework (`Purview.EventSourcing`)**
   - `AggregateBase`, `IEventStore`, `IQueryableEventStore`, and `IEventStoreTransactionFactory`.
+  - [Subscriptions](Subscriptions.md): catch-up reads over the event stream, including events written
+    before the subscriber existed.
   - [Transaction guarantees](Transaction-Guarantees.md): atomic requirements, best-effort fallback, and failure
     behavior.
   - [Snapshot schema versioning](Snapshot-Schema-Versioning.md): compatibility detection and event-replay rebuilds.

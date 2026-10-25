@@ -20,7 +20,7 @@ namespace Purview.EventSourcing.InMemory.Events;
 /// <param name="aggregateIdFactory">Optional factory used to generate aggregate ids when none is supplied.</param>
 /// <param name="principalAccessor">Optional accessor supplying the principal recorded against saved events.</param>
 /// <param name="metrics">Optional metrics recorder; defaults to a no-op.</param>
-/// <param name="currentTenant">Optional tenant scope. This store does not enforce tenant isolation and refuses a tenant-scoped operation.</param>
+/// <param name="currentTenant">Optional tenant scope; defaults to the system scope. Reads fail closed, so an unowned stream is visible only to the system scope.</param>
 /// <remarks>
 /// Aggregates are held in memory and are identified by id in a case-insensitive manner. This store is
 /// intended for testing and single-process scenarios; data is not shared between instances or persisted
@@ -350,6 +350,12 @@ public partial class InMemoryEventStore<T>(
 
 		return matched.ToAsyncEnumerable();
 	}
+
+	///<inheritdoc/>
+	public IAsyncEnumerable<string> GetAggregateIdsAsync(CancellationToken cancellationToken = default) =>
+		// Filtered the same way every read is: an unowned stream is visible only to the system scope,
+		// so discovery cannot hand one tenant's aggregate ids to another.
+		_events.Keys.Where(IsVisible).ToArray().ToAsyncEnumerable();
 
 	///<inheritdoc/>
 	public async Task<Result<T, AggregateReadFailure>> GetOrCreateAsync(

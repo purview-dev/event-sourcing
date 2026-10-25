@@ -16,6 +16,9 @@ per-registration values.
 | Blob-backed snapshots / large payloads | No | No | No | Yes | No | No |
 | Provider-neutral transaction guarantee | Explicit `BestEffort` or required `Atomic` | Atomic within one database boundary | Atomic within one database boundary | Best effort | Best effort | Best effort |
 | Transactional outbox (atomic with events) | No | Yes (`AddSqlServerOutbox<THandler>`) | Yes (`AddPostgresOutbox<THandler>`) | No | No | No |
+| [Subscriptions](Subscriptions.md) (catch-up over the event stream) | Contracts + `AddEventSubscription` | Yes, via snapshot-store discovery | Yes, via snapshot-store discovery | Needs a supplied `IAggregateStreamDiscovery<T>` | Yes, via snapshot-store discovery | No (no event stream) |
+| Durable subscription checkpoints | In-memory only (replays after restart) | Not provided | Not provided | Not provided | Not provided | n/a |
+| Event-stream retention / pruning | No | No | No | No | No | n/a |
 | Provider-specific native transaction factory | No | `ISqlServerEventStoreTransactionFactory` | `IPostgresEventStoreTransactionFactory` | No | No | No |
 | Runtime-configured JSON payload indexes | No | Yes (event + snapshot stores, auto-create path) | Yes (GIN + expression indexes on event + snapshot stores) | No | No | Yes (container indexing policy, including composite and spatial paths) |
 | Snapshot query paging | n/a | Offset (integer continuation) | Offset (integer continuation) | n/a | Offset (integer continuation) | Native Cosmos DB continuation tokens |

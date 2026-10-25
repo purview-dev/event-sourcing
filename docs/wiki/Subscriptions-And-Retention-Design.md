@@ -1,12 +1,14 @@
 # Subscriptions and Retention — Design
 
-> **Status: proposal. Nothing on this page is implemented.**
+> **Status: subscriptions are implemented; retention is not.**
 >
-> No type, option or method described here exists in the framework today. This page is a design to
-> be agreed before any code is written; treat every signature as illustrative. When the work lands,
-> this page is replaced by documentation of what was actually built, and
-> [Provider Feature Matrix](Provider-Feature-Matrix.md) and
-> [Guarantees and Limitations](Guarantees-and-Limitations.md) are updated with it.
+> Part 1 shipped as catch-up subscriptions (Option A) — see [Subscriptions](Subscriptions.md) for
+> what actually exists, which is the authoritative reference. The shipped contracts differ in detail
+> from the sketches below; this page is kept for the *reasoning*, particularly the ordering analysis
+> and the options that were rejected.
+>
+> **Part 2, retention, remains a proposal.** No type, option or method in that section exists. The
+> ordered live tail described in Option D is not implemented either.
 
 ## What already exists, and what is missing
 

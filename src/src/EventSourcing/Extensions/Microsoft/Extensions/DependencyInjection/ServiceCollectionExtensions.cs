@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.Aggregates.Events.Upcasting;
 using Purview.EventSourcing.ChangeFeed;
@@ -8,6 +9,7 @@ using Purview.EventSourcing.EventStores.NullQueryable;
 using Purview.EventSourcing.Manifest;
 using Purview.EventSourcing.Outbox;
 using Purview.EventSourcing.Services;
+using Purview.EventSourcing.Subscriptions;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -81,6 +83,64 @@ public static class ServiceCollectionExtensions
 						&& options.PollInterval > TimeSpan.Zero
 						&& options.Retention >= TimeSpan.Zero,
 					"OutboxDispatchOptions is invalid."
+				);
+			return services;
+		}
+
+		/// <summary>
+		/// Registers a subscriber, its catch-up processor, and a hosted loop that drives it.
+		/// </summary>
+		/// <typeparam name = "TAggregate">The aggregate type to subscribe to.</typeparam>
+		/// <typeparam name = "TSubscriber">The <see cref = "IEventSubscriber{T}"/> implementation.</typeparam>
+		/// <param name = "configure">Optional <see cref = "SubscriptionOptions"/> configuration.</param>
+		/// <returns>The <paramref name = "services"/> for chaining.</returns>
+		/// <remarks>
+		/// <para>
+		/// Unlike the change feed and the outbox, a subscription reads the event stream itself, so it
+		/// delivers events written before the subscriber existed. Delivery is at-least-once and ordered
+		/// within an aggregate, so the subscriber must be idempotent.
+		/// </para>
+		/// <para>
+		/// Registers <see cref = "InMemorySubscriptionCheckpointStore"/> only if no
+		/// <see cref = "ISubscriptionCheckpointStore"/> is already registered. That default loses every
+		/// position on restart, which replays all streams; register a durable store in a deployed
+		/// application.
+		/// </para>
+		/// <para>
+		/// Stream discovery defaults to <see cref = "QueryableAggregateStreamDiscovery{T}"/>, which needs a
+		/// queryable snapshot store. Register an <see cref = "IAggregateStreamDiscovery{T}"/> before calling
+		/// this to use a provider-specific implementation instead.
+		/// </para>
+		/// </remarks>
+		public IServiceCollection AddEventSubscription<TAggregate, TSubscriber>(
+			Action<SubscriptionOptions>? configure = null
+		)
+			where TAggregate : class, IAggregate, new()
+			where TSubscriber : class, IEventSubscriber<TAggregate>
+		{
+			services.TryAddScoped<IEventSubscriber<TAggregate>, TSubscriber>();
+			services.TryAddSingleton<ISubscriptionCheckpointStore, InMemorySubscriptionCheckpointStore>();
+			// TryAdd compares service types exactly, so a closed-generic TryAdd would not see a
+			// provider's open-generic registration and would win by being registered last.
+			var hasDiscovery = services.Any(descriptor =>
+				descriptor.ServiceType == typeof(IAggregateStreamDiscovery<TAggregate>)
+				|| descriptor.ServiceType == typeof(IAggregateStreamDiscovery<>)
+			);
+			if (!hasDiscovery)
+			{
+				services.AddScoped<
+					IAggregateStreamDiscovery<TAggregate>,
+					QueryableAggregateStreamDiscovery<TAggregate>
+				>();
+			}
+			services.TryAddScoped<IEventSubscriptionProcessor<TAggregate>, EventSubscriptionProcessor<TAggregate>>();
+			services.AddHostedService<SubscriptionHostedService<TAggregate>>();
+			services
+				.AddOptions<SubscriptionOptions>()
+				.Configure(options => configure?.Invoke(options))
+				.Validate(
+					static options => options.PollInterval > TimeSpan.Zero && options.CheckpointInterval >= 1,
+					"SubscriptionOptions is invalid."
 				);
 			return services;
 		}

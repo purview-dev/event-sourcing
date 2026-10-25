@@ -6,6 +6,7 @@
 - [Provider Feature Matrix](Provider-Feature-Matrix.md)
 - [Provider Capabilities](Provider-Capabilities.md)
 - [Transactional Outbox](Transactional-Outbox.md)
+- [Subscriptions](Subscriptions.md)
 - [Transaction Guarantees](Transaction-Guarantees.md)
 - [Event Contract Manifest](Event-Contract-Manifest.md)
 - [Source Generator Performance](Source-Generator-Performance.md)

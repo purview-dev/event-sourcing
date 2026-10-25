@@ -22,4 +22,14 @@ public interface IInMemoryEventStore<T> : INonQueryableEventStore<T>, IAggregate
 	/// <param name="cancellationToken">A token that can be used to cancel the operation.</param>
 	/// <returns>A task that completes when the store has been cleared.</returns>
 	Task ClearAsync(CancellationToken cancellationToken = default);
+
+	/// <summary>
+	/// Enumerates the ids of the streams visible to the current tenant.
+	/// </summary>
+	/// <param name="cancellationToken">A token that can be used to cancel the operation.</param>
+	/// <remarks>
+	/// This store has no queryable snapshot reads, so it supplies its own stream discovery for
+	/// subscriptions rather than using the queryable default.
+	/// </remarks>
+	IAsyncEnumerable<string> GetAggregateIdsAsync(CancellationToken cancellationToken = default);
 }

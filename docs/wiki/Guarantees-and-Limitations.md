@@ -152,6 +152,35 @@ enabling tenancy, or read that data under `TenantScope.System`.
 - The filter is applied to the whole admin route group before any endpoint is mapped, so an endpoint added
   later cannot escape tenant scoping by omitting it.
 
+## Subscriptions
+
+A [subscription](Subscriptions.md) reads the event stream itself, so it delivers events written before
+the subscriber existed - the thing neither the change feed nor the outbox can do.
+
+Guaranteed: **at-least-once** delivery (the position is written after the subscriber returns, so a crash
+redelivers rather than skips), **version order within one aggregate**, and **tenant isolation** across
+discovery, the event read and the recorded position.
+
+Not guaranteed, and not configurable:
+
+- **No ordering between aggregates.** Streams are per-aggregate on every provider and there is no global
+  sequence. A projection that depends on the relative order of two different aggregates' events cannot be
+  built on a subscription.
+- **No dead-letter path.** A subscriber that throws stops that stream at the failing event and retries it
+  every cycle, indefinitely. This is fail-closed by choice: skipping would lose data silently. An
+  unresolvable event type is not a failure - it is delivered with `IsUnresolved` set and skipped past.
+- **No durable checkpoint store ships.** The default is in-memory and replays every stream after a
+  restart.
+- **Cosmos DB cannot be subscribed to** (no event stream), and **Azure Storage ships no stream discovery**
+  (no queryable snapshot store), so subscriptions need a supplied `IAggregateStreamDiscovery<T>` there.
+- Discovery over a queryable snapshot store finds only **snapshotted** aggregates.
+
+Subscriptions are deliberately absent from `EventStoreCapabilities`: whether one can run depends on the
+registered discovery implementation, which is dependency-injection state rather than a property of the
+store, so a capability flag could not report it truthfully.
+
+Event-stream **retention** is not implemented. Streams grow without bound; nothing removes an event.
+
 ## Metrics
 
 Every storage provider records the same instruments on the `Purview.EventSourcing` meter, so a dashboard
