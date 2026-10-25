@@ -24,6 +24,14 @@ This fallback is safe because it never mutates the event stream and never treats
 version bump may temporarily increase replay work, so deploy it before removing runtime types or converters needed by
 old snapshot payloads if a rolling deployment must support both application versions.
 
+## Cosmos DB document shape change
+
+The Cosmos DB snapshot store now maps documents with Entity Framework rather than serializing the aggregate with
+`System.Text.Json`. Documents written by an earlier version do not match the new model and are not read back. Because
+snapshots are replaceable, the migration is a re-snapshot: delete the container's documents (or the container) and let
+snapshot-eligible saves rewrite them, or rebuild them from the event stream through the Admin portal. No event data is
+affected.
+
 ## Administrative inspection and rebuild
 
 The Admin portal reports whether a snapshot is materialized for an aggregate

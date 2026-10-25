@@ -9,10 +9,38 @@ not. Individual topics link to their detailed pages; do not duplicate conflictin
   optimizations or read models.
 - Events within a stream are persisted in aggregate-version order. Writes to different aggregates
   never contend.
-- Providers detect conflicting writes (optimistic concurrency) and surface them as
-  `ConcurrencyException`/`IConcurrencyConflict`; see `ConcurrencyRetry` and `AggregateWriteLock`
-  for retry and in-process serialization. `EventStoreCapabilities.Concurrency` reports which
-  providers are optimistic versus last-writer-wins.
+- Providers detect conflicting writes (optimistic concurrency) and surface them as the
+  `ConcurrencyConflict` case on the operation's result; see `ConcurrencyRetry` and
+  `AggregateWriteLock` for retry and in-process serialization.
+  `EventStoreCapabilities.Concurrency` reports which providers are optimistic versus
+  last-writer-wins. This holds whichever row the conflict is detected on - a stream-version
+  check or a duplicate event row for an already-persisted version are the same outcome, and a
+  shared contract test asserts it against every event-store provider.
+- Inside a transaction the same failure arrives on `TransactionAggregateResult.Failure`.
+  `Error` carries only genuine exceptions, so a save that failed for a reason the caller can act
+  on is never reported as an unexplained `Saved == false`.
+
+## Expected failures are results; exceptions are exceptional
+
+See [Result and Failure Model](Result-And-Failure-Model.md) for the full vocabulary.
+
+- A failure a correct caller can anticipate and act on is a **result case**. A failure that means
+  the system, the configuration or the calling code is wrong stays an **exception**. Cancellation is
+  always `OperationCanceledException`.
+- `GetAsync`, `GetAtAsync`, `GetOrCreateAsync` and `GetDeletedAsync` return
+  `Result<T, AggregateReadFailure>`. None of them returns `null`, so "absent" and "deleted" are no
+  longer the same answer.
+- `SaveAsync`, `DeleteAsync` and `RestoreAsync` return `Result<SaveOutcome<T>, …>`. A success that
+  wrote nothing is still a success: `SaveOutcomeKind` distinguishes `Written`, `NoChanges` and
+  `AlreadyApplied` (an idempotency marker matched), which the old `bool` conflated with failure.
+- The failure cases are shared across every provider, so a caller handles `AggregateNotFound`,
+  `AggregateDeleted`, `AggregateLocked`, `ConcurrencyConflict` or `AggregateInvalid` without
+  referencing a provider assembly.
+- `CommitException` and the provider infrastructure exceptions still throw: storage refusing a write
+  is not an outcome a caller can act on.
+- `ExistsAsync` returns `AggregateExistence`, which was already a typed outcome. It carries `DoesExist`
+  and `IsDeleted` separately, because an aggregate that exists in a deleted state is not the same answer
+  as one that exists, and it has no conversion to `bool` that could flatten the two.
 
 ## Transaction guarantees and failure modes
 
@@ -39,6 +67,120 @@ Providers persist and expose event metadata where supported
 (`EventStoreCapabilities.PreservedMetadata`). The metadata fields are `SchemaVersion`,
 `CorrelationId`, `CausationId`, `UserId`, `IdempotencyId`, `AggregateVersion`, and `When`. A field
 that is not preserved by a provider is exposed as `null`/default.
+
+## Crypto-shredding
+
+Opt-in. An event implementing `IEventDataSubject` has its payload encrypted (AES-GCM-256) under a key
+belonging to that subject, held in `IEventCryptoKeyStore`. Erasing the key erases the subject's data
+everywhere it appears, without rewriting or deleting a single event, and without touching any other
+subject's data.
+
+- The ciphertext is stored as an envelope **in place of the plaintext payload**, so no provider needs a
+  schema change. A payload written before protection was configured is still readable.
+- The subject id is bound into the encryption as associated data, so ciphertext cannot be re-attributed
+  from one subject to another.
+- On replay, a payload whose key has been erased is surfaced as an unknown event: the aggregate version
+  still advances, the read succeeds, and the gap is reported through `AggregateBase.SkippedEvents`.
+  Replay never fails because somebody exercised their right to erasure.
+- Wired for the SQL Server, PostgreSQL, MongoDB and Azure Storage event stores, including the Azure blob
+  route used for oversized events.
+
+**Snapshots are disabled while payload protection is enabled.** A snapshot serializes aggregate state,
+which holds the same personal data in clear, and one snapshot can span many subjects - so it cannot be
+encrypted under any single subject's key. A snapshot surviving key erasure would make crypto-shredding
+untrue, so a store configured with an `IEventPayloadProtector` does not write snapshots at all. Replay
+from events stays correct; reads of long streams are slower. Existing snapshots written before protection
+was enabled are **not** retrospectively removed - delete them as part of enabling protection.
+
+The in-memory store holds live objects rather than serialized payloads, so there is nothing to encrypt
+and crypto-shredding does not apply to it.
+
+## Multi-tenancy
+
+Opt-in, and **currently enforced only by the SQL Server and PostgreSQL providers**.
+
+- `ICurrentTenant` supplies the `TenantScope` an operation runs under. The default registration reports
+  `TenantScope.System`, which applies no filter, so a single-tenant deployment is unaffected.
+- A multi-tenant host registers its own `ICurrentTenant` - typically resolving the tenant from a claim on
+  the current principal - before `AddEventSourcing()`.
+- `TenantScope.System` is a distinct state rather than a null tenant id, so a resolver that *fails* to
+  determine a tenant can never be mistaken for permission to read every tenant. Use it for infrastructure
+  work that deliberately crosses tenants; `AmbientCurrentTenant.BeginScope` changes scope temporarily,
+  which is how a super user selects a tenant.
+- Rows carry a `TenantId`, stamped on write, and reads are constrained by an Entity Framework global query
+  filter. The filter is the enforcement point: a read that forgets the tenant is the failure this exists to
+  prevent, so it is applied to the entity rather than to individual queries.
+Enforced by every event store - SQL Server, PostgreSQL, MongoDB, Azure Storage and in-memory - and by the
+SQL Server, PostgreSQL, MongoDB and Cosmos DB queryable snapshot stores. The mechanism differs by what the
+store can express, but the guarantee does not:
+
+| Store | Mechanism |
+| --- | --- |
+| SQL Server, PostgreSQL | `TenantId` column with an Entity Framework global query filter |
+| MongoDB | `TenantId` field composed into every read and delete filter |
+| Azure Storage | `TenantId` property, composed into the OData filter; point reads filtered on read-back |
+| Cosmos DB snapshots | `__tenantId` shadow property, applied after `WithPartitionKey` |
+| In-memory | Ownership tracked beside the data |
+
+**Azure Storage snapshots are blob-backed and are not tenant-filtered.** Everything else above is.
+
+### A tenant-less deployment
+
+Registering no `ICurrentTenant` leaves the scope as `TenantScope.System`: every filter short-circuits, no
+tenant predicate is applied, and writes record no owner. A single-tenant deployment therefore behaves
+exactly as it did before tenancy existed, and needs no configuration.
+
+**An unowned row is visible only to the system scope.** The filters deliberately do *not* treat a null
+`TenantId` as visible to every tenant. That choice matters more than it looks: if any write path ever
+fails to stamp the tenant, the row becomes invisible to its own tenant - an obvious, reported absence -
+rather than silently readable by all of them. Fail-closed turns a stamping bug into missing data instead
+of a cross-tenant leak.
+
+The consequence is that **enabling tenancy over data written while tenant-less hides that data from
+tenant-scoped reads**. The system scope still sees it. Backfill `TenantId` on existing rows as part of
+enabling tenancy, or read that data under `TenantScope.System`.
+
+### Admin portal
+
+- `AdminPortalOptions.EnforceTenantScope` (off by default) requires every admin request to resolve to a
+  single tenant. `IAdminTenantResolver` decides it from the caller's entitlements and the tenant named in
+  the `Purview-Tenant` header; the default implementation reads tenant claims.
+- An administrator entitled to one tenant is scoped to it. One entitled to several - a super user - must
+  name the tenant; naming none is refused with `400`, and naming an unentitled tenant with `403`. **There
+  is no fallback that serves every tenant**: the resolver returns a tenant identifier and nothing else, so
+  the system scope is unreachable from a signed-in session.
+- The filter is applied to the whole admin route group before any endpoint is mapped, so an endpoint added
+  later cannot escape tenant scoping by omitting it.
+
+## Metrics
+
+Every storage provider records the same instruments on the `Purview.EventSourcing` meter, so a dashboard
+built against one provider keeps working against another. Instrument and tag names are a compatibility
+contract.
+
+| Instrument | Kind | Tags |
+| --- | --- | --- |
+| `purview.eventsourcing.save.duration` | Histogram (ms) | `aggregate.type`, `outcome` |
+| `purview.eventsourcing.get.duration` | Histogram (ms) | `aggregate.type` |
+| `purview.eventsourcing.events.appended` | Counter | `aggregate.type` |
+
+`outcome` is `written`, `no-changes`, `already-applied`, or the failure case - `concurrency-conflict`,
+`locked`, `deleted`, `invalid`. Only a returned result is recorded; an exception escaping a save is an
+infrastructure fault, already reported through logging and the activity. `events.appended` counts only a
+real write, so an empty save or an idempotent replay records nothing rather than a zero.
+
+Recording requires the host to have configured metrics (`IMeterFactory`, registered by
+`AddMetrics()` and by default in ASP.NET Core). Without it the recorder is a no-op: metrics are never a
+precondition for persisting events.
+
+## Originating user
+
+`EventMetadata.UserId` is read from the claim named by `EventStoreOperationContext.ClaimIdentifier`, taken
+from the `IEventStorePrincipalAccessor` registered in dependency injection. The default accessor reads the
+ambient `ClaimsPrincipal.Current`, which ASP.NET Core never populates, so a web application must register
+its own; see [Getting Started](Getting-Started.md#record-who-made-the-change). With
+`RequiresValidPrincipalIdentifier` enabled and no identifier available, the save fails rather than
+recording an anonymous change.
 
 ## Schema evolution, manifests, and upcasters
 
@@ -83,8 +225,10 @@ facts for package selection.
   `GET /admin/api/aggregates/{aggregateType}/{aggregateId}/snapshot`, and the opt-in mutation
   `POST /admin/api/aggregates/{aggregateType}/{aggregateId}/snapshot/rebuild`) are opt-in,
   separately authorized, and audited through `IAdminAuditLogger` (default in-memory; replace with a
-  durable implementation in production). Health reflects whether the capability contract resolves;
-  it does not probe live storage. The manifest endpoint reports the runtime event-contract manifest
+  durable implementation in production). Health probes the configured storage through the provider's
+  `IAdminStorageProbe` and reports `Healthy`, `Unhealthy`, or `Unknown` when no probe is registered;
+  the probe failure is logged rather than returned, because a storage error can carry endpoint or
+  credential detail. The manifest endpoint reports the runtime event-contract manifest
   and its compatibility status against a supplied baseline. A snapshot rebuild reconstructs the
   aggregate from its canonical event stream and persists a fresh snapshot; it is idempotent and
   requires both an event-backed `IEventStore` and a registered `IQueryableEventStore`.
@@ -96,6 +240,11 @@ facts for package selection.
   provider-converted scalar value objects may not translate deep members through `.Value`; see the
   [Provider Feature Matrix](Provider-Feature-Matrix.md) and [SQL Server Guide](SQL-Server-Guide.md)
   for exact limits.
+- The Cosmos DB snapshot store shares that Entity Framework mapping, so the same member shapes are
+  supported and rejected. It differs in paging: continuation tokens are native Cosmos DB tokens -
+  opaque, forward-only, and `null` on the final page - and Cosmos DB reports no total count while
+  paging. Ordering by more than one member, or ordering alongside a range filter, needs a matching
+  composite index declared through `CosmosDbIndexOptions.CompositeIndices`.
 
 ## Unknown-event handling and recovery
 

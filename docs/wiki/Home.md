@@ -12,6 +12,7 @@ This wiki is the project documentation hub for framework features, provider capa
 - [Provider Capabilities](Provider-Capabilities.md)
 - [Transactional Outbox](Transactional-Outbox.md)
 - [Transaction Guarantees](Transaction-Guarantees.md)
+- [Result and Failure Model](Result-And-Failure-Model.md)
 - [Event Contract Manifest](Event-Contract-Manifest.md)
 - [Event Versioning Strategy](Event-Versioning-Strategy.md)
 - [Event Versioning Examples](Event-Versioning-Examples.md)

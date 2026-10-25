@@ -104,7 +104,23 @@ notifications, event ranges, query results) and shared aggregates (`PersistenceA
 
 ## Environment notes
 
-- Integration suites require Docker and the provider images (Testcontainers).
+- Integration suites start their containers through [Purview.Containers](https://www.nuget.org/packages/Purview.Containers),
+  which selects **WSL Containers** on a Windows host and **Docker** everywhere else. Either runtime
+  works; nothing in the fixtures names one. Pin a backend with `PURVIEW_CONTAINERS_BACKEND=wsl` or
+  `=docker` to fail loudly instead of falling back.
+- Under WSL Containers a session holds an exclusive lock on its image store, so run the integration
+  suites one module at a time: `just test '/*/*/*/*' --max-parallel-test-modules 1`.
+- Azure Storage, Cosmos DB, PostgreSQL and SQL Server use the matching service modules. MongoDB and
+  the Cosmos DB emulator have no module, so `MongoDBTestContainer` and `CosmosDbTestContainer` in
+  `SharedTestingFramework` build them from the generic `ContainerBuilder` — including the MongoDB
+  single-node replica set the event store's transactions need.
 - The Azure/Cosmos/Mongo snapshot fixtures rely on Azurite; the SQL fixtures on a SQL Server image.
+- **The Cosmos DB suite cannot pass against the `vnext` emulator.** That emulator's query engine does
+  not resolve the `root` alias Entity Framework emits (`SELECT VALUE c FROM root c`) and answers every
+  query with `400 SC2001 Identifier 'root' could not be resolved`, including the existence check the
+  snapshot write performs. The alias is not configurable in EF. The classic emulator image accepts it,
+  as the service itself does, but is heavy enough to be unreliable under a default WSL Containers
+  session. Until the vnext query engine supports the alias, validate the Cosmos provider against a
+  real Cosmos DB account.
 - The CI pipeline runs only the unit-test tree filter; integration suites are exercised locally or
   via an opt-in run.

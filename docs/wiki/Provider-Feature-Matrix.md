@@ -17,7 +17,9 @@ per-registration values.
 | Provider-neutral transaction guarantee | Explicit `BestEffort` or required `Atomic` | Atomic within one database boundary | Atomic within one database boundary | Best effort | Best effort | Best effort |
 | Transactional outbox (atomic with events) | No | Yes (`AddSqlServerOutbox<THandler>`) | Yes (`AddPostgresOutbox<THandler>`) | No | No | No |
 | Provider-specific native transaction factory | No | `ISqlServerEventStoreTransactionFactory` | `IPostgresEventStoreTransactionFactory` | No | No | No |
-| Runtime-configured JSON payload indexes | No | Yes (event + snapshot stores, auto-create path) | Yes (GIN + expression indexes on event + snapshot stores) | No | No | No |
+| Runtime-configured JSON payload indexes | No | Yes (event + snapshot stores, auto-create path) | Yes (GIN + expression indexes on event + snapshot stores) | No | No | Yes (container indexing policy, including composite and spatial paths) |
+| Snapshot query paging | n/a | Offset (integer continuation) | Offset (integer continuation) | n/a | Offset (integer continuation) | Native Cosmos DB continuation tokens |
+| Snapshot query mapping | n/a | Entity Framework | Entity Framework | n/a | MongoDB driver | Entity Framework |
 | DI registration helpers | `AddNullQueryableEventStore()` | `AddSqlServerEventStore()`, `AddSqlServerSnapshotQueryableEventStore()` | `AddPostgresEventStore()`, `AddPostgresSnapshotQueryableEventStore()` | `AddAzureStorageEventStore()` | `AddMongoDBEventStore()`, `AddMongoDBSnapshotQueryableEventStore()` | `AddCosmosDbSnapshotQueryableEventStore()` |
 
 ## Selection guidance
@@ -46,11 +48,14 @@ guaranteed per stream. The following capabilities are built in:
 - **Strategy-gated snapshots.** The SQL Server/PostgreSQL same-table snapshot honors `ISnapshotStrategy` (defaults to
   every save, preserving historical behavior) and per-operation overrides via `SetSnapshotStrategy`, so write
   amplification can be tuned.
-- **Concurrency retry + in-process serialization.** `ConcurrencyRetry.ExecuteAsync` retries conflicts (all provider
-  `ConcurrencyException` types implement `IConcurrencyConflict`) with exponential backoff; `AggregateWriteLock`
-  serializes read-modify-write work per stream within a process.
-- **Conflict recognition across providers.** MongoDB duplicate-key writes now surface as `ConcurrencyException` (not
-  `CommitException`), and the in-memory store throws on conflicting versions instead of silently dropping them.
+- **Concurrency retry + in-process serialization.** `ConcurrencyRetry.ExecuteAsync` retries conflicts with exponential
+  backoff — the result overload retries while the operation returns `ConcurrencyConflict`, and the exception overload
+  remains for operations that still throw; `AggregateWriteLock` serializes read-modify-write work per stream within a
+  process.
+- **Conflict recognition across providers.** Every provider reports a lost optimistic-concurrency check as the same
+  `ConcurrencyConflict` case, carrying the expected and actual stream versions. MongoDB duplicate-key writes report a
+  conflict rather than a commit failure, and the in-memory store reports conflicting versions instead of silently
+  dropping them.
 - **Partial-replay detection.** `AggregateBase.SkippedEvents` reports events skipped during replay so callers can detect
   a partially reconstructed aggregate in a mixed-version fleet. `SkippedEvents` is replay-transient metadata and is
   **not** persisted in SQL Server/PostgreSQL EF-backed snapshot payloads; snapshot reads reconstruct stored aggregate
@@ -65,8 +70,9 @@ guaranteed per stream. The following capabilities are built in:
 - **Hot-partition mitigation / sharding.** A stream is a single aggregate instance; a hot aggregate concentrates onto
   one partition in every provider. SQL Server per-aggregate-type table/schema overrides and provider-native partitioning
   are the available levers.
-- **Snapshot query listing paging is offset-based.** Queryable store `ListAsync`/`QueryAsync` continuation is an integer
-  skip; deep pages are O(n). Keyset conversion for arbitrary `orderBy` clauses is not implemented.
+- **Snapshot query listing paging is offset-based** for the SQL Server, PostgreSQL and MongoDB query stores. Queryable
+  store `ListAsync`/`QueryAsync` continuation is an integer skip; deep pages are O(n). Keyset conversion for arbitrary
+  `orderBy` clauses is not implemented. The Cosmos DB store is the exception: it pages with native continuation tokens.
 - **Event-stream aggregate listing is an unbounded scan.** `GetAggregateIdsAsync` streams ids in deterministic (ordered)
   form but does not support keyset resumption through the API.
 
@@ -80,6 +86,28 @@ indexes, and per-type schema overrides).
 - Applications may use the event store without any query snapshot store at all.
 - Applications may also pair one event-store provider with a different query-store provider when that better fits read
   requirements.
+
+### Cosmos DB query translation notes
+
+- The Cosmos DB snapshot store is Entity Framework-backed and shares the SQL Server/PostgreSQL snapshot mapping, so the
+  same member shapes are supported and the same shapes are rejected. The aggregate is mapped as the document root, so
+  predicates translate against the document itself.
+- Paging uses **Cosmos DB continuation tokens** rather than an offset, so deep pages cost the same as shallow ones.
+  Tokens are opaque, forward-only, and the token returned with the final page is `null`. `IncludeTotalCount` issues a
+  separate `COUNT` query.
+- Every query is scoped to the aggregate type's partition. Comparisons against `AggregateType` in a caller predicate are
+  folded to a constant, as they are for the SQL providers.
+- `ToLowerInvariant()`/`ToUpperInvariant()` are rewritten to `ToLower()`/`ToUpper()` so they translate to `LOWER`/
+  `UPPER`; `StringComparison` overloads of `Equals`, `Contains`, `StartsWith` and `EndsWith` translate natively.
+- Ordering by more than one member, or ordering alongside a range filter, requires a matching composite index — configure
+  it through `CosmosDbIndexOptions.CompositeIndices`.
+- Cosmos DB cannot report a total page or item count while paging, and does not support backwards paging.
+- Dictionary members and other read-only collection members are not part of the queryable snapshot shape; mark them
+  `[EFOpaque]` to persist them as converted JSON, or remodel them as complex entry collections to query their contents.
+- Writing a snapshot costs one additional request: Entity Framework has no Cosmos DB upsert, so the store establishes
+  whether the document exists before writing it.
+- Container creation and the indexing policy remain on the Azure Cosmos DB SDK, because Entity Framework does not emit a
+  container indexing policy.
 
 ### SQL Server query translation notes
 

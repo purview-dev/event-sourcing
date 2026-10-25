@@ -125,7 +125,7 @@ Validation checks:
 - Command errors fail before events are recorded.
 - Save-time validation covers whole-aggregate consistency.
 - Replay/hydration paths do not reject historical facts that were valid when written.
-- Validation failures are surfaced from `SaveResult<TAggregate>` where needed.
+- Validation failures are surfaced as the `AggregateInvalid` case where needed.
 
 ## Operation Semantics
 

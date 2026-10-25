@@ -95,14 +95,44 @@ public sealed class OrderService(IEventStore store)
 {
     public async Task PlaceOrderAsync(string orderId, string customerId, CancellationToken cancellationToken)
     {
-        var order = await store.GetAsync<OrderAggregate>(orderId, cancellationToken)
-            ?? await store.CreateAsync<OrderAggregate>(orderId, cancellationToken: cancellationToken);
+        var orderResult = await store.GetAsync<OrderAggregate>(orderId, cancellationToken);
+        var order = orderResult.IsSuccess
+            ? orderResult.Value
+            : await store.CreateAsync<OrderAggregate>(orderId, cancellationToken: cancellationToken);
 
         order.CreateOrder(customerId);
         await store.SaveAsync(order, cancellationToken);
     }
 }
 ```
+
+## Record who made the change
+
+A save records the originating user in `EventMetadata.UserId`, read from the claim named by
+`EventStoreOperationContext.ClaimIdentifier`. The principal comes from `IEventStorePrincipalAccessor`,
+resolved from dependency injection.
+
+The default implementation reads the ambient `ClaimsPrincipal.Current`. **In ASP.NET Core that is always
+`null`** - the framework populates neither `ClaimsPrincipal.Current` nor `Thread.CurrentPrincipal` from the
+request - so a web application must register an accessor backed by its own notion of the current user:
+
+```csharp
+sealed class HttpContextPrincipalAccessor(IHttpContextAccessor accessor) : IEventStorePrincipalAccessor
+{
+    public ClaimsPrincipal? GetPrincipal() => accessor.HttpContext?.User;
+}
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<IEventStorePrincipalAccessor, HttpContextPrincipalAccessor>();
+```
+
+Register it **before** `AddEventSourcing()`, or use `TryAddSingleton` semantics in mind: the framework
+registers its default with `TryAddSingleton`, so an earlier registration wins.
+
+`RequiresValidPrincipalIdentifier` (default `true`, and settable per provider or through
+`EventStoreOperationContext.RequiresValidPrincipalIdentifierDefault`) makes a save fail when no identifier
+is available. Leave it on for an authenticated application; turn it off for background work, seeding, or a
+sample with no authentication, where there is legitimately no user.
 
 ## Query aggregate event history (time/range filters)
 

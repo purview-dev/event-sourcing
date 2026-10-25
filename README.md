@@ -23,6 +23,7 @@ Purview Event Sourcing is a .NET event sourcing framework for building aggregate
 | `Purview.EventSourcing.AzureStorage` | Azure Table / Blob event store | [`src/src/AzureStorage/Sdk/README.md`](src/src/AzureStorage/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.AzureStorage.svg)](https://www.nuget.org/packages/Purview.EventSourcing.AzureStorage) |
 | `Purview.EventSourcing.MongoDB` | MongoDB event stream and queryable snapshot stores | [`src/src/MongoDB/Sdk/README.md`](src/src/MongoDB/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.MongoDB.svg)](https://www.nuget.org/packages/Purview.EventSourcing.MongoDB) |
 | `Purview.EventSourcing.CosmosDb` | Azure Cosmos DB queryable snapshot store | [`src/src/CosmosDb/Sdk/README.md`](src/src/CosmosDb/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.CosmosDb.svg)](https://www.nuget.org/packages/Purview.EventSourcing.CosmosDb) |
+| `Purview.EventSourcing.EntityFrameworkCore` | Shared Entity Framework Core mapping, conversion, and query translation. Brought in automatically by the SQL Server, PostgreSQL, and Cosmos DB packages; you do not install it directly | (see package source at `src/src/EntityFrameworkCore`) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.EntityFrameworkCore.svg)](https://www.nuget.org/packages/Purview.EventSourcing.EntityFrameworkCore) |
 | `Purview.EventSourcing.InMemory` | In-memory event/snapshot store implementation for local and test scenarios | (see package source at `src/src/InMemory`) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.InMemory.svg)](https://www.nuget.org/packages/Purview.EventSourcing.InMemory) |
 | `Purview.EventSourcing.Validation.FluentValidation` | `FluentValidation` adapter for aggregate save-time validation | (see package source at `src/src/Validation.FluentValidation`) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.Validation.FluentValidation.svg)](https://www.nuget.org/packages/Purview.EventSourcing.Validation.FluentValidation) |
 | `Purview.EventSourcing.Validation.ZodSharp` | `Purview.ZodSharp` adapter for aggregate save-time validation | (see package source at `src/src/Validation.ZodSharp`) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.Validation.ZodSharp.svg)](https://www.nuget.org/packages/Purview.EventSourcing.Validation.ZodSharp) |
@@ -102,8 +103,10 @@ public sealed class OrderService(IEventStore store)
 {
     public async Task PlaceOrderAsync(string orderId, string customerId, CancellationToken cancellationToken)
     {
-        var order = await store.GetAsync<OrderAggregate>(orderId, cancellationToken)
-            ?? await store.CreateAsync<OrderAggregate>(orderId, cancellationToken: cancellationToken);
+        var orderResult = await store.GetAsync<OrderAggregate>(orderId, cancellationToken);
+        var order = orderResult.IsSuccess
+            ? orderResult.Value
+            : await store.CreateAsync<OrderAggregate>(orderId, cancellationToken: cancellationToken);
 
         order.CreateOrder(customerId);
         order.AddLineItem("SKU-1", "Demo product", 1, 19.99m);

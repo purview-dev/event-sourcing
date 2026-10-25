@@ -70,7 +70,11 @@ public class OrderService(IEventStore store)
 {
     public async Task PlaceOrderAsync(string orderId, string customerId)
     {
-        var order = await store.GetOrCreateAsync<OrderAggregate>(orderId);
+        var result = await store.GetOrCreateAsync<OrderAggregate>(orderId);
+        if (result.IsFailure)
+            return;
+
+        var order = result.Value;
         order.CreateOrder(customerId, 0m);
         await store.SaveAsync(order);
     }
@@ -657,7 +661,8 @@ Generator Behaviors](Source-Generator-Behaviors.md).
 
 ## Behavior Notes and Caveats
 
-- `IsDeletedAsync` throws when the aggregate does not exist (it does not return `false` for missing aggregates).
+- Reads and writes return results rather than `null` or `bool`; see
+  [Result and Failure Model](Result-And-Failure-Model.md) for the cases each operation can report.
 - Event replay is tolerant by default: unknown or unappliable events are skipped, and stream version continues to
   advance.
 - Integration coverage includes replay compatibility scenarios for:

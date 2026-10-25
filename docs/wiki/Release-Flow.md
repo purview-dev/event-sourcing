@@ -56,6 +56,17 @@ The shared workflow:
 A release is therefore produced simply by bumping `package.json` (via changesets) and merging to `main`. Do not create
 release tags manually.
 
+## Release gates for 2.0.0
+
+The 2.0.0 GA release is gated on all of the following. A prerelease may ship without them; a stable release may not.
+
+| Gate | Why |
+| --- | --- |
+| **.NET 11 is GA, and every dependency is re-pinned to the stable line** | The repository builds against `11.0.0-rc.2.*` for the runtime, EF Core and SourceLink, and `11.0.0-rc.2` for the Npgsql EF provider. Shipping a stable package against release-candidate dependencies is not supportable. Re-pin `DotnetRuntimeVersion`, `Npgsql.EntityFrameworkCore.PostgreSQL`, `System.Security.Cryptography.Pkcs` and `Microsoft.SourceLink.GitHub`, then re-run the full build, unit and provider integration suites. |
+| **`LangVersion` is reviewed** | C# 15 union declarations are a preview language feature and back the result model. If unions have not stabilised by GA, the decision to ship on `LangVersion=preview` must be taken explicitly rather than inherited. |
+| **Every declared capability is behaviourally contract-tested** | `EventStoreCapabilities` is a promise to consumers; a capability that is advertised but unverified is a defect. |
+| **Provider integration suites pass in CI** | The unit filter never starts a container, so provider regressions are otherwise invisible. |
+
 ## Prerelease support
 
 Prerelease versions (any SemVer containing a hyphen, for example `2.0.0-prerelease.29`) release through the same
