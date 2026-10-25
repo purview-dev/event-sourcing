@@ -25,6 +25,12 @@ This wiki is the project documentation hub for framework features, provider capa
 - [Shared Testing Framework](Shared-Testing-Framework.md)
 - [Release Flow](Release-Flow.md)
 
+## Proposals
+
+Designs under discussion. **Not implemented** — nothing described on these pages exists yet.
+
+- [Subscriptions and Retention](Subscriptions-And-Retention-Design.md)
+
 ## Feature highlights
 
 - **Core framework (`Purview.EventSourcing`)**

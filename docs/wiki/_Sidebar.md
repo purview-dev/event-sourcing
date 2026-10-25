@@ -19,3 +19,4 @@
 - [Source Generator Code Fixes](Code-Fixes.md)
 - [SQL Server Guide](SQL-Server-Guide.md)
 - [Release Flow](Release-Flow.md)
+- _Proposal:_ [Subscriptions and Retention](Subscriptions-And-Retention-Design.md)
