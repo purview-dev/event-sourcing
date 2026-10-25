@@ -116,9 +116,14 @@ public static class HostApplicationBuilderExtensions
 									&& response.Content is not null
 								)
 								{
+									// IOpenApiMediaType exposes Schema read-only; the concrete media type is what
+									// carries the setter.
 									foreach (var content in response.Content.Values)
 									{
-										content.Schema = new OpenApiSchema
+										if (content is not OpenApiMediaType mediaType)
+											continue;
+
+										mediaType.Schema = new OpenApiSchema
 										{
 											Type = JsonSchemaType.String,
 											Format = "binary",

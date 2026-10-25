@@ -1,5 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<ItemGroup>
 		<ProjectReference Include="..\..\src\InMemory\InMemory.csproj" />
+		<!-- The EF snapshot mapping is shared by the SQL Server, Postgres and Cosmos DB providers; the
+		     providers reference it privately, so the tests need their own reference. -->
+		<ProjectReference Include="..\..\src\EntityFrameworkCore\EntityFrameworkCore.csproj" />
 	</ItemGroup>
 </Project>

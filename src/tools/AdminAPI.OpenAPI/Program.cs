@@ -1,9 +1,10 @@
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
+using Purview.EventSourcing.Admin.Failures;
 using Purview.EventSourcing.Admin.Models;
 using Purview.EventSourcing.Admin.Queries;
 using Purview.EventSourcing.Admin.Services;
-
+using Purview.Results;
 
 // Exports the Admin API OpenAPI document to a file so it can be committed and used to generate a typed client
 // (for example with NSwag). Usage:
@@ -94,7 +95,7 @@ sealed class StubAggregateQueryService : IAdminAggregateQueryService
 		CancellationToken cancellationToken
 	) => throw new NotSupportedException();
 
-	public Task<AggregateSummaryResponse?> GetAsync(
+	public Task<Result<AggregateSummaryResponse, AdminQueryFailure>> GetAsync(
 		string aggregateType,
 		string aggregateId,
 		CancellationToken cancellationToken
@@ -103,7 +104,7 @@ sealed class StubAggregateQueryService : IAdminAggregateQueryService
 
 sealed class StubEventQueryService : IAdminEventQueryService
 {
-	public Task<PagedResult<EventEnvelopeResponse>?> GetRangeAsync(
+	public Task<Result<PagedResult<EventEnvelopeResponse>, AdminQueryFailure>> GetRangeAsync(
 		string aggregateType,
 		string aggregateId,
 		EventRangeQuery query,
@@ -113,14 +114,14 @@ sealed class StubEventQueryService : IAdminEventQueryService
 
 sealed class StubProjectionService : IAdminProjectionService
 {
-	public Task<ProjectionResponse?> ProjectAtVersionAsync(
+	public Task<Result<ProjectionResponse, AdminQueryFailure>> ProjectAtVersionAsync(
 		string aggregateType,
 		string aggregateId,
 		long targetVersion,
 		CancellationToken cancellationToken
 	) => throw new NotSupportedException();
 
-	public Task<ProjectionResponse?> ProjectAtTimeAsync(
+	public Task<Result<ProjectionResponse, AdminQueryFailure>> ProjectAtTimeAsync(
 		string aggregateType,
 		string aggregateId,
 		DateTimeOffset targetUtc,

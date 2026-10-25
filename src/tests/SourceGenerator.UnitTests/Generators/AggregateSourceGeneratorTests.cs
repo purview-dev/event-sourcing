@@ -1,6 +1,6 @@
-using Microsoft.CodeAnalysis;
 using System.Reflection;
 using System.Text.Json;
+using Microsoft.CodeAnalysis;
 
 namespace Purview.EventSourcing.SourceGenerator.Generators;
 
@@ -346,7 +346,11 @@ namespace Testing
 }
 ";
 
-		using var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.ScalarComplexValueMayNotTranslateInSQLSnapshots);
 	}
 
@@ -1280,7 +1284,11 @@ namespace Testing
 ";
 
 		// Act
-		using var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result.Generated().HasRecord("NonPartialMethodEvent", "Testing.MixedEvents")).IsFalse();
 		await Assert.That(result).HasDiagnostic("EVENTSTORE007");
@@ -1576,7 +1584,11 @@ public partial class OrderAggregate : AggregateBase
 }
 ";
 
-		using var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.EventSchemaVersionMustBePositive);
 	}
@@ -1605,7 +1617,11 @@ namespace Testing
 }
 ";
 
-		using var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.DuplicateEventSchemaVersionOnAggregate);
 	}
@@ -1836,7 +1852,11 @@ public partial class NotARealAggregate : Testing.AggregateBase
 }
 ";
 
-		using var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic("EVENTSTORE002");
 	}
@@ -1862,7 +1882,11 @@ namespace Testing
 }
 ";
 
-		using var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic("EVENTSTORE003");
 	}
@@ -1884,7 +1908,11 @@ public partial class GenericAggregate<TValue> : AggregateBase
 }
 ";
 
-		using var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic("EVENTSTORE004");
 	}
@@ -1909,7 +1937,11 @@ namespace Testing
 }
 ";
 
-		using var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic("EVENTSTORE005");
 	}
@@ -1940,7 +1972,11 @@ namespace Testing
 }}
 ";
 
-		using var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic("EVENTSTORE011");
 	}
@@ -1965,7 +2001,11 @@ namespace Testing
 }
 ";
 
-		using var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic("EVENTSTORE008");
 	}
@@ -1990,7 +2030,11 @@ namespace Testing
 }
 ";
 
-		using var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic("EVENTSTORE008");
 	}
@@ -2019,7 +2063,11 @@ namespace Testing
 }
 ";
 
-		using var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.DuplicateGeneratedEventName);
 	}
@@ -2042,7 +2090,11 @@ namespace Testing
 }
 ";
 
-		using var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.EventParameterMustMapToWritableProperty);
 	}
@@ -2195,7 +2247,11 @@ namespace Testing
 }
 ";
 
-		using var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.EventParameterMustMapToWritableProperty);
 	}
@@ -2218,7 +2274,11 @@ namespace Testing
 }
 ";
 
-		using var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic("EVENTSTORE010");
 	}
@@ -3168,7 +3228,11 @@ namespace Testing
 }
 ";
 
-		using var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.EventNameOverrideShouldBePastTense);
 		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.UnableToInferEventName);
@@ -3258,7 +3322,11 @@ public partial class ItemAggregate : AggregateBase
 }}
 ";
 
-		using var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert
 			.That(result)

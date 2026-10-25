@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text.Json.Serialization;
 using MongoDB.Bson.Serialization.Attributes;
 using Purview.EventSourcing.MongoDB.StorageClient;
@@ -29,6 +29,11 @@ public sealed class IdempotencyMarkerEntity : IEntity
 	public int EntityType { get; set; } = EntityTypes.IdempotencyMarkerType;
 
 	/// <summary>
+	/// The tenant that owns the document; null in a single-tenant deployment.
+	/// </summary>
+	public string? TenantId { get; set; }
+
+	/// <summary>
 	/// The identifier of the aggregate the save operation targeted.
 	/// </summary>
 	public string AggregateId { get; set; } = default!;
@@ -41,7 +46,7 @@ public sealed class IdempotencyMarkerEntity : IEntity
 		"CA1819:Properties should not return arrays",
 		Justification = "This is a DTO."
 	)]
-	public int[] EventVersions { get; set; } = [];
+	public long[] EventVersions { get; set; } = [];
 
 	/// <summary>
 	/// The time the marker was persisted.

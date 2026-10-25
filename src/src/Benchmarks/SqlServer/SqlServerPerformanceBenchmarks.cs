@@ -2,6 +2,7 @@ using System.Reflection;
 using BenchmarkDotNet.Attributes;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
+using Purview.Containers.MsSql;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Persistence;
 using Purview.EventSourcing.Aggregates.Snapshotting;
@@ -12,7 +13,6 @@ using Purview.EventSourcing.Services;
 using Purview.EventSourcing.SqlServer.Events;
 using Purview.EventSourcing.SqlServer.Snapshot;
 using Purview.EventSourcing.SqlServer.Snapshots;
-using Testcontainers.MsSql;
 
 namespace Purview.EventSourcing.Benchmarks.SqlServer;
 
@@ -76,12 +76,14 @@ public class SqlServerPerformanceBenchmarks
 			var aggregate = _eventStore.CreateAsync(_seededIds[i]).GetAwaiter().GetResult();
 			PopulateAggregate(aggregate, i, _workload.EventsPerAggregate);
 			var result = _eventStore.SaveAsync(aggregate, operationContext: null).GetAwaiter().GetResult();
-			if (!result.Saved || !result.IsValid)
+			if (result.IsFailure)
 				throw new InvalidOperationException($"Seeding save failed for aggregate '{_seededIds[i]}'.");
 
-			var loadedAggregate =
-				_eventStore.GetAsync(_seededIds[i], operationContext: null).GetAwaiter().GetResult()
-				?? throw new InvalidOperationException($"Seeded aggregate '{_seededIds[i]}' was not found.");
+			var loadResult = _eventStore.GetAsync(_seededIds[i], operationContext: null).GetAwaiter().GetResult();
+			if (loadResult.IsFailure)
+				throw new InvalidOperationException($"Seeded aggregate '{_seededIds[i]}' was not found.");
+
+			var loadedAggregate = loadResult.Value;
 			ValidateAggregate(loadedAggregate, i, _workload.EventsPerAggregate);
 			loaded.Add(loadedAggregate);
 		}
@@ -173,7 +175,7 @@ public class SqlServerPerformanceBenchmarks
 		PopulateAggregate(aggregate, _saveCounter, _workload.EventsPerAggregate);
 
 		var result = await _eventStore.SaveAsync(aggregate, operationContext: null);
-		if (!result.Saved || !result.IsValid)
+		if (result.IsFailure)
 			throw new InvalidOperationException($"Save failed for aggregate '{aggregate.Id()}'.");
 	}
 
@@ -188,7 +190,7 @@ public class SqlServerPerformanceBenchmarks
 		operationContext.SetSnapshotStrategy(new IntervalSnapshotStrategy<PersistenceAggregate>(1000));
 
 		var result = await _eventStore.SaveAsync(aggregate, operationContext);
-		if (!result.Saved || !result.IsValid)
+		if (result.IsFailure)
 			throw new InvalidOperationException($"Save failed for aggregate '{aggregate.Id()}'.");
 	}
 
@@ -197,11 +199,11 @@ public class SqlServerPerformanceBenchmarks
 	public async Task EventStore_Get()
 	{
 		var index = _getIndex++ % _seededIds.Length;
-		var aggregate =
-			await _eventStore!.GetAsync(_seededIds[index], operationContext: null)
-			?? throw new InvalidOperationException($"Aggregate '{_seededIds[index]}' was not found.");
+		var result = await _eventStore!.GetAsync(_seededIds[index], operationContext: null);
+		if (result.IsFailure)
+			throw new InvalidOperationException($"Aggregate '{_seededIds[index]}' was not found.");
 
-		ValidateAggregate(aggregate, index, _workload.EventsPerAggregate);
+		ValidateAggregate(result.Value, index, _workload.EventsPerAggregate);
 	}
 
 	[Benchmark]
@@ -513,7 +515,7 @@ public class SqlServerPerformanceBenchmarks
 
 		public Task AfterSaveAsync(
 			TAggregate aggregate,
-			int previousSavedVersion,
+			long previousSavedVersion,
 			bool isNew,
 			EventRecord[] events,
 			CancellationToken cancellationToken = default
@@ -560,7 +562,8 @@ public class SqlServerPerformanceBenchmarks
 			where T : class => DispatchProxy.Create<T, NoOpDispatchProxy>();
 	}
 
-	sealed class NoOpDispatchProxy : DispatchProxy
+	// Not sealed: DispatchProxy.Create derives a type from this at runtime and rejects a sealed base.
+	class NoOpDispatchProxy : DispatchProxy
 	{
 		protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
 		{

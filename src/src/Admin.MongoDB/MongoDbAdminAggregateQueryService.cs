@@ -1,8 +1,10 @@
 using MongoDB.Driver;
+using Purview.EventSourcing.Admin.Failures;
 using Purview.EventSourcing.Admin.Models;
 using Purview.EventSourcing.Admin.Queries;
 using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.MongoDB.Events.Entities;
+using Purview.Results;
 
 namespace Purview.EventSourcing.Admin.MongoDB;
 
@@ -87,7 +89,7 @@ public sealed class MongoDBAdminAggregateQueryService(IMongoClient mongoClient, 
 	}
 
 	///<inheritdoc/>
-	public async Task<AggregateSummaryResponse?> GetAsync(
+	public async Task<Result<AggregateSummaryResponse, AdminQueryFailure>> GetAsync(
 		string aggregateType,
 		string aggregateId,
 		CancellationToken cancellationToken
@@ -108,7 +110,9 @@ public sealed class MongoDBAdminAggregateQueryService(IMongoClient mongoClient, 
 		var item = await collection.Find(filter).FirstOrDefaultAsync(cancellationToken);
 
 		return item == null
-			? null
+			? AdminQueryFailure.Failure<AggregateSummaryResponse>(
+				new AdminAggregateNotFound(aggregateType, aggregateId)
+			)
 			: new AggregateSummaryResponse(
 				aggregateType,
 				item.AggregateId,

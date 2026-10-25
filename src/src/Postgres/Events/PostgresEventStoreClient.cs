@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using Purview.EventSourcing.Postgres.Events.EntityFramework;
+using Purview.EventSourcing.Tenancy;
 
 namespace Purview.EventSourcing.Postgres.Events;
 
@@ -33,9 +34,12 @@ sealed partial class PostgresEventStoreClient
 	readonly PostgresEventStoreOptions _options;
 	readonly string _tableEnsureKey;
 
-	public PostgresEventStoreClient(PostgresEventStoreOptions options)
+	readonly ICurrentTenant _currentTenant;
+
+	public PostgresEventStoreClient(PostgresEventStoreOptions options, ICurrentTenant? currentTenant = null)
 	{
 		_options = options ?? throw new ArgumentNullException(nameof(options));
+		_currentTenant = currentTenant ?? new SystemCurrentTenant();
 		ValidateIdentifier(_options.SchemaName);
 		ValidateIdentifier(_options.TableName);
 		PostgresJsonIndexSchemaManager.ValidateOrThrow(
@@ -62,7 +66,7 @@ sealed partial class PostgresEventStoreClient
 		int entityType,
 		string aggregateId,
 		string aggregateType,
-		int version,
+		long version,
 		bool isDeleted,
 		string? payload,
 		string? eventType,
@@ -90,7 +94,7 @@ sealed partial class PostgresEventStoreClient
 		int entityType,
 		string aggregateId,
 		string aggregateType,
-		int version,
+		long version,
 		bool isDeleted,
 		string? payload,
 		string? eventType,
@@ -133,7 +137,7 @@ sealed partial class PostgresEventStoreClient
 		int entityType,
 		string aggregateId,
 		string aggregateType,
-		int version,
+		long version,
 		bool isDeleted,
 		string? payload,
 		string? eventType,
@@ -161,7 +165,7 @@ sealed partial class PostgresEventStoreClient
 		int entityType,
 		string aggregateId,
 		string aggregateType,
-		int version,
+		long version,
 		bool isDeleted,
 		string? payload,
 		string? eventType,
@@ -195,7 +199,7 @@ sealed partial class PostgresEventStoreClient
 		int entityType,
 		string aggregateId,
 		string aggregateType,
-		int version,
+		long version,
 		bool isDeleted,
 		string? payload,
 		string? eventType,
@@ -227,7 +231,7 @@ sealed partial class PostgresEventStoreClient
 		int entityType,
 		string aggregateId,
 		string aggregateType,
-		int version,
+		long version,
 		bool isDeleted,
 		string? payload,
 		string? eventType,
@@ -270,7 +274,7 @@ sealed partial class PostgresEventStoreClient
 		int entityType,
 		string aggregateId,
 		string aggregateType,
-		int version,
+		long version,
 		bool isDeleted,
 		string? payload,
 		string? eventType,
@@ -325,7 +329,7 @@ sealed partial class PostgresEventStoreClient
 		int entityType,
 		string aggregateId,
 		string aggregateType,
-		int version,
+		long version,
 		bool isDeleted,
 		string? payload,
 		string? eventType,
@@ -372,7 +376,7 @@ sealed partial class PostgresEventStoreClient
 		await context.SaveChangesAsync(cancellationToken);
 	}
 
-	static async Task UpsertSnapshotInBatchAsync(
+	async Task UpsertSnapshotInBatchAsync(
 		EventStoreDbContext context,
 		RowData snapshotRow,
 		bool snapshotIsNew,
@@ -496,8 +500,8 @@ sealed partial class PostgresEventStoreClient
 	public async IAsyncEnumerable<RowData> GetEventRangeAsync(
 		string aggregateId,
 		string aggregateType,
-		int versionFrom,
-		int versionTo,
+		long versionFrom,
+		long versionTo,
 		[System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default
 	)
 	{
@@ -665,7 +669,7 @@ sealed partial class PostgresEventStoreClient
 		DbContextOptionsBuilder<EventStoreDbContext> optionsBuilder = new();
 		var commandTimeout = Math.Max(1, _options.TimeoutInSeconds ?? 60);
 		optionsBuilder.UseNpgsql(_options.ConnectionString, sql => sql.CommandTimeout(commandTimeout));
-		return new(optionsBuilder.Options, _options.SchemaName, _options.TableName);
+		return new(optionsBuilder.Options, _options.SchemaName, _options.TableName, _currentTenant);
 	}
 
 	EventStoreDbContext CreateContext(NpgsqlConnection connection, NpgsqlTransaction? transaction)
@@ -673,19 +677,24 @@ sealed partial class PostgresEventStoreClient
 		DbContextOptionsBuilder<EventStoreDbContext> optionsBuilder = new();
 		var commandTimeout = Math.Max(1, _options.TimeoutInSeconds ?? 60);
 		optionsBuilder.UseNpgsql(connection, sql => sql.CommandTimeout(commandTimeout));
-		EventStoreDbContext context = new(optionsBuilder.Options, _options.SchemaName, _options.TableName);
+		EventStoreDbContext context = new(
+			optionsBuilder.Options,
+			_options.SchemaName,
+			_options.TableName,
+			_currentTenant
+		);
 		if (transaction is not null)
 			context.Database.UseTransaction(transaction);
 		return context;
 	}
 
-	static async Task UpsertCoreAsync(
+	async Task UpsertCoreAsync(
 		EventStoreDbContext context,
 		string id,
 		int entityType,
 		string aggregateId,
 		string aggregateType,
-		int version,
+		long version,
 		bool isDeleted,
 		string? payload,
 		string? eventType,
@@ -725,18 +734,19 @@ sealed partial class PostgresEventStoreClient
 			entity.EventType = eventType;
 			entity.IdempotencyId = idempotencyId;
 			entity.SchemaVersion = schemaVersion;
+			entity.TenantId = _currentTenant.Current.TenantId;
 			entity.Timestamp = timestamp;
 		}
 
 		await context.SaveChangesAsync(cancellationToken);
 	}
 
-	static EventStoreEntity CreateEntity(
+	EventStoreEntity CreateEntity(
 		string id,
 		int entityType,
 		string aggregateId,
 		string aggregateType,
-		int version,
+		long version,
 		bool isDeleted,
 		string? payload,
 		string? eventType,
@@ -756,10 +766,13 @@ sealed partial class PostgresEventStoreClient
 			EventType = eventType,
 			IdempotencyId = idempotencyId,
 			SchemaVersion = schemaVersion,
+			TenantId = _currentTenant.Current.TenantId,
 			Timestamp = timestamp,
 		};
 
-	static EventStoreEntity ToEntity(RowData row) =>
+	// Instance, not static: the tenant is stamped here rather than at each call site, so a new write
+	// path cannot forget it. The query filter would then hide the row from its own tenant.
+	EventStoreEntity ToEntity(RowData row) =>
 		new()
 		{
 			Id = row.Id,
@@ -775,6 +788,7 @@ sealed partial class PostgresEventStoreClient
 			CorrelationId = row.CorrelationId,
 			CausationId = row.CausationId,
 			UserId = row.UserId,
+			TenantId = _currentTenant.Current.TenantId,
 			Timestamp = row.Timestamp,
 		};
 
@@ -841,7 +855,7 @@ sealed partial class PostgresEventStoreClient
 		public int EntityType { get; init; }
 		public string AggregateId { get; init; } = default!;
 		public string AggregateType { get; init; } = default!;
-		public int Version { get; init; }
+		public long Version { get; init; }
 		public bool IsDeleted { get; init; }
 		public string? Payload { get; init; }
 		public string? EventType { get; init; }

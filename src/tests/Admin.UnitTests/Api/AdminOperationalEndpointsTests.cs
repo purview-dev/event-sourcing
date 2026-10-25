@@ -1,4 +1,7 @@
+using System.Net;
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
+using Purview.EventSourcing.Admin.Failures;
 using Purview.EventSourcing.Admin.Models;
 using Purview.EventSourcing.Admin.Queries;
 using Purview.EventSourcing.Admin.Security;
@@ -6,9 +9,7 @@ using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Outbox;
 using Purview.EventSourcing.Services;
-using System.Net;
-using System.Net.Http.Json;
-using System.Text.Json;
+using Purview.Results;
 
 namespace Purview.EventSourcing.Admin.API;
 
@@ -44,7 +45,7 @@ public sealed class AdminOperationalEndpointsTests
 	}
 
 	[Test]
-	public async Task Health_WhenFeatureEnabled_ReturnsReadinessSummary(CancellationToken cancellationToken)
+	public async Task Health_WhenNoStorageProbeRegistered_ReportsUnknown(CancellationToken cancellationToken)
 	{
 		await using var host = await AdminTestHost.CreateAsync(configureAdmin: static options =>
 			options.Features.ViewCapabilities = true
@@ -56,8 +57,55 @@ public sealed class AdminOperationalEndpointsTests
 		await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
 		var json = await response.Content.ReadFromJsonAsync<JsonDocument>(cancellationToken: cancellationToken);
 		var root = json!.RootElement;
-		await Assert.That(root.GetProperty("status").GetString()).IsEqualTo("Ready");
+		await Assert.That(root.GetProperty("status").GetString()).IsEqualTo("Unknown");
 		await Assert.That(root.GetProperty("supportsTransactionalOutbox").GetBoolean()).IsFalse();
+	}
+
+	sealed class StubStorageProbe(Func<bool> probe) : IAdminStorageProbe
+	{
+		public Task<bool> IsReachableAsync(CancellationToken cancellationToken) => Task.FromResult(probe());
+	}
+
+	static async Task<string?> GetHealthStatusAsync(Func<bool> probe, CancellationToken cancellationToken)
+	{
+		await using var host = await AdminTestHost.CreateAsync(
+			configureAdmin: static options => options.Features.ViewCapabilities = true,
+			configureServices: services => services.AddSingleton<IAdminStorageProbe>(new StubStorageProbe(probe))
+		);
+
+		var response = await host.Client.GetAsync("/admin/api/health", cancellationToken);
+		var json = await response.Content.ReadFromJsonAsync<JsonDocument>(cancellationToken: cancellationToken);
+
+		return json!.RootElement.GetProperty("status").GetString();
+	}
+
+	[Test]
+	public async Task Health_WhenStorageProbeSucceeds_ReportsHealthy(CancellationToken cancellationToken)
+	{
+		var status = await GetHealthStatusAsync(static () => true, cancellationToken);
+
+		await Assert.That(status).IsEqualTo("Healthy");
+	}
+
+	[Test]
+	public async Task Health_WhenStorageProbeReportsUnreachable_ReportsUnhealthy(CancellationToken cancellationToken)
+	{
+		var status = await GetHealthStatusAsync(static () => false, cancellationToken);
+
+		await Assert.That(status).IsEqualTo("Unhealthy");
+	}
+
+	// A probe that throws is the realistic failure: storage is down, so the driver raises rather than
+	// returning. The endpoint must still answer, and must answer Unhealthy.
+	[Test]
+	public async Task Health_WhenStorageProbeThrows_ReportsUnhealthy(CancellationToken cancellationToken)
+	{
+		var status = await GetHealthStatusAsync(
+			static () => throw new InvalidOperationException("storage unavailable"),
+			cancellationToken
+		);
+
+		await Assert.That(status).IsEqualTo("Unhealthy");
 	}
 
 	[Test]
@@ -350,7 +398,7 @@ public sealed class AdminOperationalEndpointsTests
 
 	sealed class PagingEventQueryService : IAdminEventQueryService
 	{
-		public Task<PagedResult<EventEnvelopeResponse>?> GetRangeAsync(
+		public Task<Result<PagedResult<EventEnvelopeResponse>, AdminQueryFailure>> GetRangeAsync(
 			string aggregateType,
 			string aggregateId,
 			EventRangeQuery query,
@@ -381,12 +429,14 @@ public sealed class AdminOperationalEndpointsTests
 							null,
 							null
 						),
-						JsonSerializer.SerializeToElement(/*lang=json,strict*/ """{}""")
+						JsonSerializer.SerializeToElement( /*lang=json,strict*/
+							"""{}"""
+						)
 					)
 				);
 			}
 
-			return Task.FromResult<PagedResult<EventEnvelopeResponse>?>(
+			return Task.FromResult<Result<PagedResult<EventEnvelopeResponse>, AdminQueryFailure>>(
 				new PagedResult<EventEnvelopeResponse>(items, page, pageSize, total)
 			);
 		}

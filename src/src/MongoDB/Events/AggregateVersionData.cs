@@ -1,4 +1,4 @@
-﻿using Purview.EventSourcing.Aggregates;
+using Purview.EventSourcing.Aggregates;
 
 namespace Purview.EventSourcing.MongoDB.Events;
 
@@ -8,7 +8,7 @@ namespace Purview.EventSourcing.MongoDB.Events;
 /// <param name="SavedVersion">The last version persisted to the event stream.</param>
 /// <param name="SnapshotVersion">The version captured by the most recent snapshot, or zero when none exists.</param>
 /// <param name="CurrentVersion">The current version of the aggregate.</param>
-public record struct AggregateVersionData(int SavedVersion, int SnapshotVersion, int CurrentVersion)
+public record struct AggregateVersionData(long SavedVersion, long SnapshotVersion, long CurrentVersion)
 {
 	/// <summary>
 	/// Creates an <see cref="AggregateVersionData"/> instance from the details of an <see cref="IAggregate"/>.

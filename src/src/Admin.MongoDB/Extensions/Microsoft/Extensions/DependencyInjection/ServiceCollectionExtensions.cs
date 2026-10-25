@@ -38,6 +38,12 @@ public static class ServiceCollectionExtensions
 				return new MongoDBAdminProjectionService(mongoClient, databaseName);
 			});
 
+			services.TryAddTransient<IAdminStorageProbe>(sp =>
+			{
+				var mongoClient = sp.GetRequiredService<IMongoClient>();
+				return new MongoDBAdminStorageProbe(mongoClient, databaseName);
+			});
+
 			return services;
 		}
 	}

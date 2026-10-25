@@ -1,11 +1,17 @@
+using Purview.EventSourcing.CosmosDb;
 using TUnit.Core.Interfaces;
 
 namespace Purview.EventSourcing.Fixtures.CosmosDb;
 
 public class CosmosDbSnapshotEventStoreFixture : IAsyncInitializer, IAsyncDisposable
 {
-	readonly Testcontainers.Azurite.AzuriteContainer _azuriteContainer;
-	readonly Testcontainers.CosmosDb.CosmosDbContainer _cosmosDbContainer;
+	readonly Containers.Azurite.AzuriteContainer _azuriteContainer;
+	readonly CosmosDbTestContainer _cosmosDbContainer;
+
+	// One set of overrides for the whole session: Entity Framework keys its internal service provider
+	// on the context options, and these form part of them, so a fresh instance per context would have
+	// EF build a provider per test.
+	readonly CosmosDbClientOverrides _cosmosDbClientOverrides;
 
 	public CosmosDbSnapshotEventStoreFixture()
 	{
@@ -13,14 +19,23 @@ public class CosmosDbSnapshotEventStoreFixture : IAsyncInitializer, IAsyncDispos
 
 		_azuriteContainer = ContainerHelper.CreateAzurite();
 		_cosmosDbContainer = ContainerHelper.CreateCosmosDB();
+
+		// The emulator is only reachable through a client that accepts its certificate, and only at the
+		// endpoint it advertises. The factory must hand out a new client each time: a Cosmos client
+		// configures the one it is given, and rejects one that has already issued a request.
+		_cosmosDbClientOverrides = new()
+		{
+			HttpClientFactory = CosmosDbTestContainer.CreateHttpClient,
+			LimitToEndpoint = true,
+		};
 	}
 
 	public CosmosDbSnapshotEventStoreContext CreateContext(int correlationIdsToGenerate = 1)
 	{
 		CosmosDbSnapshotEventStoreContext eventStoreContext = new(
 			_cosmosDbContainer.GetConnectionString(),
-			_cosmosDbContainer.HttpClient,
-			_azuriteContainer.GetConnectionString()
+			_cosmosDbClientOverrides,
+			_azuriteContainer.GetEmulatorConnectionString()
 		);
 
 		eventStoreContext.CreateCosmosDbEventStore(correlationIdsToGenerate: correlationIdsToGenerate);

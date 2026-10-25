@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
 using MongoDB.Driver;
+using Purview.EventSourcing.Admin.Failures;
 using Purview.EventSourcing.Admin.Models;
 using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.MongoDB.Events.Entities;
-using System.Text.Json;
+using Purview.Results;
 
 namespace Purview.EventSourcing.Admin.MongoDB;
 
@@ -23,7 +26,12 @@ public sealed class MongoDBAdminProjectionService(IMongoClient mongoClient, stri
 	readonly string _databaseName = databaseName ?? throw new ArgumentNullException(nameof(databaseName));
 
 	///<inheritdoc/>
-	public async Task<ProjectionResponse?> ProjectAtVersionAsync(
+	[SuppressMessage(
+		"Maintainability",
+		"CA1506:Avoid excessive class coupling",
+		Justification = "Projection replays a stream through the Mongo driver, the event mapper and the result model."
+	)]
+	public async Task<Result<ProjectionResponse, AdminQueryFailure>> ProjectAtVersionAsync(
 		string aggregateType,
 		string aggregateId,
 		long targetVersion,
@@ -49,7 +57,9 @@ public sealed class MongoDBAdminProjectionService(IMongoClient mongoClient, stri
 
 		if (events.Count == 0)
 		{
-			return null;
+			return AdminQueryFailure.Failure<ProjectionResponse>(
+				new AdminAggregateNotFound(aggregateType, aggregateId)
+			);
 		}
 
 		List<long> appliedVersions = [];
@@ -101,7 +111,7 @@ public sealed class MongoDBAdminProjectionService(IMongoClient mongoClient, stri
 	}
 
 	///<inheritdoc/>
-	public async Task<ProjectionResponse?> ProjectAtTimeAsync(
+	public async Task<Result<ProjectionResponse, AdminQueryFailure>> ProjectAtTimeAsync(
 		string aggregateType,
 		string aggregateId,
 		DateTimeOffset targetUtc,
@@ -125,7 +135,9 @@ public sealed class MongoDBAdminProjectionService(IMongoClient mongoClient, stri
 
 		if (events.Count == 0)
 		{
-			return null;
+			return AdminQueryFailure.Failure<ProjectionResponse>(
+				new AdminAggregateNotFound(aggregateType, aggregateId)
+			);
 		}
 
 		List<long> appliedVersions = [];

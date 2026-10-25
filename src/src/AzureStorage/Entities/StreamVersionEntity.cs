@@ -1,4 +1,4 @@
-﻿using Azure;
+using Azure;
 using Azure.Data.Tables;
 
 namespace Purview.EventSourcing.AzureStorage.Entities;
@@ -10,7 +10,7 @@ namespace Purview.EventSourcing.AzureStorage.Entities;
 /// Each aggregate has a single stream-version entity that records its most recently saved version, whether it
 /// has been deleted, and the aggregate type. It is used to check existence and enforce optimistic concurrency.
 /// </remarks>
-public sealed class StreamVersionEntity : ITableEntity
+public sealed class StreamVersionEntity : ITableEntity, IHasTenant
 {
 	/// <summary>
 	/// Gets or sets a value indicating whether the aggregate has been deleted.
@@ -25,7 +25,7 @@ public sealed class StreamVersionEntity : ITableEntity
 	/// <summary>
 	/// This is the most recently saved version of the aggregate.
 	/// </summary>
-	public int Version { get; set; }
+	public long Version { get; set; }
 
 	/// <summary>
 	/// Gets or sets the partition key of the entity, which is the aggregate id.
@@ -45,5 +45,10 @@ public sealed class StreamVersionEntity : ITableEntity
 	/// <summary>
 	/// Gets or sets the entity tag used for optimistic concurrency.
 	/// </summary>
+	/// <summary>
+	/// The tenant that owns the row; null in a single-tenant deployment.
+	/// </summary>
+	public string? TenantId { get; set; }
+
 	public ETag ETag { get; set; }
 }

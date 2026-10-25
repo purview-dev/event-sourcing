@@ -1,9 +1,11 @@
 using Microsoft.Extensions.Caching.Distributed;
+using Purview.Containers.MsSql;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.ChangeFeed;
+using Purview.EventSourcing.Cryptography;
 using Purview.EventSourcing.Services;
 using Purview.EventSourcing.SqlServer.Events;
-using Testcontainers.MsSql;
+using Purview.EventSourcing.Tenancy;
 using TUnit.Core.Interfaces;
 
 namespace Purview.EventSourcing.Fixtures.SqlServer;
@@ -31,10 +33,19 @@ public class SqlServerEventStoreFixture : IAsyncInitializer, IAsyncDisposable
 		IAggregateChangeFeedNotifier<TAggregate>? aggregateChangeNotifier = null,
 		bool removeFromCacheOnDelete = false,
 		Guid? runId = null,
-		Action<SqlServerEventStoreOptions>? configureOptions = null
+		Action<SqlServerEventStoreOptions>? configureOptions = null,
+		ICurrentTenant? currentTenant = null,
+		IEventPayloadProtector? payloadProtector = null
 	)
 		where TAggregate : class, IAggregate, new() =>
-		CreateEventStoreContext(aggregateChangeNotifier, removeFromCacheOnDelete, runId, configureOptions).EventStore;
+		CreateEventStoreContext(
+			aggregateChangeNotifier,
+			removeFromCacheOnDelete,
+			runId,
+			configureOptions,
+			currentTenant,
+			payloadProtector
+		).EventStore;
 
 	internal (
 		SqlServerEventStore<TAggregate> EventStore,
@@ -45,7 +56,9 @@ public class SqlServerEventStoreFixture : IAsyncInitializer, IAsyncDisposable
 		IAggregateChangeFeedNotifier<TAggregate>? aggregateChangeNotifier = null,
 		bool removeFromCacheOnDelete = false,
 		Guid? runId = null,
-		Action<SqlServerEventStoreOptions>? configureOptions = null
+		Action<SqlServerEventStoreOptions>? configureOptions = null,
+		ICurrentTenant? currentTenant = null,
+		IEventPayloadProtector? payloadProtector = null
 	)
 		where TAggregate : class, IAggregate, new()
 	{
@@ -70,7 +83,7 @@ public class SqlServerEventStoreFixture : IAsyncInitializer, IAsyncDisposable
 		};
 		configureOptions?.Invoke(options);
 
-		SqlServerEventStoreClient client = new(options);
+		SqlServerEventStoreClient client = new(options, currentTenant);
 		Client = client;
 
 		SqlServerEventStore<TAggregate> eventStore = new(
@@ -79,7 +92,9 @@ public class SqlServerEventStoreFixture : IAsyncInitializer, IAsyncDisposable
 			distributedCache: cache,
 			eventStoreTelemetry: telemetry,
 			aggregateChangeNotifier: aggregateChangeNotifier ?? IAggregateChangeFeedNotifier<TAggregate>.Mock(),
-			aggregateRequirementsManager: aggregateRequirementsManager
+			aggregateRequirementsManager: aggregateRequirementsManager,
+			currentTenant: currentTenant,
+			payloadProtector: payloadProtector
 		);
 
 		return (eventStore, client, cache, telemetry);

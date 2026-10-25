@@ -8,7 +8,9 @@ using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events.Upcasting;
 using Purview.EventSourcing.Aggregates.Snapshotting;
 using Purview.EventSourcing.AzureStorage.Entities;
+using Purview.EventSourcing.Cryptography;
 using Purview.EventSourcing.Services;
+using Purview.EventSourcing.Tenancy;
 using Purview.EventSourcing.Validation;
 
 namespace Purview.EventSourcing.AzureStorage;
@@ -47,8 +49,19 @@ public sealed partial class TableEventStore<T> : ITableEventStore<T>, IAsyncDisp
 	readonly ISnapshotStrategySelector? _snapshotStrategySelector;
 	readonly IEventUpcasterRegistry? _eventUpcasterRegistry;
 
+	readonly IEventStorePrincipalAccessor _principalAccessor;
+
+	readonly IEventStoreMetrics _metrics;
+
+	readonly ICurrentTenant _currentTenant;
+
+	readonly IEventPayloadProtector? _payloadProtector;
+
 	readonly string _aggregateTypeFullName;
 	readonly string _aggregateTypeShortName;
+
+	// Exposed so the save operation tags metrics with the same value every other provider uses.
+	internal string AggregateTypeShortName => _aggregateTypeShortName;
 	readonly TableSaveOperation<T> _saveOperation;
 
 	static readonly ConcurrentDictionary<string, Type> EventTypeCache = new(StringComparer.Ordinal);
@@ -68,6 +81,10 @@ public sealed partial class TableEventStore<T> : ITableEventStore<T>, IAsyncDisp
 	/// <param name="snapshotStrategy">Optional, the strategy that decides when a snapshot should be written.</param>
 	/// <param name="snapshotStrategySelector">Optional, the selector used to pick a snapshot strategy.</param>
 	/// <param name="eventUpcasterRegistry">Optional, the registry used to upcast persisted events during replay.</param>
+	/// <param name="principalAccessor">Optional accessor supplying the principal recorded against saved events.</param>
+	/// <param name="metrics">Optional metrics recorder; defaults to a no-op.</param>
+	/// <param name="currentTenant">Optional tenant scope. This provider does not enforce tenant isolation and refuses a tenant-scoped operation.</param>
+	/// <param name="payloadProtector">Optional payload protector; when omitted payloads are stored unencrypted.</param>
 	/// <exception cref="ArgumentNullException"><paramref name="azureStorageOptions"/> is <see langword="null"/>.</exception>
 	public TableEventStore(
 		IAggregateEventNameMapper eventNameMapper,
@@ -81,7 +98,11 @@ public sealed partial class TableEventStore<T> : ITableEventStore<T>, IAsyncDisp
 		IAggregateIdFactory? aggregateIdFactory = null,
 		ISnapshotStrategy<T>? snapshotStrategy = null,
 		ISnapshotStrategySelector? snapshotStrategySelector = null,
-		IEventUpcasterRegistry? eventUpcasterRegistry = null
+		IEventUpcasterRegistry? eventUpcasterRegistry = null,
+		IEventStorePrincipalAccessor? principalAccessor = null,
+		IEventStoreMetrics? metrics = null,
+		ICurrentTenant? currentTenant = null,
+		IEventPayloadProtector? payloadProtector = null
 	)
 	{
 		_eventNameMapper = eventNameMapper;
@@ -95,13 +116,17 @@ public sealed partial class TableEventStore<T> : ITableEventStore<T>, IAsyncDisp
 		_snapshotStrategy = snapshotStrategy ?? new IntervalSnapshotStrategy<T>();
 		_snapshotStrategySelector = snapshotStrategySelector;
 		_eventUpcasterRegistry = eventUpcasterRegistry;
+		_principalAccessor = principalAccessor ?? new AmbientEventStorePrincipalAccessor();
+		_metrics = metrics ?? NoOpEventStoreMetrics.Instance;
+		_currentTenant = currentTenant ?? new SystemCurrentTenant();
+		_payloadProtector = payloadProtector;
 
 		var name = typeof(T).Name;
 
 		TableName = nameBuilder?.GetTableName<T>() ?? $"{azureStorageOptions.Value.Table}{name}";
 		ContainerName = nameBuilder?.GetBlobContainerName<T>() ?? azureStorageOptions.Value.Container;
 
-		_tableClient = new(azureStorageOptions.Value, TableName);
+		_tableClient = new(azureStorageOptions.Value, TableName, _currentTenant);
 		_blobClient = new(azureStorageOptions.Value, ContainerName);
 
 		_aggregateTypeShortName = typeof(T).Name;
@@ -123,7 +148,10 @@ public sealed partial class TableEventStore<T> : ITableEventStore<T>, IAsyncDisp
 			_eventStoreTelemetry,
 			_aggregateTypeFullName,
 			_snapshotStrategy,
-			_snapshotStrategySelector
+			_snapshotStrategySelector,
+			_principalAccessor,
+			_metrics,
+			_payloadProtector
 		);
 	}
 
@@ -274,25 +302,10 @@ public sealed partial class TableEventStore<T> : ITableEventStore<T>, IAsyncDisp
 		});
 	}
 
-	static bool ReturnAggregate(bool isDeleted, string aggregateId, EventStoreOperationContext context)
-	{
-		if (isDeleted)
-		{
-#pragma warning disable IDE0010 // Add missing cases
-			switch (context.DeleteMode)
-			{
-				case DeleteHandlingMode.ThrowsException:
-					throw AggregateIsDeletedException(aggregateId);
-				case DeleteHandlingMode.ReturnsNull:
-					return false;
-			}
-#pragma warning restore IDE0010 // Add missing cases
-		}
+	static bool ReturnAggregate(bool isDeleted, EventStoreOperationContext context) =>
+		!isDeleted || context.DeleteMode == DeleteHandlingMode.ReturnsAggregate;
 
-		return true;
-	}
-
-	internal string CreateEventRowKey(int version) =>
+	internal string CreateEventRowKey(long version) =>
 		$"{_eventStoreOptions.Value.EventPrefix}_{$"{version}".PadLeft(_eventStoreOptions.Value.EventSuffixLength, '0')}";
 
 	internal static string CreateIdempotencyCheckRowKey(string idempotencyId) =>
@@ -344,7 +357,18 @@ public sealed partial class TableEventStore<T> : ITableEventStore<T>, IAsyncDisp
 	/// <seealso cref="GenerateSnapshotBlobPath"/>
 	/// <exception cref="ArgumentException"><paramref name="aggregateId"/> is null, empty, or white space.</exception>
 	public string CreateCacheKey(string aggregateId) =>
-		$"{_aggregateTypeShortName}:{aggregateId}{AggregateSnapshotSchema.GetStorageSuffix<T>()}".ToLowerInvariant();
+		$"{TenantCacheScope()}{_aggregateTypeShortName}:{aggregateId}{AggregateSnapshotSchema.GetStorageSuffix<T>()}".ToLowerInvariant();
+
+	/// <summary>
+	/// Namespaces a cache key by tenant.
+	/// </summary>
+	/// <remarks>
+	/// The distributed cache is read before the tenant-filtered storage lookup, so an unqualified key
+	/// would let one tenant read another's cached aggregate straight out of a shared cache, bypassing
+	/// every storage filter. The system scope keeps the unqualified key, matching unowned rows.
+	/// </remarks>
+	/// <returns>The tenant prefix, or an empty string under the system scope.</returns>
+	string TenantCacheScope() => _currentTenant.Current.IsSystem ? string.Empty : $"{_currentTenant.Current.TenantId}:";
 #pragma warning restore CA1308 // Normalize strings to uppercase
 
 	///<inheritdoc/>

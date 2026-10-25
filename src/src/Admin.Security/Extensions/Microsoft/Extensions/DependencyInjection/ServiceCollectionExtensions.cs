@@ -1,9 +1,9 @@
 using System.ComponentModel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.Admin.Security.Handlers;
 using Purview.EventSourcing.Admin.Security.Providers;
+using Purview.EventSourcing.Admin.Services;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -32,6 +32,9 @@ public static class ServiceCollectionExtensions
 
 			// Default in-memory audit logger; applications may replace it with a durable implementation.
 			services.TryAddSingleton<IAdminAuditLogger, InMemoryAdminAuditLogger>();
+
+			// TryAdd: a host entitling administrators differently registers its own resolver first.
+			services.TryAddSingleton<IAdminTenantResolver>(new ClaimsAdminTenantResolver());
 
 			return services;
 		}

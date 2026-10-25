@@ -36,7 +36,8 @@ sealed class IndexModel(
 			return RedirectToPage("/Customer/Index");
 
 		var ct = HttpContext.RequestAborted;
-		CurrentCustomer = await customerStore.GetAsync<CustomerAggregate>(customerId, ct);
+		var currentCustomerResult = await customerStore.GetAsync<CustomerAggregate>(customerId, ct);
+		CurrentCustomer = currentCustomerResult.IsSuccess ? currentCustomerResult.Value : null;
 
 		ContinuationRequest request = new() { MaxRecords = 500 };
 		var inventoryResult = await inventoryStore.ListAsync<InventoryAggregate>(

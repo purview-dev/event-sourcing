@@ -62,9 +62,17 @@ public sealed class AzureVariantStartupUsageTests(AppHostFixture fixture)
 
 		while (true)
 		{
-			var response = await client.GetAsync("/", timeoutCts.Token);
-			if (response.IsSuccessStatusCode)
-				return await response.Content.ReadAsStringAsync(timeoutCts.Token);
+			try
+			{
+				var response = await client.GetAsync("/", timeoutCts.Token);
+				if (response.IsSuccessStatusCode)
+					return await response.Content.ReadAsStringAsync(timeoutCts.Token);
+			}
+			catch (HttpRequestException) when (!timeoutCts.IsCancellationRequested)
+			{
+				// Connection refused: Kestrel has not bound the port yet. This is the case the retry
+				// exists for, and it arrives as an exception rather than a status code.
+			}
 
 			await Task.Delay(TimeSpan.FromMilliseconds(500), timeoutCts.Token);
 		}

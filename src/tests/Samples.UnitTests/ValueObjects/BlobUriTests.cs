@@ -1,4 +1,4 @@
-﻿namespace Purview.EventSourcing.Samples.ValueObjects;
+namespace Purview.EventSourcing.Samples.ValueObjects;
 
 public sealed class BlobUriTests
 {

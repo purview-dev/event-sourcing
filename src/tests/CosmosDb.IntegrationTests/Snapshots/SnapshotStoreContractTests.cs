@@ -8,7 +8,7 @@ namespace Purview.EventSourcing.CosmosDb.Snapshots;
 
 [GenerateGenericTest(typeof(PersistenceAggregate))]
 [ClassDataSource<CosmosDbSnapshotEventStoreFixture>(Shared = SharedType.PerTestSession)]
-[NotInParallel(nameof(CosmosDbClient))]
+[NotInParallel(CosmosDbTestConstraints.Container)]
 [InheritsTests]
 public sealed class SnapshotStoreContractTests<TAggregate>(CosmosDbSnapshotEventStoreFixture fixture)
 	: SnapshotStoreContractTestsBase<TAggregate>,

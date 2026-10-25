@@ -73,6 +73,8 @@ public sealed partial class PostgresOutboxStore(
 			{
 				await EnsureSchemaAsync(token);
 
+				// Without SKIP LOCKED a concurrent claim blocks on the same rows, then re-applies the
+				// outer UPDATE once the first commits - handing both dispatchers the same batch.
 				await using NpgsqlCommand command = new(
 					$"""
 					UPDATE {_schema}.{_table}
@@ -84,6 +86,7 @@ public sealed partial class PostgresOutboxStore(
 						  AND ("NextAttemptUtc" IS NULL OR "NextAttemptUtc" <= @now)
 						ORDER BY "CreatedUtc", "Id"
 						LIMIT @batch
+						FOR UPDATE SKIP LOCKED
 					)
 					RETURNING "Id", "AggregateType", "AggregateId", "EventType", "PayloadJson",
 						"IdempotencyKey", "CorrelationId", "CreatedUtc", "State", "AttemptCount",

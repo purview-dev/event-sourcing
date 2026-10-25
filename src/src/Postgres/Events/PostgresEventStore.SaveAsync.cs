@@ -2,15 +2,16 @@ using System.Data.Common;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
-using System.Security.Claims;
 using Npgsql;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.Aggregates.Snapshotting;
+using Purview.EventSourcing.Cryptography;
+using Purview.EventSourcing.Exceptions;
+using Purview.EventSourcing.Failures;
 using Purview.EventSourcing.Internal;
-using Purview.EventSourcing.Postgres.Events.Exceptions;
-using Purview.EventSourcing.Storage;
 using Purview.EventSourcing.Validation;
+using Purview.Results;
 
 namespace Purview.EventSourcing.Postgres.Events;
 
@@ -18,14 +19,19 @@ partial class PostgresEventStore<T>
 {
 	///<inheritdoc/>
 	[DebuggerStepThrough]
-	public async Task<SaveResult<T>> SaveAsync(
+	public async Task<Result<SaveOutcome<T>, AggregateSaveFailure>> SaveAsync(
 		[NotNull] T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
 	)
 	{
+		var saveStopwatch = Stopwatch.StartNew();
 		var operation = await SaveCoreAsync(aggregate, operationContext, null, null, cancellationToken);
 		await operation.AfterCommitAsync(cancellationToken);
+
+		saveStopwatch.Stop();
+		_metrics.RecordSave(saveStopwatch.Elapsed.TotalMilliseconds, _aggregateTypeShortName, operation.Result);
+
 		return operation.Result;
 	}
 
@@ -72,17 +78,15 @@ partial class PostgresEventStore<T>
 		var validationResult = await GuardAsync(aggregate, cancellationToken);
 
 		if (!validationResult.IsValid)
-		{
-			return new TransactionalSaveOperation<T>(
-				SaveResultBuilder.Create(aggregate, false, false, validationResult)
-			);
-		}
+			return Failed(AggregateSaveFailure.Failure<SaveOutcome<T>>(new AggregateInvalid(validationResult)));
 
 		if (aggregate.Details.Locked)
 		{
-			return operationContext.LockMode is LockHandlingMode.ThrowsException
-				? throw new AggregateLockedException(idempotencyId)
-				: new TransactionalSaveOperation<T>(SaveResultBuilder.Create(aggregate, false, false));
+			return Failed(
+				AggregateSaveFailure.Failure<SaveOutcome<T>>(
+					new AggregateLocked(aggregate.AggregateType, aggregate.Id())
+				)
+			);
 		}
 
 		if (string.IsNullOrWhiteSpace(aggregate.Details.Id))
@@ -100,7 +104,7 @@ partial class PostgresEventStore<T>
 			);
 			activity?.Dispose();
 
-			return new TransactionalSaveOperation<T>(SaveResultBuilder.Create(aggregate, false, true));
+			return Outcome(aggregate, SaveOutcomeKind.NoChanges);
 		}
 
 		var isNew = aggregate.IsNew();
@@ -132,7 +136,7 @@ partial class PostgresEventStore<T>
 				{
 					_eventStoreTelemetry.EventsAlreadyApplied(aggregate.Id(), idempotencyId);
 					activity?.Dispose();
-					return new TransactionalSaveOperation<T>(SaveResultBuilder.Create(aggregate, true, true));
+					return Outcome(aggregate, SaveOutcomeKind.AlreadyApplied);
 				}
 			}
 #pragma warning disable CA1031
@@ -143,7 +147,7 @@ partial class PostgresEventStore<T>
 			}
 		}
 
-		return await PersistAndNotifyAsync(
+		var persisted = await PersistAndNotifyAsync(
 			aggregate,
 			operationContext,
 			idempotencyId,
@@ -156,6 +160,12 @@ partial class PostgresEventStore<T>
 			activity,
 			cancellationToken
 		);
+
+		// Only a write actually appended events; a no-op or an idempotent replay appended none.
+		if (persisted.Result.IsSuccess && persisted.Result.Value.Kind is SaveOutcomeKind.Written)
+			_metrics.EventsAppended(changeEvents.Length, _aggregateTypeShortName);
+
+		return persisted;
 	}
 
 	[SuppressMessage(
@@ -193,14 +203,15 @@ partial class PostgresEventStore<T>
 			cancellationToken
 		);
 
-		if (streamEntity?.IsDeleted == true)
+		if (streamEntity?.IsDeleted == true && !changeEvents.Any(record => record.Event is Restored))
 		{
-			var throwIfDeleted = !changeEvents.Any(record => record.Event is Restored);
-			if (throwIfDeleted)
-			{
-				activity?.Dispose();
-				throw new AggregateDeletedException(aggregate.Id(), idempotencyId);
-			}
+			activity?.Dispose();
+
+			return Failed(
+				AggregateSaveFailure.Failure<SaveOutcome<T>>(
+					new AggregateDeleted(aggregate.AggregateType, aggregate.Id())
+				)
+			);
 		}
 
 		try
@@ -221,7 +232,7 @@ partial class PostgresEventStore<T>
 				Timestamp = now,
 			};
 
-			var userId = ClaimsPrincipal.Current?.FindFirst(operationContext.ClaimIdentifier)?.Value;
+			var userId = _principalAccessor.GetPrincipal()?.FindFirst(operationContext.ClaimIdentifier)?.Value;
 			if (operationContext.RequiresValidPrincipalIdentifier && string.IsNullOrWhiteSpace(userId))
 				throw new NullReferenceException(
 					$"Missing ClaimsPrincipal identifier '{operationContext.ClaimIdentifier}'. Unable to save aggregate."
@@ -239,7 +250,11 @@ partial class PostgresEventStore<T>
 					CorrelationId = changeEvents[i].Metadata.CorrelationId ?? operationContext.CorrelationId,
 				};
 
-				var serializedEvent = SerializeEvent(changeEvent);
+				var serializedEvent = await ProtectIfRequiredAsync(
+					changeEvent,
+					SerializeEvent(changeEvent),
+					cancellationToken
+				);
 				insertRows.Add(
 					new PostgresEventStoreClient.RowData
 					{
@@ -298,10 +313,8 @@ partial class PostgresEventStore<T>
 			if (shouldSnapshot && !requireSnapshotWrite)
 				await CreateSnapshotBestEffortAsync(aggregate, connection, transaction, cancellationToken);
 
-			var result = SaveResultBuilder.Create(aggregate, true, false);
-
 			return new TransactionalSaveOperation<T>(
-				result,
+				new SaveOutcome<T>(aggregate, SaveOutcomeKind.Written),
 				async afterCommitCancellationToken =>
 				{
 					try
@@ -366,9 +379,20 @@ partial class PostgresEventStore<T>
 
 			await HandleSaveFailureAsync(aggregate, operationContext, changeEvents, ex);
 
+			if (ex is ConcurrencyException conflict)
+				return Failed(AggregateSaveFailure.Failure<SaveOutcome<T>>(ToConcurrencyConflict(aggregate, conflict)));
+
 			throw;
 		}
 	}
+
+	static ConcurrencyConflict ToConcurrencyConflict(T aggregate, ConcurrencyException exception) =>
+		new(aggregate.AggregateType, aggregate.Id(), exception.VersionAttempted, exception.Version);
+
+	static TransactionalSaveOperation<T> Failed(Result<SaveOutcome<T>, AggregateSaveFailure> failure) => new(failure);
+
+	static TransactionalSaveOperation<T> Outcome(T aggregate, SaveOutcomeKind kind) =>
+		new(new SaveOutcome<T>(aggregate, kind));
 
 	async Task HandleSaveFailureAsync(
 		T aggregate,
@@ -393,8 +417,14 @@ partial class PostgresEventStore<T>
 			: await _validator.ValidateAsync(aggregate, cancellationToken);
 	}
 
-	static bool ShouldSnapShot(T aggregate, EventRecord[] events, EventStoreOperationContext context)
+	bool ShouldSnapShot(T aggregate, EventRecord[] events, EventStoreOperationContext context)
 	{
+		// A snapshot serializes aggregate state, which holds the same personal data as the protected
+		// events in clear - and one snapshot can span many subjects, so no single key can protect it.
+		// With protection enabled the store does not snapshot at all: a snapshot surviving key erasure
+		// would make crypto-shredding untrue. Replay from events stays correct, only slower.
+		if (_payloadProtector is not null)
+			return false;
 		// Deleted/restored transitions must always be reflected promptly.
 		if (aggregate.Details.IsDeleted || events.Any(record => record.Event is Restored))
 			return true;
@@ -462,8 +492,12 @@ partial class PostgresEventStore<T>
 				);
 			}
 		}
-		catch (PostgresException ex)
+		// Writes reach storage both directly and through Entity Framework, which wraps the provider
+		// exception. Unwrap it so a duplicate event-row key is classified identically on both paths.
+		catch (Exception outer) when (outer is PostgresException || outer.InnerException is PostgresException)
 		{
+			var ex = outer as PostgresException ?? (PostgresException)outer.InnerException!;
+
 			_eventStoreTelemetry.SaveFailedAtStorage(aggregate.Id(), _aggregateTypeFullName, ex);
 
 			ClearCacheFireAndForget(aggregate);
@@ -645,4 +679,17 @@ partial class PostgresEventStore<T>
 	static NpgsqlTransaction GetNpgsqlTransaction(DbTransaction transaction) =>
 		transaction as NpgsqlTransaction
 		?? throw new InvalidOperationException("PostgreSQL transactions require a NpgsqlTransaction.");
+
+	/// <summary>
+	/// Encrypts a serialized payload when its event names a data subject.
+	/// </summary>
+	/// <remarks>
+	/// Applied after serialization so the stored payload is the envelope, which keeps the persistence
+	/// schema unchanged. An event with no data subject, or a store with no protector configured, is
+	/// stored as before.
+	/// </remarks>
+	Task<string> ProtectIfRequiredAsync(object changeEvent, string serialized, CancellationToken cancellationToken) =>
+		_payloadProtector is not null && changeEvent is IEventDataSubject dataSubject
+			? _payloadProtector.ProtectAsync(serialized, dataSubject.DataSubjectId, cancellationToken)
+			: Task.FromResult(serialized);
 }

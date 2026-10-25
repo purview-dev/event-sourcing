@@ -1,11 +1,14 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Purview.EventSourcing.Admin.Failures;
 using Purview.EventSourcing.Admin.Models;
 using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.Admin.SQLServer.Internal;
 using Purview.EventSourcing.SqlServer.Events;
 using Purview.EventSourcing.SqlServer.Events.EntityFramework;
-using System.Text.Json;
+using Purview.EventSourcing.Tenancy;
+using Purview.Results;
 
 namespace Purview.EventSourcing.Admin.SQLServer;
 
@@ -18,11 +21,14 @@ namespace Purview.EventSourcing.Admin.SQLServer;
 /// which event versions were applied and which were skipped.
 /// </remarks>
 /// <param name="options">The configured <see cref="SqlServerEventStoreOptions"/>.</param>
-public sealed class SqlServerAdminProjectionService(IOptions<SqlServerEventStoreOptions> options)
-	: IAdminProjectionService
+/// <param name="currentTenant">Optional tenant scope; when omitted the query is not tenant-filtered.</param>
+public sealed class SqlServerAdminProjectionService(
+	IOptions<SqlServerEventStoreOptions> options,
+	ICurrentTenant? currentTenant = null
+) : IAdminProjectionService
 {
 	///<inheritdoc/>
-	public async Task<ProjectionResponse?> ProjectAtVersionAsync(
+	public async Task<Result<ProjectionResponse, AdminQueryFailure>> ProjectAtVersionAsync(
 		string aggregateType,
 		string aggregateId,
 		long targetVersion,
@@ -76,7 +82,9 @@ public sealed class SqlServerAdminProjectionService(IOptions<SqlServerEventStore
 		}
 
 		if (rowList.Count == 0)
-			return null;
+			return AdminQueryFailure.Failure<ProjectionResponse>(
+				new AdminAggregateNotFound(aggregateType, aggregateId)
+			);
 
 		var reason =
 			targetVersion > rowList.Last().Version
@@ -102,7 +110,7 @@ public sealed class SqlServerAdminProjectionService(IOptions<SqlServerEventStore
 	}
 
 	///<inheritdoc/>
-	public async Task<ProjectionResponse?> ProjectAtTimeAsync(
+	public async Task<Result<ProjectionResponse, AdminQueryFailure>> ProjectAtTimeAsync(
 		string aggregateType,
 		string aggregateId,
 		DateTimeOffset targetUtc,
@@ -158,7 +166,9 @@ public sealed class SqlServerAdminProjectionService(IOptions<SqlServerEventStore
 		}
 
 		if (rowList.Count == 0)
-			return null;
+			return AdminQueryFailure.Failure<ProjectionResponse>(
+				new AdminAggregateNotFound(aggregateType, aggregateId)
+			);
 
 		var latestTimestamp = rowList.Last().Timestamp;
 		var reason =
@@ -184,10 +194,10 @@ public sealed class SqlServerAdminProjectionService(IOptions<SqlServerEventStore
 		);
 	}
 
-	static EventStoreDbContext CreateContext(SqlServerEventStoreOptions options, SqlServerAdminTableDescriptor table)
+	EventStoreDbContext CreateContext(SqlServerEventStoreOptions options, SqlServerAdminTableDescriptor table)
 	{
 		DbContextOptionsBuilder<EventStoreDbContext> builder = new();
 		builder.UseSqlServer(options.ConnectionString);
-		return new EventStoreDbContext(builder.Options, table.SchemaName, table.TableName);
+		return new EventStoreDbContext(builder.Options, table.SchemaName, table.TableName, currentTenant);
 	}
 }

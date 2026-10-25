@@ -1,5 +1,7 @@
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Snapshotting;
+using Purview.EventSourcing.Failures;
+using Purview.Results;
 
 namespace Purview.EventSourcing.CosmosDb.Snapshot;
 
@@ -10,29 +12,29 @@ partial class CosmosDbSnapshotEventStore<T>
 		_eventStore.CreateAsync(aggregateId, cancellationToken);
 
 	/// <inheritdoc/>
-	public Task<T?> GetOrCreateAsync(
+	public Task<Result<T, AggregateReadFailure>> GetOrCreateAsync(
 		string? aggregateId,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
 	) => _eventStore.GetOrCreateAsync(aggregateId, operationContext, cancellationToken);
 
 	/// <inheritdoc/>
-	public Task<T?> GetAsync(
+	public Task<Result<T, AggregateReadFailure>> GetAsync(
 		string aggregateId,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
 	) => _eventStore.GetAsync(aggregateId, operationContext, cancellationToken);
 
 	/// <inheritdoc/>
-	public Task<T?> GetAtAsync(
+	public Task<Result<T, AggregateReadFailure>> GetAtAsync(
 		string aggregateId,
-		int version,
+		long version,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
 	) => _eventStore.GetAtAsync(aggregateId, version, operationContext, cancellationToken);
 
 	/// <inheritdoc/>
-	public async Task<SaveResult<T>> SaveAsync(
+	public async Task<Result<SaveOutcome<T>, AggregateSaveFailure>> SaveAsync(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -43,8 +45,8 @@ partial class CosmosDbSnapshotEventStore<T>
 
 		var result = await _eventStore.SaveAsync(aggregate, operationContext, cancellationToken);
 		if (
-			result
-			&& !result.Skipped
+			result.IsSuccess
+			&& result.Value.Written
 			&& SnapshotStrategyResolver.ShouldSnapshot(
 				aggregate,
 				eventsApplied,
@@ -59,15 +61,14 @@ partial class CosmosDbSnapshotEventStore<T>
 	}
 
 	/// <inheritdoc/>
-	public Task<bool> IsDeletedAsync(string aggregateId, CancellationToken cancellationToken = default) =>
-		_eventStore.IsDeletedAsync(aggregateId, cancellationToken);
+	/// <inheritdoc/>
+	public Task<Result<T, AggregateReadFailure>> GetDeletedAsync(
+		string aggregateId,
+		CancellationToken cancellationToken = default
+	) => _eventStore.GetDeletedAsync(aggregateId, cancellationToken);
 
 	/// <inheritdoc/>
-	public Task<T?> GetDeletedAsync(string aggregateId, CancellationToken cancellationToken = default) =>
-		_eventStore.GetDeletedAsync(aggregateId, cancellationToken);
-
-	/// <inheritdoc/>
-	public async Task<bool> DeleteAsync(
+	public async Task<Result<SaveOutcome<T>, AggregateDeleteFailure>> DeleteAsync(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -76,14 +77,14 @@ partial class CosmosDbSnapshotEventStore<T>
 		ArgumentNullException.ThrowIfNull(aggregate, nameof(aggregate));
 
 		var result = await _eventStore.DeleteAsync(aggregate, operationContext, cancellationToken);
-		if (result)
-			await _cosmosDbClient.DeleteAsync(aggregate.Details.Id, _partitionKey, cancellationToken);
+		if (result.IsSuccess)
+			await _cosmosDbClient.DeleteAsync(aggregate.Details.Id, cancellationToken);
 
 		return result;
 	}
 
 	/// <inheritdoc/>
-	public async Task<bool> RestoreAsync(
+	public async Task<Result<SaveOutcome<T>, AggregateRestoreFailure>> RestoreAsync(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -92,7 +93,7 @@ partial class CosmosDbSnapshotEventStore<T>
 		ArgumentNullException.ThrowIfNull(aggregate, nameof(aggregate));
 
 		var result = await _eventStore.RestoreAsync(aggregate, operationContext, cancellationToken);
-		if (result)
+		if (result.IsSuccess)
 			await SnapshotAsync(aggregate, cancellationToken);
 
 		return result;
@@ -105,7 +106,7 @@ partial class CosmosDbSnapshotEventStore<T>
 	) => _eventStore.GetAggregateIdsAsync(includeDeleted, cancellationToken);
 
 	/// <inheritdoc/>
-	public Task<ExistsState> ExistsAsync(string aggregateId, CancellationToken cancellationToken = default) =>
+	public Task<AggregateExistence> ExistsAsync(string aggregateId, CancellationToken cancellationToken = default) =>
 		_eventStore.ExistsAsync(aggregateId, cancellationToken);
 
 	/// <inheritdoc/>
@@ -114,8 +115,8 @@ partial class CosmosDbSnapshotEventStore<T>
 	/// <inheritdoc/>
 	public IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync(
 		string aggregateId,
-		int versionFrom,
-		int? versionTo,
+		long versionFrom,
+		long? versionTo,
 		CancellationToken cancellationToken
 	) => _eventStore.GetEventRangeAsync(aggregateId, versionFrom, versionTo, cancellationToken);
 }

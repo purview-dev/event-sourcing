@@ -8,7 +8,22 @@ public readonly partial record struct EmailAddress
 {
 	public string Value { get; }
 
-	public string Domain => Value.Split('@')[1];
+	/// <summary>
+	/// The part after the '@', or an empty string when there is no value to read.
+	/// </summary>
+	/// <remarks>
+	/// A record struct is always constructible as <c>default</c>, and validators read computed members
+	/// before a value is assigned, so this cannot assume <see cref="Value"/> is a well-formed address.
+	/// </remarks>
+	public string Domain
+	{
+		get
+		{
+			var separator = Value?.IndexOf('@', StringComparison.Ordinal) ?? -1;
+
+			return separator < 0 ? string.Empty : Value![(separator + 1)..];
+		}
+	}
 
 	[System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1308:Normalize strings to uppercase")]
 	static partial void OnNormalize(ref string value) => value = value?.Trim().ToLowerInvariant()!;

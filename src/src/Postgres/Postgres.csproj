@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup Label="NuGet Package Values">
 		<IsPackable>true</IsPackable>
 		<Title>Purview Event Store for PostgreSQL</Title>
@@ -15,19 +15,19 @@
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
-		<PackageReference Include="Microsoft.Extensions.Options" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\EventSourcing\EventSourcing.csproj" />
 		<ProjectReference Include="..\ImplementationShared\ImplementationShared.csproj" PrivateAssets="All" />
+		<ProjectReference Include="..\EntityFrameworkCore\EntityFrameworkCore.csproj" />
 		<ProjectReference
 			Include="..\EntityFrameworkCore.SourceGenerator\EntityFrameworkCore.SourceGenerator.csproj"
 			PrivateAssets="all"
 			ReferenceOutputAssembly="false"
 			OutputItemType="Analyzer"
+			Pack="false"
 		/>
 	</ItemGroup>
 </Project>

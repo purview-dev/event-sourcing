@@ -18,7 +18,9 @@ sealed class BenchmarkSuiteRun
 
 	public List<string> Warnings { get; set; } = [];
 
-	public bool Passed => Failures.Count == 0;
+	// A suite that measured nothing is a failure, not a pass. Every benchmark in a suite can error during
+	// setup and BenchmarkDotNet still exits cleanly, which previously reported a green run from no data.
+	public bool Passed => Failures.Count == 0 && Cases.Count > 0;
 
 	public IEnumerable<string> FormatSummary()
 	{
@@ -31,6 +33,9 @@ sealed class BenchmarkSuiteRun
 
 		foreach (var caseRecord in Cases)
 			yield return caseRecord.Format();
+
+		if (Cases.Count == 0)
+			yield return "  FAILURE: the suite executed no benchmarks; every case errored or none was discovered.";
 
 		if (Failures.Count > 0)
 		{

@@ -26,7 +26,13 @@ public static class ServiceCollectionExtensions
 
 		var mvcBuilder = services.AddRazorPages();
 		if (enableRazorRuntimeCompilation)
+		{
+			// ASP.NET Core 11 deprecates runtime compilation (ASPDEPR003). This stays opt-in and
+			// development-only; removing the parameter is a public API change and is tracked separately.
+#pragma warning disable ASPDEPR003
 			mvcBuilder.AddRazorRuntimeCompilation();
+#pragma warning restore ASPDEPR003
+		}
 
 		services.AddHttpContextAccessor();
 		services.AddTransient<SameOriginResolverHandler>();

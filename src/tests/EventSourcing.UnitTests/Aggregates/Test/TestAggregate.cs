@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using Purview.EventSourcing.Aggregates.Test.Events;
 
 namespace Purview.EventSourcing.Aggregates.Test;

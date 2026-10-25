@@ -99,6 +99,27 @@ public static class ServiceCollectionExtensions
 				.AddSingleton<IEventUpcasterRegistry, EventUpcasterRegistry>();
 
 			services.TryAddSingleton<IEventStoreCorrelationIdProvider, ActivityEventStoreCorrelationIdProvider>();
+
+			// TryAdd, so a host that knows who the current user is - a web application resolving it from
+			// the request - replaces the ambient default by registering its own first.
+			services.TryAddSingleton<IEventStorePrincipalAccessor, AmbientEventStorePrincipalAccessor>();
+
+			// Defaults to TenantScope.System, which applies no tenant filter, so a single-tenant
+			// deployment behaves as before. A multi-tenant host registers its own resolver.
+			services.TryAddSingleton<
+				Purview.EventSourcing.Tenancy.ICurrentTenant,
+				Purview.EventSourcing.Tenancy.AmbientCurrentTenant
+			>();
+
+			// The generated recorder needs an IMeterFactory, which only a host that configured metrics
+			// provides. Falling back keeps a host that has not - a console application, a test - working
+			// instead of failing to resolve the event store; recording metrics is never a precondition
+			// for persisting events.
+			services.TryAddSingleton<IEventStoreMetrics>(static serviceProvider =>
+				serviceProvider.GetService<System.Diagnostics.Metrics.IMeterFactory>() is null
+					? NoOpEventStoreMetrics.Instance
+					: ActivatorUtilities.CreateInstance<EventStoreMetricsCore>(serviceProvider)
+			);
 			services.TryAddSingleton<IEventStoreTransactionFactory, EventStoreTransactionFactory>();
 			services.TryAddSingleton<IAggregateTypeRegistry, AssemblyAggregateTypeRegistry>();
 

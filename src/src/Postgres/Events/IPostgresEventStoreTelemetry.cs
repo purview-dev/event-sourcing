@@ -31,7 +31,7 @@ public interface IPostgresEventStoreTelemetry
 	/// <param name="aggregateTypeFullName">The full name of the aggregate type being retrieved.</param>
 	/// <returns>The started activity, or <see langword="null"/> when the activity source is disabled.</returns>
 	[Activity]
-	Activity? GetAggregateAtVersion(string aggregateId, int version, [Baggage] string aggregateTypeFullName);
+	Activity? GetAggregateAtVersion(string aggregateId, long version, [Baggage] string aggregateTypeFullName);
 
 	/// <summary>
 	/// Starts an activity for an aggregate save operation.
@@ -58,7 +58,7 @@ public interface IPostgresEventStoreTelemetry
 	/// <param name="eventCount">The number of events applied.</param>
 	/// <param name="version">The aggregate version after reconstitution.</param>
 	[Event]
-	void EventsReconstituted(Activity? activity, int eventCount, int version);
+	void EventsReconstituted(Activity? activity, int eventCount, long version);
 
 	/// <summary>
 	/// Records the completion of a save operation.
@@ -120,7 +120,7 @@ public interface IPostgresEventStoreTelemetry
 	void GetAggregateAtSpecificVersionFailed(
 		string aggregateId,
 		string aggregateTypeFullName,
-		int specificVersion,
+		long specificVersion,
 		Exception exception
 	);
 
@@ -148,7 +148,7 @@ public interface IPostgresEventStoreTelemetry
 	/// <param name="specificVersion">The version of the aggregate being retrieved.</param>
 	/// <param name="aggregateTypeFullName">The full name of the aggregate type being retrieved.</param>
 	[Log(LogLevel.Debug)]
-	void GetAggregateAtSpecificVersionStart(string aggregateId, int specificVersion, string aggregateTypeFullName);
+	void GetAggregateAtSpecificVersionStart(string aggregateId, long specificVersion, string aggregateTypeFullName);
 
 	/// <summary>
 	/// Logs that a save operation contained no changes.
@@ -173,7 +173,7 @@ public interface IPostgresEventStoreTelemetry
 		string aggregateTypeFullName,
 		string aggregateType,
 		string eventType,
-		int aggregateVersion
+		long aggregateVersion
 	);
 
 	/// <summary>
@@ -192,7 +192,7 @@ public interface IPostgresEventStoreTelemetry
 		string aggregateType,
 		string eventType,
 		string eventTypeFullName,
-		int aggregateVersion
+		long aggregateVersion
 	);
 
 	/// <summary>
@@ -312,7 +312,7 @@ public interface IPostgresEventStoreTelemetry
 	void GetAggregateAtSpecificVersionComplete(
 		string aggregateId,
 		string aggregateTypeFullName,
-		int specificVersion,
+		long specificVersion,
 		long elapsedMilliseconds
 	);
 
@@ -381,7 +381,7 @@ public interface IPostgresEventStoreTelemetry
 	/// <param name="aggregateType">The short type name of the aggregate.</param>
 	/// <param name="isDeleted">Whether the aggregate is deleted.</param>
 	[Log(LogLevel.Debug)]
-	void StreamVersionFound(string aggregateId, int streamVersion, string aggregateType, bool isDeleted);
+	void StreamVersionFound(string aggregateId, long streamVersion, string aggregateType, bool isDeleted);
 
 	/// <summary>
 	/// Logs that retrieving a stream version failed.

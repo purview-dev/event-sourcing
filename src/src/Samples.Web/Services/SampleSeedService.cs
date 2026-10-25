@@ -3,12 +3,11 @@ using Azure;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using Npgsql;
+// Commit and concurrency failures are one type across every provider now, so the sample catches each
+// once rather than once per store.
+using Purview.EventSourcing.Exceptions;
 using Purview.EventSourcing.Samples.Options;
 using Purview.EventSourcing.Samples.Services;
-using AzureCommitException = Purview.EventSourcing.AzureStorage.Exceptions.CommitException;
-using AzureConcurrencyException = Purview.EventSourcing.AzureStorage.Exceptions.ConcurrencyException;
-using SqlServerCommitException = Purview.EventSourcing.SqlServer.Events.Exceptions.CommitException;
-using SqlServerConcurrencyException = Purview.EventSourcing.SqlServer.Events.Exceptions.ConcurrencyException;
 
 namespace Purview.EventSourcing.Samples.Web.Services;
 
@@ -27,23 +26,20 @@ sealed class SampleSeedService(
 			try
 			{
 				var sw = Stopwatch.StartNew();
-				await seedDataService.SeedAsync(cancellationToken);
+				var seeded = await seedDataService.SeedAsync(cancellationToken);
 
 				sw.Stop();
+
+				if (!seeded && attempt < 2)
+				{
+					// Another app instance may be seeding the demo store at the same time.
+					await Task.Delay(TimeSpan.FromMilliseconds(100 * (attempt + 1)), cancellationToken);
+					continue;
+				}
 
 				telemetry.Complete(sampleStoreOptions.Value.CurrentKey, attempt + 1, sw.Elapsed);
 
 				return;
-			}
-			catch (SqlServerConcurrencyException) when (attempt < 2)
-			{
-				// Another app instance may be seeding the demo store at the same time.
-				await Task.Delay(TimeSpan.FromMilliseconds(100 * (attempt + 1)), cancellationToken);
-			}
-			catch (AzureConcurrencyException) when (attempt < 2)
-			{
-				// Another app instance may be seeding the demo store at the same time.
-				await Task.Delay(TimeSpan.FromMilliseconds(100 * (attempt + 1)), cancellationToken);
 			}
 			catch (RequestFailedException ex)
 			{
@@ -60,14 +56,9 @@ sealed class SampleSeedService(
 				telemetry.NpgsqlFailed(sampleStoreOptions.Value.CurrentKey, ex);
 				break;
 			}
-			catch (SqlServerCommitException ex)
+			catch (CommitException ex)
 			{
-				telemetry.SqlServerCommitFailed(sampleStoreOptions.Value.CurrentKey, ex);
-				break;
-			}
-			catch (AzureCommitException ex)
-			{
-				telemetry.AzureCommitFailed(sampleStoreOptions.Value.CurrentKey, ex);
+				telemetry.CommitFailed(sampleStoreOptions.Value.CurrentKey, ex);
 				break;
 			}
 			catch (FormatException ex)

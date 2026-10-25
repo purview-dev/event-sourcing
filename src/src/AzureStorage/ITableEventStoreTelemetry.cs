@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Purview.Telemetry;
 
 namespace Purview.EventSourcing.AzureStorage;
@@ -41,7 +41,7 @@ public interface ITableEventStoreTelemetry
 	void GetAggregateAtSpecificVersionFailed(
 		string aggregateId,
 		string aggregateTypeFullName,
-		int specificVersion,
+		long specificVersion,
 		Exception exception
 	);
 
@@ -69,7 +69,7 @@ public interface ITableEventStoreTelemetry
 	/// <param name="specificVersion">The requested aggregate version.</param>
 	/// <param name="aggregateTypeFullName">The full name of the aggregate type.</param>
 	[Log(LogLevel.Debug)]
-	void GetAggregateAtSpecificVersionStart(string aggregateId, int specificVersion, string aggregateTypeFullName);
+	void GetAggregateAtSpecificVersionStart(string aggregateId, long specificVersion, string aggregateTypeFullName);
 
 	/// <summary>
 	/// Logs that a save was skipped because the aggregate contained no changes.
@@ -94,7 +94,7 @@ public interface ITableEventStoreTelemetry
 		string aggregateTypeFullName,
 		string aggregateType,
 		string eventType,
-		int aggregateVersion
+		long aggregateVersion
 	);
 
 	/// <summary>
@@ -113,7 +113,7 @@ public interface ITableEventStoreTelemetry
 		string aggregateType,
 		string eventType,
 		string eventTypeFullName,
-		int aggregateVersion
+		long aggregateVersion
 	);
 
 	/// <summary>
@@ -235,7 +235,7 @@ public interface ITableEventStoreTelemetry
 	void GetAggregateAtSpecificVersionComplete(
 		string aggregateId,
 		string aggregateTypeFullName,
-		int specificVersion,
+		long specificVersion,
 		long elapsedMilliseconds
 	);
 
@@ -339,7 +339,7 @@ public interface ITableEventStoreTelemetry
 	/// <param name="aggregateType">The name of the aggregate type.</param>
 	/// <param name="isDeleted">Whether the aggregate is marked as deleted.</param>
 	[Log(LogLevel.Debug)]
-	void StreamVersionFound(string aggregateId, int streamVersion, string aggregateType, bool isDeleted);
+	void StreamVersionFound(string aggregateId, long streamVersion, string aggregateType, bool isDeleted);
 
 	/// <summary>
 	/// Logs that reading the stream version entity failed.

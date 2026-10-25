@@ -1,9 +1,10 @@
 using Microsoft.Extensions.Caching.Distributed;
+using Purview.Containers.PostgreSql;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.ChangeFeed;
 using Purview.EventSourcing.Postgres.Events;
 using Purview.EventSourcing.Services;
-using Testcontainers.PostgreSql;
+using Purview.EventSourcing.Tenancy;
 using TUnit.Core.Interfaces;
 
 namespace Purview.EventSourcing.Fixtures.Postgres;
@@ -31,10 +32,17 @@ public class PostgresEventStoreFixture : IAsyncInitializer, IAsyncDisposable
 		IAggregateChangeFeedNotifier<TAggregate>? aggregateChangeNotifier = null,
 		bool removeFromCacheOnDelete = false,
 		Guid? runId = null,
-		Action<PostgresEventStoreOptions>? configureOptions = null
+		Action<PostgresEventStoreOptions>? configureOptions = null,
+		ICurrentTenant? currentTenant = null
 	)
 		where TAggregate : class, IAggregate, new() =>
-		CreateEventStoreContext(aggregateChangeNotifier, removeFromCacheOnDelete, runId, configureOptions).EventStore;
+		CreateEventStoreContext(
+			aggregateChangeNotifier,
+			removeFromCacheOnDelete,
+			runId,
+			configureOptions,
+			currentTenant
+		).EventStore;
 
 	internal (
 		PostgresEventStore<TAggregate> EventStore,
@@ -45,7 +53,8 @@ public class PostgresEventStoreFixture : IAsyncInitializer, IAsyncDisposable
 		IAggregateChangeFeedNotifier<TAggregate>? aggregateChangeNotifier = null,
 		bool removeFromCacheOnDelete = false,
 		Guid? runId = null,
-		Action<PostgresEventStoreOptions>? configureOptions = null
+		Action<PostgresEventStoreOptions>? configureOptions = null,
+		ICurrentTenant? currentTenant = null
 	)
 		where TAggregate : class, IAggregate, new()
 	{
@@ -68,7 +77,7 @@ public class PostgresEventStoreFixture : IAsyncInitializer, IAsyncDisposable
 		};
 		configureOptions?.Invoke(options);
 
-		PostgresEventStoreClient client = new(options);
+		PostgresEventStoreClient client = new(options, currentTenant);
 		Client = client;
 
 		PostgresEventStore<TAggregate> eventStore = new(
@@ -77,7 +86,8 @@ public class PostgresEventStoreFixture : IAsyncInitializer, IAsyncDisposable
 			distributedCache: cache,
 			eventStoreTelemetry: telemetry,
 			aggregateChangeNotifier: aggregateChangeNotifier ?? IAggregateChangeFeedNotifier<TAggregate>.Mock(),
-			aggregateRequirementsManager: aggregateRequirementsManager
+			aggregateRequirementsManager: aggregateRequirementsManager,
+			currentTenant: currentTenant
 		);
 
 		return (eventStore, client, cache, telemetry);

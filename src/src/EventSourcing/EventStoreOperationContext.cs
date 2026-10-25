@@ -62,12 +62,7 @@ public sealed record class EventStoreOperationContext
 	/// <summary>
 	/// Controls how to handle aggregates marked as deleted during get and save/ restore operations.
 	/// </summary>
-	public DeleteHandlingMode DeleteMode { get; set; } = DeleteHandlingMode.ReturnsNull;
-
-	/// <summary>
-	/// Controls how to handle aggregates marked as locked.
-	/// </summary>
-	public LockHandlingMode LockMode { get; set; } = LockHandlingMode.ThrowsException;
+	public DeleteHandlingMode DeleteMode { get; set; } = DeleteHandlingMode.ReturnsFailure;
 
 	/// <summary>
 	/// Gets/ sets a value indicating how the <see cref="IEventStore{T}"/>

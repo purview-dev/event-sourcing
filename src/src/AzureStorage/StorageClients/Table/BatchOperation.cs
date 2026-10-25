@@ -50,4 +50,14 @@ sealed class BatchOperation
 	}
 
 	internal IEnumerable<TableTransactionAction> GetActions() => _operations;
+
+	/// <summary>
+	/// Resolves the entity behind a failed transaction action so a caller can classify the failure
+	/// by the row it collided with.
+	/// </summary>
+	internal void RecordFailedAction(int? failedActionIndex) =>
+		FailedEntity =
+			failedActionIndex is int index && index >= 0 && index < _operations.Count
+				? _operations[index].Entity
+				: null;
 }

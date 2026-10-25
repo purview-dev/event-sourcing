@@ -1,4 +1,6 @@
+using Purview.EventSourcing.Admin.Failures;
 using Purview.EventSourcing.Admin.Models;
+using Purview.Results;
 
 namespace Purview.EventSourcing.Admin.Services;
 
@@ -15,9 +17,10 @@ public interface IAdminProjectionService
 	/// <param name="targetVersion">The stream version up to and including which events are applied.</param>
 	/// <param name="cancellationToken">The token to monitor for cancellation requests.</param>
 	/// <returns>
-	/// The projected aggregate state, or <see langword="null"/> when the aggregate stream does not exist.
+	/// The projected aggregate state, or <see cref="AdminAggregateNotFound"/> when the stream holds no events
+	/// up to that version.
 	/// </returns>
-	Task<ProjectionResponse?> ProjectAtVersionAsync(
+	Task<Result<ProjectionResponse, AdminQueryFailure>> ProjectAtVersionAsync(
 		string aggregateType,
 		string aggregateId,
 		long targetVersion,
@@ -32,9 +35,10 @@ public interface IAdminProjectionService
 	/// <param name="targetUtc">The UTC timestamp up to and including which events are applied.</param>
 	/// <param name="cancellationToken">The token to monitor for cancellation requests.</param>
 	/// <returns>
-	/// The projected aggregate state, or <see langword="null"/> when the aggregate stream does not exist.
+	/// The projected aggregate state, or <see cref="AdminAggregateNotFound"/> when the stream holds no events
+	/// at or before that time.
 	/// </returns>
-	Task<ProjectionResponse?> ProjectAtTimeAsync(
+	Task<Result<ProjectionResponse, AdminQueryFailure>> ProjectAtTimeAsync(
 		string aggregateType,
 		string aggregateId,
 		DateTimeOffset targetUtc,

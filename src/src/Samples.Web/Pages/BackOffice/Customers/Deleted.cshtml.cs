@@ -15,9 +15,10 @@ sealed class DeletedModel(IQueryableEventStore store) : PageModel
 			var id in store.GetAggregateIdsAsync<CustomerAggregate>(includeDeleted: true, HttpContext.RequestAborted)
 		)
 		{
-			if (await store.IsDeletedAsync<CustomerAggregate>(id, HttpContext.RequestAborted))
+			if ((await store.ExistsAsync<CustomerAggregate>(id, HttpContext.RequestAborted)).IsDeleted)
 			{
-				var aggregate = await store.GetDeletedAsync<CustomerAggregate>(id, HttpContext.RequestAborted);
+				var aggregateResult = await store.GetDeletedAsync<CustomerAggregate>(id, HttpContext.RequestAborted);
+				var aggregate = aggregateResult.IsSuccess ? aggregateResult.Value : null;
 				if (aggregate != null)
 					deleted.Add(aggregate);
 			}
@@ -28,7 +29,8 @@ sealed class DeletedModel(IQueryableEventStore store) : PageModel
 
 	public async Task<IActionResult> OnPostRestoreAsync(string id)
 	{
-		var customer = await store.GetDeletedAsync<CustomerAggregate>(id, HttpContext.RequestAborted);
+		var customerResult = await store.GetDeletedAsync<CustomerAggregate>(id, HttpContext.RequestAborted);
+		var customer = customerResult.IsSuccess ? customerResult.Value : null;
 		if (customer == null)
 			return NotFound();
 

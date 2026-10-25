@@ -1,11 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Purview.EventSourcing.Admin.Failures;
 using Purview.EventSourcing.Admin.Models;
+using Purview.EventSourcing.Admin.Postgres.Internal;
 using Purview.EventSourcing.Admin.Queries;
 using Purview.EventSourcing.Admin.Services;
-using Purview.EventSourcing.Admin.Postgres.Internal;
 using Purview.EventSourcing.Postgres.Events;
 using Purview.EventSourcing.Postgres.Events.EntityFramework;
+using Purview.EventSourcing.Tenancy;
+using Purview.Results;
 
 namespace Purview.EventSourcing.Admin.Postgres;
 
@@ -18,8 +21,11 @@ namespace Purview.EventSourcing.Admin.Postgres;
 /// paged in memory.
 /// </remarks>
 /// <param name="options">The configured <see cref="PostgresEventStoreOptions"/>.</param>
-public sealed class PostgresAdminAggregateQueryService(IOptions<PostgresEventStoreOptions> options)
-	: IAdminAggregateQueryService
+/// <param name="currentTenant">Optional tenant scope; when omitted the query is not tenant-filtered.</param>
+public sealed class PostgresAdminAggregateQueryService(
+	IOptions<PostgresEventStoreOptions> options,
+	ICurrentTenant? currentTenant = null
+) : IAdminAggregateQueryService
 {
 	///<inheritdoc/>
 	public async Task<PagedResult<AggregateSummaryResponse>> SearchAsync(
@@ -48,7 +54,7 @@ public sealed class PostgresAdminAggregateQueryService(IOptions<PostgresEventSto
 	}
 
 	///<inheritdoc/>
-	public async Task<AggregateSummaryResponse?> GetAsync(
+	public async Task<Result<AggregateSummaryResponse, AdminQueryFailure>> GetAsync(
 		string aggregateType,
 		string aggregateId,
 		CancellationToken cancellationToken
@@ -59,7 +65,11 @@ public sealed class PostgresAdminAggregateQueryService(IOptions<PostgresEventSto
 
 		AggregateSearchQuery query = new(aggregateType, aggregateId, null, null, null, null, 1, 1);
 		var result = await SearchAsync(query, cancellationToken);
-		return result.Items.Count == 0 ? null : result.Items[0];
+		return result.Items.Count == 0
+			? AdminQueryFailure.Failure<AggregateSummaryResponse>(
+				new AdminAggregateNotFound(aggregateType, aggregateId)
+			)
+			: result.Items[0];
 	}
 
 	static async Task<List<AggregateSummaryResponse>> BuildAggregateRowsAsync(
@@ -121,10 +131,10 @@ public sealed class PostgresAdminAggregateQueryService(IOptions<PostgresEventSto
 		};
 	}
 
-	static EventStoreDbContext CreateContext(PostgresEventStoreOptions options, PostgresAdminTableDescriptor table)
+	EventStoreDbContext CreateContext(PostgresEventStoreOptions options, PostgresAdminTableDescriptor table)
 	{
 		DbContextOptionsBuilder<EventStoreDbContext> builder = new();
 		builder.UseNpgsql(options.ConnectionString);
-		return new EventStoreDbContext(builder.Options, table.SchemaName, table.TableName);
+		return new EventStoreDbContext(builder.Options, table.SchemaName, table.TableName, currentTenant);
 	}
 }

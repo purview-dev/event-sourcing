@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Purview.EventSourcing.SqlServer.Events.EntityFramework;
+using Purview.EventSourcing.Tenancy;
 
 namespace Purview.EventSourcing.SqlServer.Events;
 
@@ -33,10 +34,12 @@ sealed partial class SqlServerEventStoreClient
 	readonly SqlServerEventStoreOptions _options;
 	readonly string _tableEnsureKey;
 	readonly DbContextOptions<EventStoreDbContext> _connectionStringOptions;
+	readonly ICurrentTenant _currentTenant;
 
-	public SqlServerEventStoreClient(SqlServerEventStoreOptions options)
+	public SqlServerEventStoreClient(SqlServerEventStoreOptions options, ICurrentTenant? currentTenant = null)
 	{
 		_options = options ?? throw new ArgumentNullException(nameof(options));
+		_currentTenant = currentTenant ?? new SystemCurrentTenant();
 		ValidateIdentifier(_options.SchemaName);
 		ValidateIdentifier(_options.TableName);
 		SqlServerJsonIndexSchemaManager.ValidateOrThrow(
@@ -72,7 +75,7 @@ sealed partial class SqlServerEventStoreClient
 		int entityType,
 		string aggregateId,
 		string aggregateType,
-		int version,
+		long version,
 		bool isDeleted,
 		string? payload,
 		string? eventType,
@@ -100,7 +103,7 @@ sealed partial class SqlServerEventStoreClient
 		int entityType,
 		string aggregateId,
 		string aggregateType,
-		int version,
+		long version,
 		bool isDeleted,
 		string? payload,
 		string? eventType,
@@ -143,7 +146,7 @@ sealed partial class SqlServerEventStoreClient
 		int entityType,
 		string aggregateId,
 		string aggregateType,
-		int version,
+		long version,
 		bool isDeleted,
 		string? payload,
 		string? eventType,
@@ -171,7 +174,7 @@ sealed partial class SqlServerEventStoreClient
 		int entityType,
 		string aggregateId,
 		string aggregateType,
-		int version,
+		long version,
 		bool isDeleted,
 		string? payload,
 		string? eventType,
@@ -205,7 +208,7 @@ sealed partial class SqlServerEventStoreClient
 		int entityType,
 		string aggregateId,
 		string aggregateType,
-		int version,
+		long version,
 		bool isDeleted,
 		string? payload,
 		string? eventType,
@@ -237,7 +240,7 @@ sealed partial class SqlServerEventStoreClient
 		int entityType,
 		string aggregateId,
 		string aggregateType,
-		int version,
+		long version,
 		bool isDeleted,
 		string? payload,
 		string? eventType,
@@ -280,7 +283,7 @@ sealed partial class SqlServerEventStoreClient
 		int entityType,
 		string aggregateId,
 		string aggregateType,
-		int version,
+		long version,
 		bool isDeleted,
 		string? payload,
 		string? eventType,
@@ -337,7 +340,7 @@ sealed partial class SqlServerEventStoreClient
 		int entityType,
 		string aggregateId,
 		string aggregateType,
-		int version,
+		long version,
 		bool isDeleted,
 		string? payload,
 		string? eventType,
@@ -386,7 +389,7 @@ sealed partial class SqlServerEventStoreClient
 		await context.SaveChangesAsync(cancellationToken);
 	}
 
-	static async Task UpsertSnapshotInBatchAsync(
+	async Task UpsertSnapshotInBatchAsync(
 		EventStoreDbContext context,
 		RowData snapshotRow,
 		bool snapshotIsNew,
@@ -511,8 +514,8 @@ sealed partial class SqlServerEventStoreClient
 	public async IAsyncEnumerable<RowData> GetEventRangeAsync(
 		string aggregateId,
 		string aggregateType,
-		int versionFrom,
-		int versionTo,
+		long versionFrom,
+		long versionTo,
 		[System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default
 	)
 	{
@@ -675,26 +678,32 @@ sealed partial class SqlServerEventStoreClient
 		}
 	}
 
-	EventStoreDbContext CreateContext() => new(_connectionStringOptions, _options.SchemaName, _options.TableName);
+	EventStoreDbContext CreateContext() =>
+		new(_connectionStringOptions, _options.SchemaName, _options.TableName, _currentTenant);
 
 	EventStoreDbContext CreateContext(SqlConnection connection, SqlTransaction? transaction)
 	{
 		DbContextOptionsBuilder<EventStoreDbContext> optionsBuilder = new();
 		var commandTimeout = Math.Max(1, _options.TimeoutInSeconds ?? 60);
 		optionsBuilder.UseSqlServer(connection, sql => sql.CommandTimeout(commandTimeout));
-		EventStoreDbContext context = new(optionsBuilder.Options, _options.SchemaName, _options.TableName);
+		EventStoreDbContext context = new(
+			optionsBuilder.Options,
+			_options.SchemaName,
+			_options.TableName,
+			_currentTenant
+		);
 		if (transaction is not null)
 			context.Database.UseTransaction(transaction);
 		return context;
 	}
 
-	static async Task UpsertCoreAsync(
+	async Task UpsertCoreAsync(
 		EventStoreDbContext context,
 		string id,
 		int entityType,
 		string aggregateId,
 		string aggregateType,
-		int version,
+		long version,
 		bool isDeleted,
 		string? payload,
 		string? eventType,
@@ -738,18 +747,19 @@ sealed partial class SqlServerEventStoreClient
 			entity.EventType = eventType;
 			entity.IdempotencyId = idempotencyId;
 			entity.SchemaVersion = schemaVersion;
+			entity.TenantId = _currentTenant.Current.TenantId;
 			entity.Timestamp = timestamp;
 		}
 
 		await context.SaveChangesAsync(cancellationToken);
 	}
 
-	static EventStoreEntity CreateEntity(
+	EventStoreEntity CreateEntity(
 		string id,
 		int entityType,
 		string aggregateId,
 		string aggregateType,
-		int version,
+		long version,
 		bool isDeleted,
 		string? payload,
 		string? eventType,
@@ -769,10 +779,13 @@ sealed partial class SqlServerEventStoreClient
 			EventType = eventType,
 			IdempotencyId = idempotencyId,
 			SchemaVersion = schemaVersion,
+			TenantId = _currentTenant.Current.TenantId,
 			Timestamp = timestamp,
 		};
 
-	static EventStoreEntity ToEntity(RowData row) =>
+	// Instance, not static: the tenant is stamped here rather than at each call site, so a new write
+	// path cannot forget it. The query filter would then hide the row from its own tenant.
+	EventStoreEntity ToEntity(RowData row) =>
 		new()
 		{
 			Id = row.Id,
@@ -788,6 +801,7 @@ sealed partial class SqlServerEventStoreClient
 			CorrelationId = row.CorrelationId,
 			CausationId = row.CausationId,
 			UserId = row.UserId,
+			TenantId = _currentTenant.Current.TenantId,
 			Timestamp = row.Timestamp,
 		};
 
@@ -854,7 +868,7 @@ sealed partial class SqlServerEventStoreClient
 		public int EntityType { get; init; }
 		public string AggregateId { get; init; } = default!;
 		public string AggregateType { get; init; } = default!;
-		public int Version { get; init; }
+		public long Version { get; init; }
 		public bool IsDeleted { get; init; }
 		public string? Payload { get; init; }
 		public string? EventType { get; init; }

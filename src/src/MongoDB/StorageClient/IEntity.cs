@@ -1,4 +1,4 @@
-﻿namespace Purview.EventSourcing.MongoDB.StorageClient;
+namespace Purview.EventSourcing.MongoDB.StorageClient;
 
 interface IEntity
 {
@@ -7,4 +7,6 @@ interface IEntity
 	string AggregateId { get; set; }
 
 	int EntityType { get; }
+
+	string? TenantId { get; set; }
 }

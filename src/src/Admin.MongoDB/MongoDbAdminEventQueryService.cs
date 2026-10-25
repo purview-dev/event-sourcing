@@ -1,9 +1,11 @@
+using System.Text.Json;
 using MongoDB.Driver;
+using Purview.EventSourcing.Admin.Failures;
 using Purview.EventSourcing.Admin.Models;
 using Purview.EventSourcing.Admin.Queries;
 using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.MongoDB.Events.Entities;
-using System.Text.Json;
+using Purview.Results;
 
 namespace Purview.EventSourcing.Admin.MongoDB;
 
@@ -24,7 +26,7 @@ public sealed class MongoDBAdminEventQueryService(IMongoClient mongoClient, stri
 	readonly string _databaseName = databaseName ?? throw new ArgumentNullException(nameof(databaseName));
 
 	///<inheritdoc/>
-	public async Task<PagedResult<EventEnvelopeResponse>?> GetRangeAsync(
+	public async Task<Result<PagedResult<EventEnvelopeResponse>, AdminQueryFailure>> GetRangeAsync(
 		string aggregateType,
 		string aggregateId,
 		EventRangeQuery query,
@@ -101,5 +103,8 @@ public sealed class MongoDBAdminEventQueryService(IMongoClient mongoClient, stri
 		return new PagedResult<EventEnvelopeResponse>(envelopes, query.Page, pageSize, total);
 	}
 
-	static JsonElement ParsePayload(string? payload) => string.IsNullOrWhiteSpace(payload) ? JsonSerializer.SerializeToElement("null") : JsonSerializer.SerializeToElement(payload);
+	static JsonElement ParsePayload(string? payload) =>
+		string.IsNullOrWhiteSpace(payload)
+			? JsonSerializer.SerializeToElement("null")
+			: JsonSerializer.SerializeToElement(payload);
 }

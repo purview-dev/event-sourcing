@@ -10,19 +10,21 @@ sealed class EditModel(IQueryableEventStore store) : EventSourcingPageModel
 
 	public async Task OnGetAsync(string id)
 	{
-		Item = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		var itemResult = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		Item = itemResult.IsSuccess ? itemResult.Value : null;
 	}
 
 	public async Task<IActionResult> OnPostReceiveStockAsync(string id, int quantity)
 	{
-		var item = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		var itemResult = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		var item = itemResult.IsSuccess ? itemResult.Value : null;
 		return item == null
 			? NotFound()
 			: await TrySaveAsync(
 				async () =>
 				{
 					item.ReceiveStock(quantity);
-					await store.SaveAsync(item, HttpContext.RequestAborted);
+					return await store.SaveAsync(item, HttpContext.RequestAborted);
 				},
 				$"Received {quantity} unit(s).",
 				RedirectToPage(new { id })
@@ -31,14 +33,15 @@ sealed class EditModel(IQueryableEventStore store) : EventSourcingPageModel
 
 	public async Task<IActionResult> OnPostAdjustStockAsync(string id, int newQuantity, string reason)
 	{
-		var item = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		var itemResult = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		var item = itemResult.IsSuccess ? itemResult.Value : null;
 		return item == null
 			? NotFound()
 			: await TrySaveAsync(
 				async () =>
 				{
 					item.AdjustStock(newQuantity, reason.Trim());
-					await store.SaveAsync(item, HttpContext.RequestAborted);
+					return await store.SaveAsync(item, HttpContext.RequestAborted);
 				},
 				$"Stock adjusted to {newQuantity}.",
 				RedirectToPage(new { id })
@@ -47,14 +50,15 @@ sealed class EditModel(IQueryableEventStore store) : EventSourcingPageModel
 
 	public async Task<IActionResult> OnPostReserveStockAsync(string id, int quantity, string orderId)
 	{
-		var item = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		var itemResult = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		var item = itemResult.IsSuccess ? itemResult.Value : null;
 		return item == null
 			? NotFound()
 			: await TrySaveAsync(
 				async () =>
 				{
 					item.ReserveStock(quantity, orderId.Trim());
-					await store.SaveAsync(item, HttpContext.RequestAborted);
+					return await store.SaveAsync(item, HttpContext.RequestAborted);
 				},
 				$"Reserved {quantity} unit(s) for order {orderId}.",
 				RedirectToPage(new { id })
@@ -63,14 +67,15 @@ sealed class EditModel(IQueryableEventStore store) : EventSourcingPageModel
 
 	public async Task<IActionResult> OnPostReleaseReservationAsync(string id, int quantity, string orderId)
 	{
-		var item = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		var itemResult = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		var item = itemResult.IsSuccess ? itemResult.Value : null;
 		return item == null
 			? NotFound()
 			: await TrySaveAsync(
 				async () =>
 				{
 					item.ReleaseReservation(quantity, orderId.Trim());
-					await store.SaveAsync(item, HttpContext.RequestAborted);
+					return await store.SaveAsync(item, HttpContext.RequestAborted);
 				},
 				$"Released {quantity} unit(s) for order {orderId}.",
 				RedirectToPage(new { id })
@@ -79,14 +84,15 @@ sealed class EditModel(IQueryableEventStore store) : EventSourcingPageModel
 
 	public async Task<IActionResult> OnPostShipStockAsync(string id, int quantity, string orderId)
 	{
-		var item = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		var itemResult = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		var item = itemResult.IsSuccess ? itemResult.Value : null;
 		return item == null
 			? NotFound()
 			: await TrySaveAsync(
 				async () =>
 				{
 					item.ShipStock(quantity, orderId.Trim());
-					await store.SaveAsync(item, HttpContext.RequestAborted);
+					return await store.SaveAsync(item, HttpContext.RequestAborted);
 				},
 				$"Shipped {quantity} unit(s) for order {orderId}.",
 				RedirectToPage(new { id })

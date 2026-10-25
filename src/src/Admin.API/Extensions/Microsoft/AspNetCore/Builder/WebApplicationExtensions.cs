@@ -1,9 +1,11 @@
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Purview.EventSourcing.Admin.Models;
 using Purview.EventSourcing.Admin.API.Endpoints;
+using Purview.EventSourcing.Admin.Models;
+using Purview.EventSourcing.Admin.Services;
 
 namespace Microsoft.AspNetCore.Builder;
 
@@ -40,6 +42,20 @@ public static class WebApplicationExtensions
 			configureEndpoints?.Invoke(endpointOptions);
 
 			var group = app.MapGroup(options.RoutePrefix).WithName("AdminPortal").RequireAuthorization();
+
+			// Added to the group before any endpoint is mapped, so an endpoint added later cannot escape
+			// tenant scoping by forgetting to opt in.
+			if (options.EnforceTenantScope)
+			{
+				var resolver =
+					app.Services.GetService<IAdminTenantResolver>()
+					?? throw new InvalidOperationException(
+						$"{nameof(AdminPortalOptions.EnforceTenantScope)} is enabled but no {nameof(IAdminTenantResolver)} is registered."
+					);
+
+				group.AddEndpointFilter(new AdminTenantScopeFilter(resolver, options.TenantHeaderName));
+			}
+
 			endpointOptions.GroupConvention?.Invoke(group);
 
 			// Map endpoint groups

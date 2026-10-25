@@ -1,4 +1,4 @@
-﻿using Azure;
+using Azure;
 using Azure.Data.Tables;
 
 namespace Purview.EventSourcing.AzureStorage.Entities;
@@ -11,7 +11,7 @@ namespace Purview.EventSourcing.AzureStorage.Entities;
 /// produced the event. The <see cref="PartitionKey"/> is the aggregate id and the <see cref="RowKey"/>
 /// encodes the aggregate version.
 /// </remarks>
-public sealed class EventEntity : ITableEntity
+public sealed class EventEntity : ITableEntity, IHasTenant
 {
 	/// <summary>
 	/// Gets or sets the serialized event payload.
@@ -58,5 +58,10 @@ public sealed class EventEntity : ITableEntity
 	/// <summary>
 	/// Gets or sets the entity tag used for optimistic concurrency.
 	/// </summary>
+	/// <summary>
+	/// The tenant that owns the row; null in a single-tenant deployment.
+	/// </summary>
+	public string? TenantId { get; set; }
+
 	public ETag ETag { get; set; }
 }

@@ -1,13 +1,15 @@
 using System.Diagnostics;
+using Purview.EventSourcing.Failures;
+using Purview.Results;
 
 namespace Purview.EventSourcing.SqlServer.Events;
 
 partial class SqlServerEventStore<T>
 {
 	///<inheritdoc/>
-	public async Task<T?> GetAtAsync(
+	public async Task<Result<T, AggregateReadFailure>> GetAtAsync(
 		string aggregateId,
-		int version,
+		long version,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
 	)
@@ -23,10 +25,10 @@ partial class SqlServerEventStore<T>
 		{
 			var streamVersion = await GetStreamVersionAsync(aggregateId, true, cancellationToken);
 			if (streamVersion == null)
-				return null;
+				return NotFound(aggregateId);
 
-			if (!ReturnAggregate(streamVersion.IsDeleted, aggregateId, operationContext))
-				return null;
+			if (!ReturnAggregate(streamVersion.IsDeleted, operationContext))
+				return Deleted(aggregateId);
 
 			T aggregate = new() { Details = { Id = aggregateId } };
 

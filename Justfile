@@ -139,7 +139,7 @@ perf-runtime *args:
 perf-inmemory *args:
     dotnet run --project {{ benchmarks_project }} --configuration Release -- inmemory {{ args }}
 
-# Run SQL Server event/snapshot performance harness (pass --benchmark for larger runs; requires Docker/Testcontainers)
+# Run SQL Server event/snapshot performance harness (pass --benchmark for larger runs; requires a container runtime - WSL Containers or Docker)
 [group('Performance Tests')]
 perf-sql-server *args:
     dotnet run --project {{ benchmarks_project }} --configuration Release -- sql-server {{ args }}
@@ -154,6 +154,12 @@ test filter="/*/*/*/*" *args:
 [group('Build and Test')]
 test-unit *args:
     just test "/*/*/*/*[Category=Unit]" {{ args }}
+
+# Run the provider integration suites one module at a time, which WSL Containers requires: a session
+# holds an exclusive lock on its image store, so parallel test modules fail to reach it.
+[group('Build and Test')]
+test-integration filter="/*/*/*/*" *args:
+    just test "{{ filter }}" --max-parallel-test-modules 1 {{ args }}
 
 # Pack all packable projects
 [group('Build and Test')]

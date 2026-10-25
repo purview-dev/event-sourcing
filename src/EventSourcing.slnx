@@ -10,9 +10,11 @@
 		<File Path="Directory.Build.targets" />
 	</Folder>
 	<Folder Name="/src/">
+		<Project Path="src/EntityFrameworkCore/EntityFrameworkCore.csproj" />
 		<Project Path="src/EntityFrameworkCore.SourceGenerator/EntityFrameworkCore.SourceGenerator.csproj" />
 		<Project Path="src/EventSourcing/EventSourcing.csproj" />
 		<Project Path="src/SourceGenerator.CodeFixes/SourceGenerator.CodeFixes.csproj" />
+		<Project Path="src/MirrorGenerator/MirrorGenerator.csproj" />
 		<Project Path="src/SourceGenerator/SourceGenerator.csproj" />
 	</Folder>
 	<Folder Name="/src/admin/">
@@ -56,6 +58,7 @@
 		<Project Path="tests/EventSourcing.UnitTests/EventSourcing.UnitTests.csproj" />
 		<Project Path="tests/SharedTestingFramework/SharedTestingFramework.csproj" />
 		<Project Path="tests/SourceGenerator.CodeFixes.UnitTests/SourceGenerator.CodeFixes.UnitTests.csproj" />
+		<Project Path="tests/Skills.UnitTests/Skills.UnitTests.csproj" />
 		<Project Path="tests/SourceGenerator.UnitTests/SourceGenerator.UnitTests.csproj" />
 	</Folder>
 	<Folder Name="/tests/admin/">

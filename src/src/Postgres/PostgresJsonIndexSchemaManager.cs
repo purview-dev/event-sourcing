@@ -99,7 +99,7 @@ static partial class PostgresJsonIndexSchemaManager
 		var normalized = path.Trim();
 		if (normalized.StartsWith("$.", StringComparison.Ordinal))
 			normalized = normalized[2..];
-		else if (normalized.StartsWith('$'))
+		else if (normalized.StartsWith('$', StringComparison.Ordinal))
 			normalized = normalized[1..];
 
 		return normalized.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);

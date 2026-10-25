@@ -1,3 +1,7 @@
+using System.Net;
+using System.Security.Claims;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -9,14 +13,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Purview.EventSourcing.Admin.Failures;
 using Purview.EventSourcing.Admin.Models;
 using Purview.EventSourcing.Admin.Queries;
 using Purview.EventSourcing.Admin.Services;
-using System.Net;
-using System.Net.Http.Json;
-using System.Security.Claims;
-using System.Text.Encodings.Web;
-using System.Text.Json;
+using Purview.Results;
 
 namespace Purview.EventSourcing.Admin.API;
 
@@ -529,12 +530,12 @@ sealed class RecordingAggregateQueryService : IAdminAggregateQueryService
 		return Task.FromResult(new PagedResult<AggregateSummaryResponse>([item], query.Page, query.PageSize, 1));
 	}
 
-	public Task<AggregateSummaryResponse?> GetAsync(
+	public Task<Result<AggregateSummaryResponse, AdminQueryFailure>> GetAsync(
 		string aggregateType,
 		string aggregateId,
 		CancellationToken cancellationToken
 	) =>
-		Task.FromResult<AggregateSummaryResponse?>(
+		Task.FromResult<Result<AggregateSummaryResponse, AdminQueryFailure>>(
 			new AggregateSummaryResponse(
 				aggregateType,
 				aggregateId,
@@ -549,7 +550,7 @@ sealed class RecordingAggregateQueryService : IAdminAggregateQueryService
 
 sealed class RecordingEventQueryService : IAdminEventQueryService
 {
-	public Task<PagedResult<EventEnvelopeResponse>?> GetRangeAsync(
+	public Task<Result<PagedResult<EventEnvelopeResponse>, AdminQueryFailure>> GetRangeAsync(
 		string aggregateType,
 		string aggregateId,
 		EventRangeQuery query,
@@ -569,9 +570,13 @@ sealed class RecordingEventQueryService : IAdminEventQueryService
 				null,
 				null
 			),
-			JsonSerializer.SerializeToElement(/*lang=json,strict*/ """{"customerId":"customer-1"}""")
+			// Deserialize, not SerializeToElement: the latter would turn this JSON text into a JSON
+			// string, where the contract carries the payload as raw JSON.
+			JsonSerializer.Deserialize<JsonElement>( /*lang=json,strict*/
+				"""{"customerId":"customer-1"}"""
+			)
 		);
-		return Task.FromResult<PagedResult<EventEnvelopeResponse>?>(
+		return Task.FromResult<Result<PagedResult<EventEnvelopeResponse>, AdminQueryFailure>>(
 			new PagedResult<EventEnvelopeResponse>([envelope], query.Page, query.PageSize, 1)
 		);
 	}
@@ -579,15 +584,19 @@ sealed class RecordingEventQueryService : IAdminEventQueryService
 
 sealed class RecordingProjectionService : IAdminProjectionService
 {
-	static readonly JsonElement ProjectedState = JsonSerializer.SerializeToElement(/*lang=json,strict*/ """{"event_1":{"eventType":"OrderCreatedEvent","version":1}}""");
+	// Deserialize, not SerializeToElement: the latter would turn this JSON text into a JSON string,
+	// where the contract carries the projected state as raw JSON.
+	static readonly JsonElement ProjectedState = JsonSerializer.Deserialize<JsonElement>( /*lang=json,strict*/
+		"""{"event_1":{"eventType":"OrderCreatedEvent","version":1}}"""
+	);
 
-	public Task<ProjectionResponse?> ProjectAtVersionAsync(
+	public Task<Result<ProjectionResponse, AdminQueryFailure>> ProjectAtVersionAsync(
 		string aggregateType,
 		string aggregateId,
 		long targetVersion,
 		CancellationToken cancellationToken
 	) =>
-		Task.FromResult<ProjectionResponse?>(
+		Task.FromResult<Result<ProjectionResponse, AdminQueryFailure>>(
 			new ProjectionResponse(
 				aggregateType,
 				aggregateId,
@@ -598,13 +607,13 @@ sealed class RecordingProjectionService : IAdminProjectionService
 			)
 		);
 
-	public Task<ProjectionResponse?> ProjectAtTimeAsync(
+	public Task<Result<ProjectionResponse, AdminQueryFailure>> ProjectAtTimeAsync(
 		string aggregateType,
 		string aggregateId,
 		DateTimeOffset targetUtc,
 		CancellationToken cancellationToken
 	) =>
-		Task.FromResult<ProjectionResponse?>(
+		Task.FromResult<Result<ProjectionResponse, AdminQueryFailure>>(
 			new ProjectionResponse(
 				aggregateType,
 				aggregateId,

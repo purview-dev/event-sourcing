@@ -1,11 +1,13 @@
+using System.Text.Json;
 using Azure;
 using Microsoft.Extensions.Options;
 using Purview.EventSourcing.Admin.AzureStorage.Internal;
+using Purview.EventSourcing.Admin.Failures;
 using Purview.EventSourcing.Admin.Models;
 using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.AzureStorage;
 using Purview.EventSourcing.AzureStorage.Entities;
-using System.Text.Json;
+using Purview.Results;
 
 namespace Purview.EventSourcing.Admin.AzureStorage;
 
@@ -22,7 +24,7 @@ public sealed class AzureStorageAdminProjectionService(IOptions<AzureStorageEven
 	: IAdminProjectionService
 {
 	///<inheritdoc/>
-	public async Task<ProjectionResponse?> ProjectAtVersionAsync(
+	public async Task<Result<ProjectionResponse, AdminQueryFailure>> ProjectAtVersionAsync(
 		string aggregateType,
 		string aggregateId,
 		long targetVersion,
@@ -46,7 +48,7 @@ public sealed class AzureStorageAdminProjectionService(IOptions<AzureStorageEven
 	}
 
 	///<inheritdoc/>
-	public async Task<ProjectionResponse?> ProjectAtTimeAsync(
+	public async Task<Result<ProjectionResponse, AdminQueryFailure>> ProjectAtTimeAsync(
 		string aggregateType,
 		string aggregateId,
 		DateTimeOffset targetUtc,
@@ -66,7 +68,7 @@ public sealed class AzureStorageAdminProjectionService(IOptions<AzureStorageEven
 		return BuildProjection(aggregateType, aggregateId, events, $"Events projected up to timestamp {targetUtc:O}");
 	}
 
-	static ProjectionResponse? BuildProjection(
+	static Result<ProjectionResponse, AdminQueryFailure> BuildProjection(
 		string aggregateType,
 		string aggregateId,
 		List<(long Version, EventEntity Event)> events,
@@ -74,7 +76,9 @@ public sealed class AzureStorageAdminProjectionService(IOptions<AzureStorageEven
 	)
 	{
 		if (events.Count == 0)
-			return null;
+			return AdminQueryFailure.Failure<ProjectionResponse>(
+				new AdminAggregateNotFound(aggregateType, aggregateId)
+			);
 
 		List<long> appliedVersions = [];
 		List<long> skippedVersions = [];

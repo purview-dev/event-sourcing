@@ -62,7 +62,7 @@ public sealed class SqlServerSnapshotValueObjectPersistenceTests(SqlServerSnapsh
 		var eventDisplayName2 = (string)
 			eventUserDetails2.GetType().GetProperty(nameof(UserDetails2.DisplayName))!.GetValue(eventUserDetails2)!;
 
-		await Assert.That(saveResult.Saved).IsTrue();
+		await Assert.That(saveResult.IsSuccess && saveResult.Value.Written).IsTrue();
 		await Assert.That(events).Count().IsEqualTo(1);
 		await Assert.That(eventDisplayName).IsEqualTo(displayName);
 		await Assert.That(eventDisplayName2).IsEqualTo(displayName2);

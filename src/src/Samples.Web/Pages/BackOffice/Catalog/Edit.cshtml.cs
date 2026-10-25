@@ -12,21 +12,23 @@ sealed class EditModel(IQueryableEventStore store, IProductImageService imageSer
 
 	public async Task OnGetAsync(string id)
 	{
-		Item = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		var itemResult = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		Item = itemResult.IsSuccess ? itemResult.Value : null;
 		if (Item != null)
 			CurrentImageUrl = await imageService.GetImageUrlAsync(Item.ProductId, HttpContext.RequestAborted);
 	}
 
 	public async Task<IActionResult> OnPostUpdateProductNameAsync(string id, string productName)
 	{
-		var item = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		var itemResult = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		var item = itemResult.IsSuccess ? itemResult.Value : null;
 		return item == null
 			? NotFound()
 			: await TrySaveAsync(
 				async () =>
 				{
 					item.UpdateDetails(productName: productName.Trim());
-					await store.SaveAsync(item, HttpContext.RequestAborted);
+					return await store.SaveAsync(item, HttpContext.RequestAborted);
 				},
 				"Product name updated.",
 				RedirectToPage(new { id })
@@ -41,7 +43,8 @@ sealed class EditModel(IQueryableEventStore store, IProductImageService imageSer
 			return RedirectToPage(new { id });
 		}
 
-		var item = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		var itemResult = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		var item = itemResult.IsSuccess ? itemResult.Value : null;
 		if (item == null)
 			return NotFound();
 
@@ -61,7 +64,8 @@ sealed class EditModel(IQueryableEventStore store, IProductImageService imageSer
 
 	public async Task<IActionResult> OnPostDeleteImageAsync(string id)
 	{
-		var item = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		var itemResult = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		var item = itemResult.IsSuccess ? itemResult.Value : null;
 		if (item == null)
 			return NotFound();
 

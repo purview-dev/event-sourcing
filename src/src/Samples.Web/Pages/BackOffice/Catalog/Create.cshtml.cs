@@ -41,7 +41,8 @@ sealed class CreateModel(IQueryableEventStore store) : PageModel
 		var productName = ProductName.Trim();
 		var locationId = LocationId.Trim();
 
-		var location = await store.GetAsync<LocationAggregate>(locationId, ct);
+		var locationResult = await store.GetAsync<LocationAggregate>(locationId, ct);
+		var location = locationResult.IsSuccess ? locationResult.Value : null;
 		if (location is null || location.Details.IsDeleted)
 		{
 			ModelState.AddModelError(nameof(LocationId), "Please select a valid physical location.");

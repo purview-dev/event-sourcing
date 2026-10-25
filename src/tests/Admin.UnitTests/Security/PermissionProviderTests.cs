@@ -2,8 +2,8 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Purview.EventSourcing.Admin.Models;
-using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.Admin.Security.Providers;
+using Purview.EventSourcing.Admin.Services;
 
 namespace Purview.EventSourcing.Admin.Security;
 

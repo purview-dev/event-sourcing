@@ -17,6 +17,7 @@ public static class HostApplicationBuilderExtensions
 		public TBuilder AddPurviewEventSourcingAdminSqlServer()
 		{
 			builder.Services.TryAddTransient<IAdminAggregateQueryService, SqlServerAdminAggregateQueryService>();
+			builder.Services.TryAddTransient<IAdminStorageProbe, SqlServerAdminStorageProbe>();
 			builder.Services.TryAddTransient<IAdminEventQueryService, SqlServerAdminEventQueryService>();
 			builder.Services.TryAddTransient<IAdminProjectionService, SqlServerAdminProjectionService>();
 

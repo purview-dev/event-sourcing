@@ -1,4 +1,4 @@
-﻿using Purview.EventSourcing.Aggregates;
+using Purview.EventSourcing.Aggregates;
 
 namespace Purview.EventSourcing.AzureStorage;
 
@@ -8,7 +8,7 @@ namespace Purview.EventSourcing.AzureStorage;
 /// <param name="SavedVersion">The last version persisted to the event store.</param>
 /// <param name="SnapshotVersion">The version covered by the most recent snapshot.</param>
 /// <param name="CurrentVersion">The current version of the aggregate.</param>
-public record struct AggregateVersionData(int SavedVersion, int SnapshotVersion, int CurrentVersion)
+public record struct AggregateVersionData(long SavedVersion, long SnapshotVersion, long CurrentVersion)
 {
 	/// <summary>
 	/// Creates an <see cref="AggregateVersionData"/> from the details of the given <paramref name="aggregate"/>.

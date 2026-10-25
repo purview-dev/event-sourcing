@@ -2,8 +2,10 @@ using System.Globalization;
 using Microsoft.Extensions.Caching.Distributed;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
+using Purview.EventSourcing.Failures;
 using Purview.EventSourcing.MongoDB.Events;
 using Purview.EventSourcing.MongoDB.Events.Entities;
+using Purview.Results;
 
 namespace Purview.EventSourcing.MongoDB;
 
@@ -11,13 +13,13 @@ partial class MongoDBEventStore<T>
 {
 	///<inheritdoc/>
 	[System.Diagnostics.DebuggerStepThrough]
-	public Task<T?> GetAsync(
+	public Task<Result<T, AggregateReadFailure>> GetAsync(
 		string aggregateId,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
 	) => GetCoreAsync(aggregateId, operationContext, cancellationToken);
 
-	async Task<T?> GetCoreAsync(
+	async Task<Result<T, AggregateReadFailure>> GetCoreAsync(
 		string aggregateId,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -45,9 +47,9 @@ partial class MongoDBEventStore<T>
 			{
 				_eventStoreTelemetry.AggregateRetrievedFromCache(aggregateId, _aggregateTypeFullName);
 
-				return ReturnAggregate(aggregate.Details.IsDeleted, aggregateId, operationContext)
+				return ReturnAggregate(aggregate.Details.IsDeleted, operationContext)
 					? PrepareAggregateForReturn(aggregate, _aggregateRequirementsManager)
-					: null;
+					: Deleted(aggregateId);
 			}
 
 			// Single-flight: when the aggregate will be written back to the cache, serialize
@@ -73,30 +75,30 @@ partial class MongoDBEventStore<T>
 				{
 					_eventStoreTelemetry.AggregateRetrievedFromCache(aggregateId, _aggregateTypeFullName);
 
-					return ReturnAggregate(cached.Details.IsDeleted, aggregateId, operationContext)
+					return ReturnAggregate(cached.Details.IsDeleted, operationContext)
 						? PrepareAggregateForReturn(cached, _aggregateRequirementsManager)
-						: null;
+						: Deleted(aggregateId);
 				}
 			}
 
 			var streamVersion = await GetStreamVersionAsync(aggregateId, true, cancellationToken);
 			if (streamVersion == null)
-				return null;
+				return NotFound(aggregateId);
 
-			if (!ReturnAggregate(streamVersion.IsDeleted, aggregateId, operationContext))
-				return null;
+			if (!ReturnAggregate(streamVersion.IsDeleted, operationContext))
+				return Deleted(aggregateId);
 
 			//** THIS ISN'T CORRECT, SO WE'RE PASSING IN NULL TO ENABLE ALL ADDITIONAL EVENTS **//
 			// TODO: It's only odd as in I haven't thought it through completely...
 
-			//int? streamVersionIdentifier = streamVersion.Version;
+			//long? streamVersionIdentifier = streamVersion.Version;
 			//if (streamVersionIdentifier < 1)
 			//	// Passing in null for the maxVersion, because we want it to go and find all additional events
 			//	// because we don't have a valid version.
 			//	streamVersionIdentifier = null;
 
 			// Passing in null for the maxVersion, because we want it to go and find all additional events
-			int? streamVersionIdentifier = null;
+			long? streamVersionIdentifier = null;
 			if (!operationContext.SkipSnapshot)
 			{
 				// If there's no snapshot, then this isn't doing a create (as in brand new
@@ -125,6 +127,7 @@ partial class MongoDBEventStore<T>
 				_aggregateTypeFullName,
 				getStopwatch.ElapsedMilliseconds
 			);
+			_metrics.GetDuration(getStopwatch.Elapsed.TotalMilliseconds, _aggregateTypeShortName);
 		}
 
 		async Task<bool> IsCacheHitFreshAsync(T aggregate, string aggregateId, CancellationToken cancellationToken)
@@ -153,7 +156,7 @@ partial class MongoDBEventStore<T>
 	async Task GetAndApplyEventsAsync(
 		T aggregate,
 		StreamVersionEntity streamVersion,
-		int? maxVersion,
+		long? maxVersion,
 		CancellationToken cancellationToken
 	)
 	{

@@ -1,16 +1,16 @@
+using System.Linq.Expressions;
+using System.Reflection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Purview.EventSourcing.Admin.Models;
-using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.Admin.Security;
+using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Snapshotting;
 using Purview.EventSourcing.Services;
-using System.Linq.Expressions;
-using System.Reflection;
 
 namespace Purview.EventSourcing.Admin.API.Endpoints;
 
@@ -151,11 +151,8 @@ public static class AdminSnapshotEndpoints
 
 		// Load from the canonical event stream, then persist a fresh snapshot through the queryable store.
 		var getAsync = GenericInterfaceMethod(typeof(IEventStore), "GetAsync", parameterCount: 3);
-		var aggregate = await InvokeGenericAsync(
-			getAsync,
-			aggregateTypeSymbol,
-			eventStore,
-			[aggregateId, null, cancellationToken]
+		var aggregate = UnwrapResultValue(
+			await InvokeGenericAsync(getAsync, aggregateTypeSymbol, eventStore, [aggregateId, null, cancellationToken])
 		);
 		if (aggregate is null)
 			return TypedResults.NotFound();
@@ -167,8 +164,8 @@ public static class AdminSnapshotEndpoints
 			queryableStore,
 			[aggregate, null, cancellationToken]
 		);
-		var rebuilt =
-			saveResult is not null && (bool)(saveResult.GetType().GetProperty("Saved")?.GetValue(saveResult) ?? false);
+		var outcome = UnwrapResultValue(saveResult);
+		var rebuilt = outcome?.GetType().GetProperty("Written")?.GetValue(outcome) is true;
 		var currentVersion = aggregate is IAggregate value ? value.Details.CurrentVersion : 0;
 
 		await auditLogger.LogAsync(
@@ -204,6 +201,20 @@ public static class AdminSnapshotEndpoints
 		return task.GetType().GetProperty("Result")?.GetValue(task);
 	}
 
+	// GetAsync returns Result<T, AggregateReadFailure>, so reflection sees the boxed result rather than
+	// the aggregate. A failure unwraps to null, which the caller already treats as "not found".
+	static object? UnwrapResultValue(object? result)
+	{
+		if (result is null)
+			return null;
+
+		var resultType = result.GetType();
+
+		return resultType.GetProperty("IsSuccess")?.GetValue(result) is true
+			? resultType.GetProperty("Value")?.GetValue(result)
+			: null;
+	}
+
 	static LambdaExpression BuildIdEqualsExpression(Type aggregateType, string aggregateId)
 	{
 		var parameter = Expression.Parameter(aggregateType, "x");
@@ -228,7 +239,7 @@ public sealed record SnapshotStatusResponse(
 	string AggregateType,
 	string AggregateId,
 	bool Exists,
-	int CurrentVersion,
+	long CurrentVersion,
 	int SchemaVersion
 );
 
@@ -243,5 +254,5 @@ public sealed record SnapshotRebuildResponse(
 	string AggregateType,
 	string AggregateId,
 	bool Rebuilt,
-	int CurrentVersion
+	long CurrentVersion
 );

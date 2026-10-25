@@ -18,7 +18,8 @@ public sealed class PostgresProviderIntegrationTests(PostgresSnapshotEventStoreF
 
 		await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
-		var rehydrated = await store.GetAsync(aggregate.Details.Id, cancellationToken: cancellationToken);
+		var rehydratedResult = await store.GetAsync(aggregate.Details.Id, cancellationToken: cancellationToken);
+		var rehydrated = rehydratedResult.IsSuccess ? rehydratedResult.Value : null;
 		await Assert.That(rehydrated).IsNotNull();
 		await Assert.That(rehydrated!.Int32Value).IsEqualTo(123);
 		await Assert.That(rehydrated.StringProperty).Contains("hello");
@@ -78,7 +79,12 @@ public sealed class PostgresProviderIntegrationTests(PostgresSnapshotEventStoreF
 
 		await using (var setupContext = new ExecuteUpdateDBContext(options, tableName))
 		{
-			await setupContext.Database.EnsureCreatedAsync(cancellationToken);
+			// Not EnsureCreatedAsync: it creates nothing once the database holds any table, so this
+			// test's uniquely named table was skipped whenever another test had already created one.
+			await setupContext.Database.ExecuteSqlRawAsync(
+				setupContext.Database.GenerateCreateScript(),
+				cancellationToken
+			);
 			setupContext.Rows.Add(
 				new ExecuteUpdateRow
 				{
@@ -174,7 +180,7 @@ public sealed class PostgresProviderIntegrationTests(PostgresSnapshotEventStoreF
 
 	sealed class ExecuteUpdateState
 	{
-		public int Version { get; set; }
+		public long Version { get; set; }
 
 		public required string Status { get; set; }
 	}

@@ -1,15 +1,16 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
-using System.Security.Claims;
 using MongoDB.Driver;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
+using Purview.EventSourcing.Cryptography;
+using Purview.EventSourcing.Exceptions;
+using Purview.EventSourcing.Failures;
 using Purview.EventSourcing.MongoDB.Events.Entities;
-using Purview.EventSourcing.MongoDB.Events.Exceptions;
 using Purview.EventSourcing.MongoDB.StorageClient;
-using Purview.EventSourcing.Storage;
 using Purview.EventSourcing.Validation;
+using Purview.Results;
 
 namespace Purview.EventSourcing.MongoDB;
 
@@ -17,22 +18,31 @@ partial class MongoDBEventStore<T>
 {
 	///<inheritdoc/>
 	[DebuggerStepThrough]
-	public Task<SaveResult<T>> SaveAsync(
+	public Task<Result<SaveOutcome<T>, AggregateSaveFailure>> SaveAsync(
 		[NotNull] T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
 	) => SaveCoreAsync(aggregate, operationContext, cancellationToken);
 
-	async Task<SaveResult<T>> SaveCoreAsync(
+	async Task<Result<SaveOutcome<T>, AggregateSaveFailure>> SaveCoreAsync(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken,
 		params EventRecord[] additionalEvents
 	)
 	{
+		var saveStopwatch = System.Diagnostics.Stopwatch.StartNew();
 		var preparation = await PrepareSaveAsync(aggregate, operationContext, additionalEvents, cancellationToken);
+		var result = preparation.Terminal ?? await PersistAndNotifyAsync(preparation, cancellationToken);
 
-		return preparation.Terminal ?? await PersistAndNotifyAsync(preparation, cancellationToken);
+		saveStopwatch.Stop();
+		_metrics.RecordSave(saveStopwatch.Elapsed.TotalMilliseconds, _aggregateTypeShortName, result);
+
+		// Only a write actually appended events; a no-op or an idempotent replay appended none.
+		if (result.IsSuccess && result.Value.Kind is SaveOutcomeKind.Written)
+			_metrics.EventsAppended(preparation.ChangeEvents.Length, _aggregateTypeShortName);
+
+		return result;
 	}
 
 	async Task<MongoSavePreparation> PrepareSaveAsync(
@@ -51,7 +61,7 @@ partial class MongoDBEventStore<T>
 
 		if (!validationResult.IsValid)
 			return new MongoSavePreparation(
-				SaveResultBuilder.Create(aggregate, false, false, validationResult),
+				AggregateSaveFailure.Failure<SaveOutcome<T>>(new AggregateInvalid(validationResult)),
 				aggregate,
 				operationContext,
 				idempotencyId,
@@ -62,17 +72,17 @@ partial class MongoDBEventStore<T>
 
 		if (aggregate.Details.Locked)
 		{
-			return operationContext.LockMode is LockHandlingMode.ThrowsException
-				? throw new AggregateLockedException(idempotencyId)
-				: new MongoSavePreparation(
-					SaveResultBuilder.Create(aggregate, false, false),
-					aggregate,
-					operationContext,
-					idempotencyId,
-					[],
-					isNew: false,
-					marker: null
-				);
+			return new MongoSavePreparation(
+				AggregateSaveFailure.Failure<SaveOutcome<T>>(
+					new AggregateLocked(aggregate.AggregateType, aggregate.Id())
+				),
+				aggregate,
+				operationContext,
+				idempotencyId,
+				[],
+				isNew: false,
+				marker: null
+			);
 		}
 
 		if (string.IsNullOrWhiteSpace(aggregate.Details.Id))
@@ -88,7 +98,7 @@ partial class MongoDBEventStore<T>
 			);
 
 			return new MongoSavePreparation(
-				SaveResultBuilder.Create(aggregate, false, true),
+				new SaveOutcome<T>(aggregate, SaveOutcomeKind.NoChanges),
 				aggregate,
 				operationContext,
 				idempotencyId,
@@ -121,7 +131,7 @@ partial class MongoDBEventStore<T>
 			{
 				_eventStoreTelemetry.EventsAlreadyApplied(aggregate.Id(), idempotencyId);
 				return new MongoSavePreparation(
-					SaveResultBuilder.Create(aggregate, true, true),
+					new SaveOutcome<T>(aggregate, SaveOutcomeKind.AlreadyApplied),
 					aggregate,
 					operationContext,
 					idempotencyId,
@@ -143,7 +153,7 @@ partial class MongoDBEventStore<T>
 		);
 	}
 
-	async Task<SaveResult<T>> PersistAndNotifyAsync(
+	async Task<Result<SaveOutcome<T>, AggregateSaveFailure>> PersistAndNotifyAsync(
 		MongoSavePreparation preparation,
 		CancellationToken cancellationToken
 	)
@@ -165,11 +175,11 @@ partial class MongoDBEventStore<T>
 
 		var streamEntity = await GetStreamVersionAsync(aggregate.Id(), !isNew, cancellationToken);
 		var hasStreamEntity = streamEntity != null;
-		if (streamEntity?.IsDeleted == true)
+		if (streamEntity?.IsDeleted == true && !changeEvents.Any(record => record.Event is Restored))
 		{
-			var throwIfDeleted = !changeEvents.Any(record => record.Event is Restored);
-			if (throwIfDeleted)
-				throw new AggregateDeletedException(aggregate.Id(), idempotencyId);
+			return AggregateSaveFailure.Failure<SaveOutcome<T>>(
+				new AggregateDeleted(aggregate.AggregateType, aggregate.Id())
+			);
 		}
 
 		try
@@ -193,7 +203,7 @@ partial class MongoDBEventStore<T>
 			else
 				batchOperation.Update(streamEntity);
 
-			var userId = ClaimsPrincipal.Current?.FindFirst(operationContext.ClaimIdentifier)?.Value;
+			var userId = _principalAccessor.GetPrincipal()?.FindFirst(operationContext.ClaimIdentifier)?.Value;
 			if (operationContext.RequiresValidPrincipalIdentifier && string.IsNullOrWhiteSpace(userId))
 				throw new NullReferenceException(
 					$"Missing ClaimsPrincipal identifier '{operationContext.ClaimIdentifier}'. Unable to save aggregate."
@@ -211,7 +221,11 @@ partial class MongoDBEventStore<T>
 					CorrelationId = changeEvents[i].Metadata.CorrelationId ?? operationContext.CorrelationId,
 				};
 
-				var serializedEvent = SerializeEvent(changeEvent);
+				var serializedEvent = await ProtectIfRequiredAsync(
+					changeEvent,
+					SerializeEvent(changeEvent),
+					cancellationToken
+				);
 				var eventEntity = CreateSerializedEvent(
 					aggregate.Id(),
 					changeEvent,
@@ -263,20 +277,37 @@ partial class MongoDBEventStore<T>
 		{
 			ClearCacheFireAndForget(aggregate);
 
-			if (operationContext.NotificationMode.HasFlag(NotificationModes.OnFailure))
-			{
-				var deleteRequested = changeEvents.Any(record => record.Event is Deleted);
-				await _aggregateChangeNotifier.FailureAsync(aggregate, deleteRequested, ex, cancellationToken);
-			}
+			await HandleSaveFailureAsync(aggregate, operationContext, changeEvents, ex, cancellationToken);
+
+			if (ex is ConcurrencyException conflict)
+				return AggregateSaveFailure.Failure<SaveOutcome<T>>(ToConcurrencyConflict(aggregate, conflict));
 
 			throw;
 		}
 
-		return SaveResultBuilder.Create(aggregate, true, false);
+		return new SaveOutcome<T>(aggregate, SaveOutcomeKind.Written);
+	}
+
+	static ConcurrencyConflict ToConcurrencyConflict(T aggregate, ConcurrencyException exception) =>
+		new(aggregate.AggregateType, aggregate.Id(), exception.VersionAttempted, exception.Version);
+
+	async Task HandleSaveFailureAsync(
+		T aggregate,
+		EventStoreOperationContext operationContext,
+		EventRecord[] changeEvents,
+		Exception exception,
+		CancellationToken cancellationToken
+	)
+	{
+		if (!operationContext.NotificationMode.HasFlag(NotificationModes.OnFailure))
+			return;
+
+		var deleteRequested = changeEvents.Any(record => record.Event is Deleted);
+		await _aggregateChangeNotifier.FailureAsync(aggregate, deleteRequested, exception, cancellationToken);
 	}
 
 	sealed class MongoSavePreparation(
-		SaveResult<T>? terminal,
+		Result<SaveOutcome<T>, AggregateSaveFailure>? terminal,
 		T aggregate,
 		EventStoreOperationContext operationContext,
 		string idempotencyId,
@@ -285,7 +316,7 @@ partial class MongoDBEventStore<T>
 		IdempotencyMarkerEntity? marker
 	)
 	{
-		public SaveResult<T>? Terminal => terminal;
+		public Result<SaveOutcome<T>, AggregateSaveFailure>? Terminal => terminal;
 		public T Aggregate => aggregate;
 		public EventStoreOperationContext OperationContext => operationContext;
 		public string IdempotencyId => idempotencyId;
@@ -304,8 +335,14 @@ partial class MongoDBEventStore<T>
 		;
 	}
 
-	static bool ShouldSnapShot(T aggregate, EventRecord[] events)
+	bool ShouldSnapShot(T aggregate, EventRecord[] events)
 	{
+		// A snapshot serializes aggregate state, which holds the same personal data as the protected
+		// events in clear - and one snapshot can span many subjects, so no single key can protect it.
+		// With protection enabled the store does not snapshot at all: a snapshot surviving key erasure
+		// would make crypto-shredding untrue. Replay from events stays correct, only slower.
+		if (_payloadProtector is not null)
+			return false;
 		return aggregate.Details.IsDeleted || events.Any(record => record.Event is Restored) || events.Length > 0;
 	}
 
@@ -443,4 +480,17 @@ partial class MongoDBEventStore<T>
 			}
 		});
 	}
+
+	/// <summary>
+	/// Encrypts a serialized payload when its event names a data subject.
+	/// </summary>
+	/// <remarks>
+	/// Applied after serialization so the stored payload is the envelope, which keeps the persistence
+	/// schema unchanged. An event with no data subject, or a store with no protector configured, is
+	/// stored as before.
+	/// </remarks>
+	Task<string> ProtectIfRequiredAsync(object changeEvent, string serialized, CancellationToken cancellationToken) =>
+		_payloadProtector is not null && changeEvent is IEventDataSubject dataSubject
+			? _payloadProtector.ProtectAsync(serialized, dataSubject.DataSubjectId, cancellationToken)
+			: Task.FromResult(serialized);
 }

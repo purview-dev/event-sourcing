@@ -202,6 +202,6 @@ public sealed class AdminAPIClientTests(AppHostFixture fixture)
 			.SetShippingAddress("1 Client Test Way");
 
 		var result = await store.SaveAsync(order, cancellationToken);
-		return (result.Aggregate.Id(), customerId);
+		return (result.Value.Aggregate.Id(), customerId);
 	}
 }

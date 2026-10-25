@@ -11,4 +11,13 @@ partial class ContainerHelper
 	public const string CosmosDbImageTag = "vnext-latest";
 
 	public const string MongoDBImageTag = "8.0";
+
+	public const string MongoDBReplicaSetName = "rs0";
+
+	/// <summary>
+	/// The published development account key every Azure Storage emulator accepts. It is a fixed,
+	/// documented constant rather than a credential.
+	/// </summary>
+	public const string AzuriteWellKnownAccountKey =
+		"Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==";
 }

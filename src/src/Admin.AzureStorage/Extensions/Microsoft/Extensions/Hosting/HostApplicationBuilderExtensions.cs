@@ -17,6 +17,7 @@ public static class HostApplicationBuilderExtensions
 		public TBuilder AddPurviewEventSourcingAdminAzureStorage()
 		{
 			builder.Services.TryAddTransient<IAdminAggregateQueryService, AzureStorageAdminAggregateQueryService>();
+			builder.Services.TryAddTransient<IAdminStorageProbe, AzureStorageAdminStorageProbe>();
 			builder.Services.TryAddTransient<IAdminEventQueryService, AzureStorageAdminEventQueryService>();
 			builder.Services.TryAddTransient<IAdminProjectionService, AzureStorageAdminProjectionService>();
 

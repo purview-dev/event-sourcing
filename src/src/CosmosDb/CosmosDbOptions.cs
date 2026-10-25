@@ -77,6 +77,10 @@ public class CosmosDbOptions
 	/// <summary>
 	/// Gets or sets the partition key path used when creating the container.
 	/// </summary>
+	/// <remarks>
+	/// Snapshot documents are partitioned by aggregate type, so this must remain
+	/// <c>"/AggregateType"</c>; any other value is rejected when the store is created.
+	/// </remarks>
 	[Required]
 	[RegularExpression("^[/].+$")]
 	public string PartitionKeyPath { get; set; } = default!;

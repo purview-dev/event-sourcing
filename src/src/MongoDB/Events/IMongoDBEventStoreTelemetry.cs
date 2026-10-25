@@ -40,7 +40,7 @@ public interface IMongoDBEventStoreTelemetry
 	void GetAggregateAtSpecificVersionFailed(
 		string aggregateId,
 		string aggregateTypeFullName,
-		int specificVersion,
+		long specificVersion,
 		Exception exception
 	);
 
@@ -68,7 +68,7 @@ public interface IMongoDBEventStoreTelemetry
 	/// <param name="specificVersion">The version the aggregate is requested at.</param>
 	/// <param name="aggregateTypeFullName">The full name of the aggregate type.</param>
 	[Debug]
-	void GetAggregateAtSpecificVersionStart(string aggregateId, int specificVersion, string aggregateTypeFullName);
+	void GetAggregateAtSpecificVersionStart(string aggregateId, long specificVersion, string aggregateTypeFullName);
 
 	/// <summary>
 	/// Logs that a save operation contained no changes to persist.
@@ -93,7 +93,7 @@ public interface IMongoDBEventStoreTelemetry
 		string aggregateTypeFullName,
 		string aggregateType,
 		string eventType,
-		int aggregateVersion
+		long aggregateVersion
 	);
 
 	/// <summary>
@@ -112,7 +112,7 @@ public interface IMongoDBEventStoreTelemetry
 		string aggregateType,
 		string eventType,
 		string eventTypeFullName,
-		int aggregateVersion
+		long aggregateVersion
 	);
 
 	/// <summary>
@@ -233,7 +233,7 @@ public interface IMongoDBEventStoreTelemetry
 	void GetAggregateAtSpecificVersionComplete(
 		string aggregateId,
 		string aggregateTypeFullName,
-		int specificVersion,
+		long specificVersion,
 		long elapsedMilliseconds
 	);
 
@@ -327,7 +327,7 @@ public interface IMongoDBEventStoreTelemetry
 	/// <param name="aggregateType">The short name of the aggregate type.</param>
 	/// <param name="isDeleted">Whether the aggregate is soft-deleted.</param>
 	[Debug]
-	void StreamVersionFound(string aggregateId, int streamVersion, string aggregateType, bool isDeleted);
+	void StreamVersionFound(string aggregateId, long streamVersion, string aggregateType, bool isDeleted);
 
 	/// <summary>
 	/// Logs that reading the stream version record failed.

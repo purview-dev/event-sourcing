@@ -15,7 +15,12 @@ public class OrderAggregateTests
 		if (id is not null)
 			order.Details.Id = id;
 
-		order.CreateOrder("customer-1").SetShippingAddress(shippingAddress: shippingAddress);
+		order.CreateOrder("customer-1");
+
+		// Only when one was asked for: SetShippingAddress normalizes null to an empty string, so
+		// calling it unconditionally would raise an extra event and leave ShippingAddress non-null.
+		if (shippingAddress is not null)
+			order.SetShippingAddress(shippingAddress: shippingAddress);
 
 		if (withItems)
 		{

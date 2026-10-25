@@ -1,11 +1,13 @@
 using Azure;
 using Microsoft.Extensions.Options;
+using Purview.EventSourcing.Admin.AzureStorage.Internal;
+using Purview.EventSourcing.Admin.Failures;
 using Purview.EventSourcing.Admin.Models;
 using Purview.EventSourcing.Admin.Queries;
 using Purview.EventSourcing.Admin.Services;
-using Purview.EventSourcing.Admin.AzureStorage.Internal;
 using Purview.EventSourcing.AzureStorage;
 using Purview.EventSourcing.AzureStorage.Entities;
+using Purview.Results;
 
 namespace Purview.EventSourcing.Admin.AzureStorage;
 
@@ -106,7 +108,7 @@ public sealed class AzureStorageAdminAggregateQueryService(IOptions<AzureStorage
 	}
 
 	///<inheritdoc/>
-	public async Task<AggregateSummaryResponse?> GetAsync(
+	public async Task<Result<AggregateSummaryResponse, AdminQueryFailure>> GetAsync(
 		string aggregateType,
 		string aggregateId,
 		CancellationToken cancellationToken
@@ -117,7 +119,11 @@ public sealed class AzureStorageAdminAggregateQueryService(IOptions<AzureStorage
 
 		AggregateSearchQuery query = new(aggregateType, aggregateId, null, null, null, null, 1, 1);
 		var result = await SearchAsync(query, cancellationToken);
-		return result.Items.Count == 0 ? null : result.Items[0];
+		return result.Items.Count == 0
+			? AdminQueryFailure.Failure<AggregateSummaryResponse>(
+				new AdminAggregateNotFound(aggregateType, aggregateId)
+			)
+			: result.Items[0];
 	}
 
 	static IEnumerable<AggregateSummaryResponse> ApplySort(IEnumerable<AggregateSummaryResponse> rows, string sort)

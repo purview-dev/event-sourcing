@@ -1,4 +1,4 @@
-﻿namespace Purview.EventSourcing.SqlServer.Events.EntityFramework;
+namespace Purview.EventSourcing.SqlServer.Events.EntityFramework;
 
 /// <summary>
 /// EF Core entity model representing a row in the SQL Server event store table.
@@ -29,7 +29,7 @@ public sealed class EventStoreEntity
 	/// <summary>
 	/// The event or stream version number.
 	/// </summary>
-	public int Version { get; set; }
+	public long Version { get; set; }
 
 	/// <summary>
 	/// Whether this aggregate has been soft-deleted.
@@ -62,6 +62,9 @@ public sealed class EventStoreEntity
 
 	/// <summary>The user identifier recorded with the event.</summary>
 	public string? UserId { get; set; }
+
+	/// <summary>The tenant that owns the row; null in a single-tenant deployment.</summary>
+	public string? TenantId { get; set; }
 
 	/// <summary>
 	/// UTC timestamp of when this row was created or last modified.

@@ -88,8 +88,8 @@ static class AzureStorageAdminTableHelpers
 		string aggregateId,
 		string eventPrefix,
 		int eventSuffixLength,
-		int versionFrom,
-		int? versionTo
+		long versionFrom,
+		long? versionTo
 	)
 	{
 		var fromKey = BuildEventRowKey(eventPrefix, eventSuffixLength, versionFrom);
@@ -97,15 +97,15 @@ static class AzureStorageAdminTableHelpers
 		return $"(PartitionKey eq '{aggregateId}') and ((RowKey ge '{fromKey}') and (RowKey le '{toKey}'))";
 	}
 
-	public static string BuildEventRowKey(string eventPrefix, int eventSuffixLength, int version) =>
+	public static string BuildEventRowKey(string eventPrefix, int eventSuffixLength, long version) =>
 		$"{eventPrefix}_{version.ToString(System.Globalization.CultureInfo.InvariantCulture).PadLeft(eventSuffixLength, '0')}";
 
-	public static bool TryParseEventVersion(string rowKey, string eventPrefix, out int version)
+	public static bool TryParseEventVersion(string rowKey, string eventPrefix, out long version)
 	{
 		version = default;
 		var prefix = $"{eventPrefix}_";
 		return rowKey.StartsWith(prefix, StringComparison.Ordinal)
-			&& int.TryParse(rowKey[prefix.Length..], out version);
+			&& long.TryParse(rowKey[prefix.Length..], out version);
 	}
 
 	public static bool MatchesAggregateType(string persistedAggregateType, string requestedAggregateType) =>

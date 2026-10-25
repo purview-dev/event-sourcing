@@ -2,7 +2,9 @@ using System.Collections.Concurrent;
 using System.ComponentModel;
 using Microsoft.Extensions.DependencyInjection;
 using Purview.EventSourcing.Aggregates;
+using Purview.EventSourcing.Failures;
 using Purview.EventSourcing.Internal;
+using Purview.Results;
 
 namespace Purview.EventSourcing;
 
@@ -31,7 +33,7 @@ public sealed class EventStoreFacade(IServiceProvider serviceProvider) : IEventS
 		where T : class, IAggregate, new() => GetEventStore<T>().CreateAsync(aggregateId, cancellationToken);
 
 	///<inheritdoc/>
-	public Task<T?> GetOrCreateAsync<T>(
+	public Task<Result<T, AggregateReadFailure>> GetOrCreateAsync<T>(
 		string? aggregateId,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -40,7 +42,7 @@ public sealed class EventStoreFacade(IServiceProvider serviceProvider) : IEventS
 		GetEventStore<T>().GetOrCreateAsync(aggregateId, operationContext, cancellationToken);
 
 	///<inheritdoc/>
-	public Task<T?> GetAsync<T>(
+	public Task<Result<T, AggregateReadFailure>> GetAsync<T>(
 		string aggregateId,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -49,9 +51,9 @@ public sealed class EventStoreFacade(IServiceProvider serviceProvider) : IEventS
 		GetEventStore<T>().GetAsync(aggregateId, operationContext, cancellationToken);
 
 	///<inheritdoc/>
-	public Task<T?> GetAtAsync<T>(
+	public Task<Result<T, AggregateReadFailure>> GetAtAsync<T>(
 		string aggregateId,
-		int version,
+		long version,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
 	)
@@ -59,7 +61,7 @@ public sealed class EventStoreFacade(IServiceProvider serviceProvider) : IEventS
 		GetEventStore<T>().GetAtAsync(aggregateId, version, operationContext, cancellationToken);
 
 	///<inheritdoc/>
-	public Task<SaveResult<T>> SaveAsync<T>(
+	public Task<Result<SaveOutcome<T>, AggregateSaveFailure>> SaveAsync<T>(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -68,15 +70,14 @@ public sealed class EventStoreFacade(IServiceProvider serviceProvider) : IEventS
 		GetEventStore<T>().SaveAsync(aggregate, operationContext, cancellationToken);
 
 	///<inheritdoc/>
-	public Task<bool> IsDeletedAsync<T>(string aggregateId, CancellationToken cancellationToken = default)
-		where T : class, IAggregate, new() => GetEventStore<T>().IsDeletedAsync(aggregateId, cancellationToken);
-
-	///<inheritdoc/>
-	public Task<T?> GetDeletedAsync<T>(string aggregateId, CancellationToken cancellationToken = default)
+	public Task<Result<T, AggregateReadFailure>> GetDeletedAsync<T>(
+		string aggregateId,
+		CancellationToken cancellationToken = default
+	)
 		where T : class, IAggregate, new() => GetEventStore<T>().GetDeletedAsync(aggregateId, cancellationToken);
 
 	///<inheritdoc/>
-	public Task<bool> DeleteAsync<T>(
+	public Task<Result<SaveOutcome<T>, AggregateDeleteFailure>> DeleteAsync<T>(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -85,7 +86,7 @@ public sealed class EventStoreFacade(IServiceProvider serviceProvider) : IEventS
 		GetEventStore<T>().DeleteAsync(aggregate, operationContext, cancellationToken);
 
 	///<inheritdoc/>
-	public Task<bool> RestoreAsync<T>(
+	public Task<Result<SaveOutcome<T>, AggregateRestoreFailure>> RestoreAsync<T>(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -102,7 +103,7 @@ public sealed class EventStoreFacade(IServiceProvider serviceProvider) : IEventS
 		GetEventStore<T>().GetAggregateIdsAsync(includeDeleted, cancellationToken);
 
 	///<inheritdoc/>
-	public Task<ExistsState> ExistsAsync<T>(string aggregateId, CancellationToken cancellationToken = default)
+	public Task<AggregateExistence> ExistsAsync<T>(string aggregateId, CancellationToken cancellationToken = default)
 		where T : class, IAggregate, new() => GetEventStore<T>().ExistsAsync(aggregateId, cancellationToken);
 
 	///<inheritdoc/>
@@ -112,8 +113,8 @@ public sealed class EventStoreFacade(IServiceProvider serviceProvider) : IEventS
 	///<inheritdoc/>
 	public IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync<T>(
 		string aggregateId,
-		int versionFrom,
-		int? versionTo,
+		long versionFrom,
+		long? versionTo,
 		CancellationToken cancellationToken
 	)
 		where T : class, IAggregate, new() =>

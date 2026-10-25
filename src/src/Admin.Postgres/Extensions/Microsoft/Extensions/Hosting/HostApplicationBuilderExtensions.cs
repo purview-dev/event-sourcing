@@ -16,6 +16,7 @@ public static class HostApplicationBuilderExtensions
 		public TBuilder AddPurviewEventSourcingAdminPostgres()
 		{
 			builder.Services.TryAddTransient<IAdminAggregateQueryService, PostgresAdminAggregateQueryService>();
+			builder.Services.TryAddTransient<IAdminStorageProbe, PostgresAdminStorageProbe>();
 			builder.Services.TryAddTransient<IAdminEventQueryService, PostgresAdminEventQueryService>();
 			builder.Services.TryAddTransient<IAdminProjectionService, PostgresAdminProjectionService>();
 

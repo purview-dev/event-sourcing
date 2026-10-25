@@ -1,8 +1,8 @@
-using Purview.EventSourcing.Aggregates.Events;
-using Purview.EventSourcing.Aggregates.Exceptions;
 using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using Purview.EventSourcing.Aggregates.Events;
+using Purview.EventSourcing.Aggregates.Exceptions;
 
 namespace Purview.EventSourcing.Aggregates;
 
@@ -178,7 +178,7 @@ public abstract class AggregateBase : IAggregate
 			RecordAndApply(new ForceSaved());
 	}
 
-	internal void RecordSkippedEvent(int aggregateVersion, string? eventTypeName, bool isUnknown)
+	internal void RecordSkippedEvent(long aggregateVersion, string? eventTypeName, bool isUnknown)
 	{
 		_skippedEvents ??= [];
 		_skippedEvents.Add(new SkippedEventRecord(aggregateVersion, eventTypeName, isUnknown));

@@ -1,9 +1,17 @@
 <Project>
 	<PropertyGroup>
 		<NamespacePrefix>Purview.EventSourcing</NamespacePrefix>
+		<!-- Set before the SDK import so everything the SDK derives from the target framework sees it.
+		     Roslyn components pin netstandard2.0 in their own project files, which wins over this. -->
+		<TargetFramework>net11.0</TargetFramework>
 	</PropertyGroup>
 
 	<Import Sdk="Purview.BuildSdk" Project="Sdk.props" />
+
+	<PropertyGroup>
+		<!-- C# 15 unions back the Purview.Results failure model, and are a preview language feature. -->
+		<LangVersion>preview</LangVersion>
+	</PropertyGroup>
 
 	<PropertyGroup>
 		<TargetsForTfmSpecificBuildOutput>

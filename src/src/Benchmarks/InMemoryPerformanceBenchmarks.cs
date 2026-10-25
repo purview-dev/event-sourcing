@@ -74,13 +74,19 @@ public class InMemoryPerformanceBenchmarks : IDisposable
 	public async Task<OrderAggregate?> GetCachedAggregate()
 	{
 		var id = _seededIds[_getIndex++ % _seededIds.Length];
-		return await _store.GetAsync(id, null);
+		var result = await _store.GetAsync(id, null);
+
+		return result.IsSuccess ? result.Value : null;
 	}
 
 	[Benchmark]
 	[BenchmarkCategory("InMemoryStore")]
-	public async Task<OrderAggregate?> ReplayLargeStream() =>
-		await _store.GetAtAsync(_largeAggregateId, int.MaxValue, null);
+	public async Task<OrderAggregate?> ReplayLargeStream()
+	{
+		var result = await _store.GetAtAsync(_largeAggregateId, int.MaxValue, null);
+
+		return result.IsSuccess ? result.Value : null;
+	}
 
 	[GlobalCleanup]
 	public void GlobalCleanup() => Dispose();
@@ -112,7 +118,7 @@ public class InMemoryPerformanceBenchmarks : IDisposable
 
 		public Task AfterSaveAsync(
 			TAggregate aggregate,
-			int previousSavedVersion,
+			long previousSavedVersion,
 			bool isNew,
 			EventRecord[] events,
 			CancellationToken cancellationToken = default

@@ -8,12 +8,12 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Purview.EventSourcing.Admin.Models;
-using Purview.EventSourcing.Admin.Queries;
-using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.Admin.API.Contracts;
 using Purview.EventSourcing.Admin.API.Filters;
+using Purview.EventSourcing.Admin.Models;
+using Purview.EventSourcing.Admin.Queries;
 using Purview.EventSourcing.Admin.Security;
+using Purview.EventSourcing.Admin.Services;
 using ZodSharp.Core;
 
 namespace Purview.EventSourcing.Admin.API.Endpoints;
@@ -215,10 +215,11 @@ public static class AdminAggregatesEndpoints
 		return TypedResults.Ok(result);
 	}
 
-	static async Task<Results<Ok<AggregateSummaryResponse>, NotFound, ValidationProblem>> GetAggregateAsync(
+	static async Task<IResult> GetAggregateAsync(
 		string aggregateType,
 		string aggregateId,
 		IAdminAggregateQueryService queryService,
+		HttpContext httpContext,
 		CancellationToken cancellationToken
 	)
 	{
@@ -227,10 +228,11 @@ public static class AdminAggregatesEndpoints
 			return routeValidation;
 
 		var result = await queryService.GetAsync(aggregateType, aggregateId, cancellationToken);
-		return result is null ? TypedResults.NotFound() : TypedResults.Ok(result);
+
+		return result.ToHttpResult();
 	}
 
-	static async Task<Results<Ok<PagedResult<EventEnvelopeResponse>>, NotFound, ValidationProblem>> GetEventRangeAsync(
+	static async Task<IResult> GetEventRangeAsync(
 		string aggregateType,
 		string aggregateId,
 		[AsParameters] EventRangeRequest request,
@@ -256,8 +258,8 @@ public static class AdminAggregatesEndpoints
 		);
 
 		var result = await queryService.GetRangeAsync(aggregateType, aggregateId, query, cancellationToken);
-		if (result is null)
-			return TypedResults.NotFound();
+		if (result.IsFailure)
+			return result.ToHttpResult();
 
 		var payloadAuthorization = await authorizationService.AuthorizeAsync(
 			httpContext.User,
@@ -265,20 +267,22 @@ public static class AdminAggregatesEndpoints
 			AdminPortalPolicies.ViewEventPayloads
 		);
 		if (payloadAuthorization.Succeeded)
-			return TypedResults.Ok(result);
+			return TypedResults.Ok(result.Value);
 
-		var redacted = result with
+		var redacted = result.Value with
 		{
-			Items = result.Items.Select(envelope => envelope with { Payload = null }).ToArray(),
+			Items = result.Value.Items.Select(envelope => envelope with { Payload = null }).ToArray(),
 		};
+
 		return TypedResults.Ok(redacted);
 	}
 
-	static async Task<Results<Ok<ProjectionResponse>, NotFound, ValidationProblem>> GetProjectionAtVersionAsync(
+	static async Task<IResult> GetProjectionAtVersionAsync(
 		string aggregateType,
 		string aggregateId,
 		[FromQuery] long? version,
 		IAdminProjectionService projectionService,
+		HttpContext httpContext,
 		CancellationToken cancellationToken
 	)
 	{
@@ -298,14 +302,15 @@ public static class AdminAggregatesEndpoints
 			cancellationToken
 		);
 
-		return result is null ? TypedResults.NotFound() : TypedResults.Ok(result);
+		return result.ToHttpResult();
 	}
 
-	static async Task<Results<Ok<ProjectionResponse>, NotFound, ValidationProblem>> GetProjectionAtTimeAsync(
+	static async Task<IResult> GetProjectionAtTimeAsync(
 		string aggregateType,
 		string aggregateId,
 		[FromQuery] DateTimeOffset? asOfUtc,
 		IAdminProjectionService projectionService,
+		HttpContext httpContext,
 		CancellationToken cancellationToken
 	)
 	{
@@ -334,10 +339,10 @@ public static class AdminAggregatesEndpoints
 			cancellationToken
 		);
 
-		return result is null ? TypedResults.NotFound() : TypedResults.Ok(result);
+		return result.ToHttpResult();
 	}
 
-	static async Task<Results<FileStreamHttpResult, NotFound, ValidationProblem>> ExportEventsAsync(
+	static async Task<IResult> ExportEventsAsync(
 		string aggregateType,
 		string aggregateId,
 		[AsParameters] EventRangeRequest request,
@@ -363,8 +368,8 @@ public static class AdminAggregatesEndpoints
 			cancellationToken
 		);
 
-		if (firstPage is null)
-			return TypedResults.NotFound();
+		if (firstPage.IsFailure)
+			return firstPage.Error.ToHttpResult();
 
 		MemoryStream stream = new();
 		await using (
@@ -376,7 +381,7 @@ public static class AdminAggregatesEndpoints
 			)
 		)
 		{
-			var current = firstPage;
+			var current = firstPage.Value;
 			while (true)
 			{
 				foreach (var envelope in current.Items)
@@ -405,10 +410,10 @@ public static class AdminAggregatesEndpoints
 					BuildExportQuery(request, page, batchSize),
 					cancellationToken
 				);
-				if (next is null)
+				if (next.IsFailure)
 					break;
 
-				current = next;
+				current = next.Value;
 			}
 
 			await writer.FlushAsync(cancellationToken);

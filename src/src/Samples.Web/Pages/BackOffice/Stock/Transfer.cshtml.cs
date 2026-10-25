@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Purview.EventSourcing.Samples.Domain;
 using Purview.EventSourcing.Samples.Services;
-using Purview.EventSourcing.SqlServer.Events.Exceptions;
 
 namespace Purview.EventSourcing.Samples.Web.Pages.BackOffice.Stock;
 
@@ -48,26 +47,13 @@ sealed class TransferModel(IStockTransferService transferService, IQueryableEven
 			return Page();
 		}
 
-		StockTransferResult result;
-		try
-		{
-			result = await transferService.TransferAsync(
-				SourceInventoryId,
-				DestinationLocationId,
-				Quantity,
-				Reason.Trim(),
-				ct
-			);
-		}
-		catch (ConcurrencyException)
-		{
-			ModelState.AddModelError(
-				string.Empty,
-				"Another user modified the stock concurrently. Please refresh and try again."
-			);
-			await LoadDropdownsAsync(ct);
-			return Page();
-		}
+		var result = await transferService.TransferAsync(
+			SourceInventoryId,
+			DestinationLocationId,
+			Quantity,
+			Reason.Trim(),
+			ct
+		);
 
 		if (!result.Succeeded)
 		{

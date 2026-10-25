@@ -1,5 +1,7 @@
 using System.ComponentModel;
 using Purview.EventSourcing.Aggregates;
+using Purview.EventSourcing.Failures;
+using Purview.Results;
 
 namespace Purview.EventSourcing.Internal;
 
@@ -14,7 +16,7 @@ namespace Purview.EventSourcing.Internal;
 /// </remarks>
 [EditorBrowsable(EditorBrowsableState.Never)]
 public sealed class TransactionalSaveOperation<T>(
-	SaveResult<T> result,
+	Result<SaveOutcome<T>, AggregateSaveFailure> result,
 	Func<CancellationToken, Task>? afterCommit = null,
 	Func<CancellationToken, Task>? afterRollback = null
 )
@@ -25,7 +27,19 @@ public sealed class TransactionalSaveOperation<T>(
 	/// <summary>
 	/// Gets the result of the save operation.
 	/// </summary>
-	public SaveResult<T> Result { get; } = result;
+	public Result<SaveOutcome<T>, AggregateSaveFailure> Result { get; } = result;
+
+	/// <summary>
+	/// Gets a value indicating whether the save produced a write, or matched an idempotency marker for
+	/// one an earlier attempt had already made.
+	/// </summary>
+	public bool Saved => Result.IsSuccess && Result.Value.Kind is not SaveOutcomeKind.NoChanges;
+
+	/// <summary>
+	/// Gets a value indicating whether the save appended nothing, either because there was nothing to
+	/// append or because the events were already applied.
+	/// </summary>
+	public bool Skipped => Result.IsSuccess && Result.Value.Kind is not SaveOutcomeKind.Written;
 
 	readonly Func<CancellationToken, Task> _afterCommit = afterCommit ?? NoOp;
 	readonly Func<CancellationToken, Task> _afterRollback = afterRollback ?? NoOp;
