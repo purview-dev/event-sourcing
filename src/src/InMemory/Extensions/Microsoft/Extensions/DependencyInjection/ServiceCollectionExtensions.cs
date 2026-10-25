@@ -2,7 +2,6 @@ using System.ComponentModel;
 using Purview.EventSourcing.InMemory.Events;
 using Purview.EventSourcing.InMemory.Snapshots;
 using Purview.EventSourcing.Internal;
-using Purview.EventSourcing.Subscriptions;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -37,10 +36,6 @@ public static class ServiceCollectionExtensions
 				.AddTransient(typeof(INonQueryableEventStore<>), typeof(InMemoryEventStore<>))
 				.AddTransient(typeof(IInMemoryEventStore<>), typeof(InMemoryEventStore<>))
 				.AddTransient<IEventStore, EventStoreFacade>();
-
-			// Registered ahead of AddEventSubscription's TryAdd default, which needs a queryable
-			// snapshot store this provider does not have.
-			services.AddTransient(typeof(IAggregateStreamDiscovery<>), typeof(InMemoryAggregateStreamDiscovery<>));
 
 			services.AddEventStoreCapabilities(
 				new EventStoreCapabilities(
@@ -87,10 +82,6 @@ public static class ServiceCollectionExtensions
 			services
 				.AddTransient<IQueryableEventStore, QueryableEventStoreFacade>()
 				.AddTransient<IEventStore, EventStoreFacade>();
-
-			// Registered ahead of AddEventSubscription's TryAdd default, which needs a queryable
-			// snapshot store this provider does not have.
-			services.AddTransient(typeof(IAggregateStreamDiscovery<>), typeof(InMemoryAggregateStreamDiscovery<>));
 
 			services.AddEventStoreCapabilities(
 				new EventStoreCapabilities(

@@ -107,9 +107,10 @@ public static class ServiceCollectionExtensions
 		/// application.
 		/// </para>
 		/// <para>
-		/// Stream discovery defaults to <see cref = "QueryableAggregateStreamDiscovery{T}"/>, which needs a
-		/// queryable snapshot store. Register an <see cref = "IAggregateStreamDiscovery{T}"/> before calling
-		/// this to use a provider-specific implementation instead.
+		/// Stream discovery defaults to <see cref = "EventStoreAggregateStreamDiscovery{T}"/>, which works on
+		/// every provider that persists an event stream. Register an
+		/// <see cref = "IAggregateStreamDiscovery{T}"/> before calling this to narrow it - for example to the
+		/// aggregates changed since a watermark, rather than all of them.
 		/// </para>
 		/// </remarks>
 		public IServiceCollection AddEventSubscription<TAggregate, TSubscriber>(
@@ -120,8 +121,8 @@ public static class ServiceCollectionExtensions
 		{
 			services.TryAddScoped<IEventSubscriber<TAggregate>, TSubscriber>();
 			services.TryAddSingleton<ISubscriptionCheckpointStore, InMemorySubscriptionCheckpointStore>();
-			// TryAdd compares service types exactly, so a closed-generic TryAdd would not see a
-			// provider's open-generic registration and would win by being registered last.
+			// TryAdd compares service types exactly, so it would not see an open-generic registration
+			// supplied by a provider or a consumer; check both shapes before adding the default.
 			var hasDiscovery = services.Any(descriptor =>
 				descriptor.ServiceType == typeof(IAggregateStreamDiscovery<TAggregate>)
 				|| descriptor.ServiceType == typeof(IAggregateStreamDiscovery<>)
@@ -130,7 +131,7 @@ public static class ServiceCollectionExtensions
 			{
 				services.AddScoped<
 					IAggregateStreamDiscovery<TAggregate>,
-					QueryableAggregateStreamDiscovery<TAggregate>
+					EventStoreAggregateStreamDiscovery<TAggregate>
 				>();
 			}
 			services.TryAddScoped<IEventSubscriptionProcessor<TAggregate>, EventSubscriptionProcessor<TAggregate>>();

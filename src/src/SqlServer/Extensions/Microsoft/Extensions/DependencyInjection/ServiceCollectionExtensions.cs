@@ -8,6 +8,8 @@ using Purview.EventSourcing.SqlServer.Events;
 using Purview.EventSourcing.SqlServer.Outbox;
 using Purview.EventSourcing.SqlServer.Snapshot;
 using Purview.EventSourcing.SqlServer.Snapshots;
+using Purview.EventSourcing.SqlServer.Subscriptions;
+using Purview.EventSourcing.Subscriptions;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -227,6 +229,39 @@ public static class ServiceCollectionExtensions
 				ServiceDescriptor.Singleton<
 					IValidateOptions<SqlServerOutboxStoreOptions>,
 					SqlServerOutboxStoreOptionsValidator
+				>()
+			);
+
+			return services;
+		}
+
+		/// <summary>
+		/// Registers the SQL Server subscription checkpoint store, so subscription positions survive a
+		/// restart.
+		/// </summary>
+		/// <returns>The <paramref name="services"/> for chaining.</returns>
+		/// <remarks>
+		/// Call this before <c>AddEventSubscription</c>. Without a durable checkpoint store the default
+		/// in-memory one is used, and every subscription replays every stream from the beginning after a
+		/// restart.
+		/// </remarks>
+		public IServiceCollection AddSqlServerSubscriptionCheckpoints()
+		{
+			services.TryAddSingleton<ISubscriptionCheckpointStore, SqlServerSubscriptionCheckpointStore>();
+
+			services
+				.AddOptions<SqlServerSubscriptionCheckpointStoreOptions>()
+				.Configure<IConfiguration>(
+					(options, configuration) =>
+						configuration
+							.GetSection(SqlServerSubscriptionCheckpointStoreOptions.SqlServerSubscriptions)
+							.Bind(options)
+				);
+
+			services.TryAddEnumerable(
+				ServiceDescriptor.Singleton<
+					IValidateOptions<SqlServerSubscriptionCheckpointStoreOptions>,
+					SqlServerSubscriptionCheckpointStoreOptionsValidator
 				>()
 			);
 

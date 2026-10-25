@@ -352,12 +352,6 @@ public partial class InMemoryEventStore<T>(
 	}
 
 	///<inheritdoc/>
-	public IAsyncEnumerable<string> GetAggregateIdsAsync(CancellationToken cancellationToken = default) =>
-		// Filtered the same way every read is: an unowned stream is visible only to the system scope,
-		// so discovery cannot hand one tenant's aggregate ids to another.
-		_events.Keys.Where(IsVisible).ToArray().ToAsyncEnumerable();
-
-	///<inheritdoc/>
 	public async Task<Result<T, AggregateReadFailure>> GetOrCreateAsync(
 		string? aggregateId,
 		EventStoreOperationContext? operationContext,

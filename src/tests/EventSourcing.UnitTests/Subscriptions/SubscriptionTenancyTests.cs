@@ -130,7 +130,7 @@ public sealed class SubscriptionTenancyTests
 		public async Task<IReadOnlyList<string>> DiscoverAsync(TenantScope scope)
 		{
 			var store = _provider.GetRequiredService<IInMemoryEventStore<SubscriptionTestAggregate>>();
-			InMemoryAggregateStreamDiscovery<SubscriptionTestAggregate> discovery = new(store);
+			EventStoreAggregateStreamDiscovery<SubscriptionTestAggregate> discovery = new(store);
 
 			using (AmbientCurrentTenant.BeginScope(scope))
 			{

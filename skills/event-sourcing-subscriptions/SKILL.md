@@ -60,23 +60,22 @@ So a projection keyed by aggregate id is safe. A projection that depends on the 
 two *different* aggregates' events is not, and no option will make it so. Model it as a single
 aggregate instead, or accept eventual convergence.
 
-## Stream discovery is a seam, and it must be tenant-filtered
+## Stream discovery, and why a custom one is usually a mistake
 
-No provider holds an index of every stream, so discovery is supplied per provider:
+The default reads `IEventStoreCore<T>.GetAggregateIdsAsync`, which every store implements and
+filters by the current tenant. It works on every provider with an event stream - no snapshot store,
+no provider-specific wiring.
 
-- **InMemory** - automatic and exact.
-- **SQL Server, PostgreSQL, MongoDB, Cosmos DB** - the queryable default, which needs a snapshot
-  store and finds only **snapshotted** aggregates. An aggregate saved under a snapshot strategy that
-  has not written one yet is invisible to the subscription.
-- **Azure Storage** - none ships. Supply your own or subscriptions will not run.
+The cost: **every cycle enumerates every stream** of that aggregate type, so the work is linear in
+the number of aggregates, not in the number of new events. With no global sequence there is nothing
+cheaper to read. If that is too expensive, register your own `IAggregateStreamDiscovery<T>` before
+`AddEventSubscription` to narrow it - aggregates changed since a watermark, for instance.
 
-Register yours before `AddEventSubscription` and it wins over the default.
-
-**A discovery implementation that ignores the current tenant leaks.** The trap is that it will not
-look like a leak: the event read is filtered too, so no cross-tenant *events* are delivered, and any
-test that only asserts "the other tenant's subscriber received nothing" passes. Aggregate ids are
-data. Assert on what discovery returns, not on what arrives - see `SubscriptionTenancyTests`, where
-removing the discovery filter fails two tests and the acceptance scenarios stay green.
+**If you do write one, it must honour the current tenant.** The trap is that a leak will not look
+like one: the event read is filtered too, so no cross-tenant *events* are delivered, and any test
+that only asserts "the other tenant's subscriber received nothing" passes. Aggregate ids are data.
+Assert on what discovery returns, not on what arrives - in `SubscriptionTenancyTests`, removing the
+filter fails two tests while every acceptance scenario stays green.
 
 ## Checkpoints are per tenant, structurally
 
@@ -88,7 +87,19 @@ events and those events would **never** be delivered - a silent, permanent gap r
 visible error.
 
 The default checkpoint store is in-memory and loses every position on restart, replaying all
-streams. Register a durable one in anything deployed. No provider ships one yet.
+streams. Register a durable one in anything deployed, **before** `AddEventSubscription`:
+
+```csharp
+services.AddSqlServerSubscriptionCheckpoints();   // or AddPostgresSubscriptionCheckpoints()
+services.AddEventSubscription<Order, OrderProjection>();
+```
+
+Only SQL Server and PostgreSQL ship one. On Azure Storage or MongoDB you must supply an
+`ISubscriptionCheckpointStore` yourself, or accept a full replay on every restart.
+
+If you write one, encode the scope with `SubscriptionCheckpointTenantColumn` rather than inventing
+your own, and do not use a nullable tenant column: PostgreSQL treats NULLs as distinct in a unique
+index, so the system scope would silently get duplicate rows.
 
 ## Failure stalls the stream, on purpose
 

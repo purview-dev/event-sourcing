@@ -8,6 +8,8 @@ using Purview.EventSourcing.Postgres.Events;
 using Purview.EventSourcing.Postgres.Outbox;
 using Purview.EventSourcing.Postgres.Snapshot;
 using Purview.EventSourcing.Postgres.Snapshots;
+using Purview.EventSourcing.Postgres.Subscriptions;
+using Purview.EventSourcing.Subscriptions;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -219,6 +221,39 @@ public static class ServiceCollectionExtensions
 				ServiceDescriptor.Singleton<
 					IValidateOptions<PostgresOutboxStoreOptions>,
 					PostgresOutboxStoreOptionsValidator
+				>()
+			);
+
+			return services;
+		}
+
+		/// <summary>
+		/// Registers the PostgreSQL subscription checkpoint store, so subscription positions survive a
+		/// restart.
+		/// </summary>
+		/// <returns>The <paramref name="services"/> for chaining.</returns>
+		/// <remarks>
+		/// Call this before <c>AddEventSubscription</c>. Without a durable checkpoint store the default
+		/// in-memory one is used, and every subscription replays every stream from the beginning after a
+		/// restart.
+		/// </remarks>
+		public IServiceCollection AddPostgresSubscriptionCheckpoints()
+		{
+			services.TryAddSingleton<ISubscriptionCheckpointStore, PostgresSubscriptionCheckpointStore>();
+
+			services
+				.AddOptions<PostgresSubscriptionCheckpointStoreOptions>()
+				.Configure<IConfiguration>(
+					(options, configuration) =>
+						configuration
+							.GetSection(PostgresSubscriptionCheckpointStoreOptions.PostgresSubscriptions)
+							.Bind(options)
+				);
+
+			services.TryAddEnumerable(
+				ServiceDescriptor.Singleton<
+					IValidateOptions<PostgresSubscriptionCheckpointStoreOptions>,
+					PostgresSubscriptionCheckpointStoreOptionsValidator
 				>()
 			);
 

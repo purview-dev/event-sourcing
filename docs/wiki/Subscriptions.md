@@ -74,16 +74,18 @@ an event contract must not have every later event in the stream blocked by it.
 
 ## Stream discovery
 
-Event streams are keyed by aggregate id, and no provider holds an index of "every stream that
-exists". Discovery is therefore a seam, `IAggregateStreamDiscovery<T>`:
+The default is `EventStoreAggregateStreamDiscovery<T>`, over
+`IEventStoreCore<T>.GetAggregateIdsAsync`. Every store implements that method and filters it by the
+current tenant, so **discovery works on every provider that persists an event stream**, with no
+snapshot store involved.
 
-| Provider | Discovery |
-| --- | --- |
-| InMemory | `InMemoryAggregateStreamDiscovery<T>`, registered automatically. Exact — it enumerates the streams the store holds |
-| SQL Server, PostgreSQL, MongoDB, Cosmos DB | `QueryableAggregateStreamDiscovery<T>`, the default. **Requires a queryable snapshot store**, and finds only aggregates that have been snapshotted |
-| Azure Storage | **No implementation.** It has no queryable snapshot store, so supply your own `IAggregateStreamDiscovery<T>` |
+Deleted aggregates are included: a subscription that stopped seeing a stream the moment it was
+deleted would never deliver the `Deleted` event, so a projection could not learn the aggregate had
+gone.
 
-Register your own before calling `AddEventSubscription` and it will be used instead of the default.
+It enumerates **every** stream of that aggregate type each cycle, which is the cost of having no
+global sequence to read instead. Supply your own `IAggregateStreamDiscovery<T>` to narrow it — to
+the aggregates changed since a watermark, say — by registering it before `AddEventSubscription`.
 
 > An implementation must honour the current tenant. The event read is filtered too, so a leaky
 > discovery will not deliver another tenant's *events* — but aggregate ids are themselves data, and
@@ -97,15 +99,33 @@ aggregate. The tenant is part of `SubscriptionCheckpointKey` rather than somethi
 trusted to apply, so a position cannot be written without stating which tenant it belongs to.
 
 The default registration is `InMemorySubscriptionCheckpointStore`, which **loses every position on
-restart** and therefore replays all streams. That is fine for tests and local development. A
-deployed application should register a durable store:
+restart** and therefore replays all streams. That is fine for tests and local development; a
+deployed application should register a durable store before `AddEventSubscription`:
 
 ```csharp
-services.AddSingleton<ISubscriptionCheckpointStore, MyDurableCheckpointStore>();
+services.AddSqlServerEventStore();
+services.AddSqlServerSubscriptionCheckpoints();   // or AddPostgresSubscriptionCheckpoints()
 services.AddEventSubscription<Order, OrderProjection>();
 ```
 
-No provider ships a durable checkpoint store yet.
+| Provider | Durable checkpoints |
+| --- | --- |
+| SQL Server | `AddSqlServerSubscriptionCheckpoints()` |
+| PostgreSQL | `AddPostgresSubscriptionCheckpoints()` |
+| Azure Storage, MongoDB, Cosmos DB | Not provided — supply an `ISubscriptionCheckpointStore` |
+
+Both SQL stores create their table on first use (`AutoCreateTable`, on by default) and are
+configured from `EventStore:SqlServer:Subscriptions` / `EventStore:Postgres:Subscriptions`. They
+fall back to the event-store connection string when none is given.
+
+The scope is stored in a single non-null `TenantId` column, with the system scope encoded as the
+empty string by `SubscriptionCheckpointTenantColumn`. That is shared rather than per-provider
+because the encoding has to be identical everywhere, and because a nullable column would behave
+differently between the two engines — PostgreSQL treats NULLs as distinct in a unique index, which
+would silently allow duplicate system-scope rows.
+
+A position never moves backwards: a cycle that re-read an earlier range cannot rewind a position
+that is already further on, which would redeliver everything in between.
 
 ## Configuration
 
@@ -124,12 +144,14 @@ services.AddEventSubscription<Order, OrderProjection>(options => options.PollInt
 
 - **No global ordering**, and no ordered live tail. Both are discussed in
   [the design page](Subscriptions-And-Retention-Design.md).
-- **No durable checkpoint store ships with any provider.**
-- **Azure Storage has no discovery implementation**, so subscriptions do not work there without one.
+- **Durable checkpoints ship for SQL Server and PostgreSQL only.** Azure Storage, MongoDB and an
+  InMemory deployment replay every stream after a restart unless you supply a store.
 - **Cosmos DB cannot be subscribed to at all** — it persists no event stream, and `RunCycleAsync`
   throws `NotSupportedException`.
 - **A permanently failing event stalls its stream.** There is no dead-letter path.
-- Discovery over a queryable snapshot store only finds **snapshotted** aggregates.
+- **Every cycle enumerates every stream** of the aggregate type. There is no global sequence to read
+  instead, so this is linear in the number of aggregates rather than in the number of new events.
+  Supply a narrower `IAggregateStreamDiscovery<T>` if that is too expensive.
 - The in-memory event store keeps its data per instance and is registered transient, so a
   subscription over it must resolve the same instance — register it as a singleton.
 - Subscriptions are not reported through `EventStoreCapabilities`. Whether one can run depends on

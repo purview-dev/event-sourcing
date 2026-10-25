@@ -169,11 +169,14 @@ Not guaranteed, and not configurable:
 - **No dead-letter path.** A subscriber that throws stops that stream at the failing event and retries it
   every cycle, indefinitely. This is fail-closed by choice: skipping would lose data silently. An
   unresolvable event type is not a failure - it is delivered with `IsUnresolved` set and skipped past.
-- **No durable checkpoint store ships.** The default is in-memory and replays every stream after a
-  restart.
-- **Cosmos DB cannot be subscribed to** (no event stream), and **Azure Storage ships no stream discovery**
-  (no queryable snapshot store), so subscriptions need a supplied `IAggregateStreamDiscovery<T>` there.
-- Discovery over a queryable snapshot store finds only **snapshotted** aggregates.
+- **Durable checkpoints ship for SQL Server and PostgreSQL only** (`AddSqlServerSubscriptionCheckpoints`,
+  `AddPostgresSubscriptionCheckpoints`). Elsewhere the default is in-memory and replays every stream after
+  a restart.
+- **Cosmos DB cannot be subscribed to** — it persists no event stream. Every other provider works, because
+  stream discovery reads `IEventStoreCore<T>.GetAggregateIdsAsync`, which every store implements and
+  tenant-filters.
+- **Every cycle enumerates every stream** of the aggregate type: the work is linear in the number of
+  aggregates, not the number of new events. With no global sequence there is nothing cheaper to read.
 
 Subscriptions are deliberately absent from `EventStoreCapabilities`: whether one can run depends on the
 registered discovery implementation, which is dependency-injection state rather than a property of the
