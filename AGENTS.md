@@ -32,10 +32,11 @@ This repository contains the `Purview.EventSourcing` framework, its incremental 
 | `src/src/Admin.*` | Administration abstractions, security, API, UI, and provider adapters |
 | `src/src/Samples*` | Reference domains, quick start, web app, shared defaults, and Aspire AppHost |
 | `src/tests` | Unit, integration, source-generator, sample, admin, and performance projects |
-| `src/tests/SharedTestingFramework` | Shared provider fixtures and Testcontainers infrastructure |
+| `src/tests/SharedTestingFramework` | Shared provider fixtures and Purview.Containers infrastructure |
 | `docs/wiki` | User-facing design, provider, generator, dependency, and release guidance |
 | `.github/workflows` | PR validation, reusable validation/pack, and release workflows |
-| `.agents/skills` | Repository workflow and SDK guidance available to supporting agents |
+| `skills` | Agent skills this repository authors and ships to consumers via the skills CLI |
+| `.agents/skills` | Skills consumed from other repositories, installed by the CLI and gitignored |
 | `Directory.Packages.props` | Centrally managed NuGet versions |
 | `src/Directory.Build.props` / `src/Directory.Build.targets` | Solution-wide SDK, package, analyzer, and build behavior |
 | `global.json` | Required .NET SDK and Microsoft.Testing.Platform selection |
@@ -50,8 +51,9 @@ Do not introduce a second version source, dependency-version location, or parall
 2. Confirm behavior from code and tests rather than relying on memory or documentation alone. Documentation describes intent but may lag implementation.
 3. Make the smallest coherent change. Preserve public behavior unless the task explicitly changes it.
 4. Update tests for fixes and behavior changes. Update documentation when public behavior, provider support, configuration, query semantics, generated API shape, or limitations change.
-5. Run the narrowest meaningful validation first, then broader validation in proportion to risk.
-6. Review the diff for unrelated edits, generated noise, compatibility risks, and missing docs or tests.
+5. Feature work is not finished until the authored skills in `skills/` and the guides in `docs/wiki` describe it. See [Skills and documentation are part of the feature](#skills-and-documentation-are-part-of-the-feature).
+6. Run the narrowest meaningful validation first, then broader validation in proportion to risk.
+7. Review the diff for unrelated edits, generated noise, compatibility risks, and missing docs, skills or tests.
 
 Use repository-local skills when their trigger applies:
 
@@ -110,6 +112,7 @@ Use repository-local skills when their trigger applies:
 - Keep SQL identifiers, Mongo collections, Cosmos containers/partitions, and Azure Table/Blob routing configurable through established abstractions. Validate identifiers rather than concatenating untrusted input into commands.
 - Use provider-native parameterization and escaping. Never construct SQL or provider queries by interpolating untrusted values.
 - Integration tests should exercise the actual provider when behavior depends on translation, serialization, concurrency, indexing, transactions, or SDK behavior; an in-memory substitute is insufficient.
+- A new read path must be tenant-filtered and a new write path must stamp the tenant, in the same change. Both are easy to add and invisible to every existing test; see [Tenant isolation](#tenant-isolation).
 
 ## Snapshots and query translation
 
@@ -138,10 +141,38 @@ Use repository-local skills when their trigger applies:
 - Samples are executable documentation. Keep them idiomatic, comprehensible, and aligned with supported public APIs rather than using internal shortcuts.
 - Update sample tests and relevant README/wiki examples when a public workflow changes.
 - `Samples.AppHost` defines external infrastructure for local distributed execution. Prefer its established resources and configuration wiring; do not hardcode local ports, credentials, or machine-specific paths.
-- Aspire/Testcontainers work may require Docker and provider images. Report infrastructure prerequisites or failures rather than weakening tests to avoid them.
+- Aspire and container work may require a container runtime (WSL Containers or Docker) and provider images. Report infrastructure prerequisites or failures rather than weakening tests to avoid them.
+
+## Tenant isolation
+
+Tenant isolation is a security boundary, not a feature. When a change touches any read or write path in
+a provider, the event store, a snapshot store, the cache, or the Admin API, **write or update the tenancy
+test before the feature test**. Every point below was a real defect found in this repository, in several
+cases while its own tenancy tests were passing.
+
+- **A tenancy test must share storage between scopes.** Two stores built with different run identifiers
+  use different tables, databases or containers, so "tenant B cannot see tenant A" passes while proving
+  nothing. Pass the same `runId` and change only the `ICurrentTenant`.
+- **Test the cached path explicitly.** The distributed cache is read *before* the tenant-filtered storage
+  lookup, so an unqualified cache key bypasses every filter. Prime the cache as the owning tenant, then
+  assert the other tenant still cannot read. Per-test cache instances hide this entirely.
+- **Assert all three outcomes**: the owner reads it, another tenant does not, and `TenantScope.System`
+  does. Testing only the denial misses a filter that hides data from everyone.
+- **Audit every write path for the stamp.** The SQL providers had three distinct entity-construction
+  paths; two were stamped and one was not, which made reads behave as if filtering were broken. Count the
+  call sites rather than trusting a search-and-replace.
+- **Unowned rows fail closed.** Do not add `|| TenantId == null` to a filter. It turns a missed stamp from
+  an obvious absence into silent cross-tenant exposure. Only `TenantScope.System` sees unowned rows.
+- **Confirm the filter is on the runtime context.** Some providers have a migrations-only `DbContext`
+  alongside the one that actually executes queries. A filter on the wrong one compiles, passes, and
+  protects nothing.
+- Prefer structural isolation where the store allows it - a tenant-qualified key or partition - over a
+  predicate a future query can forget.
 
 ## Testing conventions
 
+- **Tenant isolation comes first.** Before testing what a change does, test that it does not leak across
+  tenants; see [Tenant isolation](#tenant-isolation). A green suite is not evidence the boundary holds.
 - This repository uses TUnit on Microsoft.Testing.Platform, selected in `global.json`. Do not add xUnit, NUnit, MSTest, or FluentAssertions patterns unless explicitly requested.
 - TUnit test methods use `[Test]`, and assertion calls are awaited, for example `await Assert.That(actual).IsEqualTo(expected);`.
 - Never use VSTest `dotnet test --filter` for these projects. Use `--treenode-filter` and observe the command form supported by the repository/SDK.
@@ -154,11 +185,34 @@ Use repository-local skills when their trigger applies:
 - PR validation restores and builds the Release solution, then runs the unit-test tree filter `/*/*/*/*[Category=Unit]` (the `Purview.BuildSdk` applies `[assembly: TUnit.Core.Category("Unit")]` to unit-test projects) and emits TRX results.
 - Unit tests should cover domain logic, contracts, failure behavior, and regressions without external infrastructure.
 - Source-generator tests should assert generated code and diagnostics using the existing testing framework.
-- Provider integration tests use `src/tests/SharedTestingFramework` and Testcontainers or provider infrastructure. Run affected-provider tests for translation, persistence, concurrency, or serialization changes when infrastructure is available.
+- Provider integration tests use `src/tests/SharedTestingFramework` and Purview.Containers (WSL Containers on Windows, Docker elsewhere) or provider infrastructure. Run affected-provider tests for translation, persistence, concurrency, or serialization changes when infrastructure is available.
 - Multi-provider contract changes require shared tests plus affected provider suites; do not prove parity with only one provider.
 - Performance work should use the source-generator or SQL Server performance harness and report comparable before/after conditions; performance tests are not a substitute for correctness tests.
 - Documentation-only changes do not require the .NET suite unless they alter executable snippets, build/release commands, or configuration whose validity needs testing.
 - Do not update approved/verified output merely to make a failure disappear. Inspect the semantic difference first.
+
+## Skills and documentation are part of the feature
+
+A capability a consumer cannot discover is not finished. **Every feature, behaviour change, new
+option, new failure case, or new limitation updates both the authored skills in `skills/` and the
+guides in `docs/wiki`, in the same change as the code.** Neither is a follow-up task.
+
+- **`skills/<name>/SKILL.md`** is how an agent working in a consumer's codebase learns the capability.
+  Add a skill when a capability needs its own decisions - a new subsystem, a security boundary, a
+  model a caller must adopt. Extend an existing skill when it is a new rule within one.
+- **`docs/wiki`** is how a person learns it. `Guarantees-and-Limitations.md` is the authoritative
+  summary: if a change alters what the framework guarantees, or adds a gap, it belongs there.
+- A skill is for *decisions and traps*, not API reference. Write the thing a caller would otherwise
+  get wrong, and say why. Prefer a rule that was a real defect over a rule that sounds prudent.
+- **State limitations in both.** A capability wired for some providers and not others, or disabled
+  under some configuration, must say so plainly. Implying parity that the tests do not demonstrate is
+  worse than documenting the gap.
+- Skills live at the repository root in lowercase `skills/`, are validated by
+  `src/tests/Skills.UnitTests`, and follow the spec frontmatter - `name`, `description`, `license`,
+  `compatibility`, `metadata`, `allowed-tools` and nothing else. See the
+  `purview-buildsdk-skill-tests` skill before authoring one.
+- Skills are **not** packed into any NuGet package; the skills CLI delivers them from git. Do not
+  reintroduce a package path for them.
 
 ## Documentation rules
 
@@ -181,6 +235,7 @@ just pipeline-build              # restore, build, lint, pack, validate (no test
 just restore
 just build
 just test                        # accepts a treenode filter and extra arguments
+just test-integration            # the same, one test module at a time (required by WSL Containers)
 just lint-check
 just pack
 just perf-source-generator
@@ -201,7 +256,7 @@ dotnet csharpier check .
 
 - Use `dotnet csharpier check .` for validation (the pipeline lints the repository root). Run the rewriting formatter only when formatting changes are in scope, and ensure it does not touch unrelated user files.
 - Local `just` recipes default to the `Debug` configuration; Release-style builds, tests, and packs run through the `Purview.Build` pipeline (`just pipeline-pr` / `just pipeline-build`).
-- The pipeline discovers tests under `src/tests` with `Build:TestPatterns` (`*Tests.csproj`), restricts the run list with `Build:TestProjects` (`*UnitTests.csproj`), and applies `Build:TestFilter` (`/*/*/*/*[Category=Unit]`), so GH Actions never runs provider integration tests or the performance harnesses; run those locally with `just test` when Docker/Testcontainers infrastructure is available.
+- The pipeline discovers tests under `src/tests` with `Build:TestPatterns` (`*Tests.csproj`), restricts the run list with `Build:TestProjects` (`*UnitTests.csproj`), and applies `Build:TestFilter` (`/*/*/*/*[Category=Unit]`), so GH Actions never runs provider integration tests or the performance harnesses; run those locally with `just test` when a container runtime (WSL Containers or Docker) is available.
 - Pack when package assets, public package dependencies, analyzers, build targets, or packaging metadata change.
 - Build the canonical solution when shared contracts, project configuration, central packages, or generator/package wiring change.
 
@@ -221,6 +276,8 @@ Before handing work back:
 - Confirm only intended files changed and all pre-existing worktree changes remain intact.
 - Review public API, serialization, event-schema, provider-parity, security, and package-content implications.
 - Add or update focused tests for code changes and verify failures are not hidden by empty filters or ignored infrastructure errors.
+- If the change touched a read path, a write path, or the cache, confirm a tenancy test covers it and that the test would fail without the filter or the stamp.
 - Update all affected docs, samples, feature matrices, analyzer metadata, and release notes when applicable.
+- Confirm the authored skills in `skills/` and the guides in `docs/wiki` describe the change, including any provider it is *not* wired for. If neither needed a change, say why.
 - Run appropriate build, test, formatting, and pack checks in proportion to risk.
 - State exactly what validation ran. If a check was skipped or blocked, give the concrete reason and remaining risk.

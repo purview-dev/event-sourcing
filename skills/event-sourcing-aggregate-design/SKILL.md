@@ -1,18 +1,10 @@
 ---
 name: event-sourcing-aggregate-design
-description: "Use when designing or refining event-sourced aggregates, commands, events, invariants, source-generator hooks, or snapshot-queryable mirror properties."
-category: architecture
-roles:
-  - architecture
-  - coding
-  - domain-driven-design
-tags:
-  - event-sourcing
-  - aggregates
-  - domain-modeling
-  - ddd
-  - snapshots
-  - sql
+description: "Use when designing or refining an event-sourced aggregate in Purview.EventSourcing - aggregate boundaries and invariants, turning state changes into domain events, the [GenerateAggregate] and [GenerateAggregateEvent] source-generator contract and its hooks, naming, and query-facing snapshot mirror properties."
+license: MIT
+metadata:
+  package: Purview.EventSourcing
+  category: architecture
 ---
 
 # Event Sourcing Aggregate Design Skill

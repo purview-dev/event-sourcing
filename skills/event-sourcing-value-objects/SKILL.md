@@ -1,18 +1,10 @@
 ---
 name: event-sourcing-value-objects
-description: "Use when modeling scalar, complex, or contextual value objects with source-generated normalization, validation, Hydrate/Create semantics, or query-translation awareness."
-category: architecture
-roles:
-  - architecture
-  - coding
-  - domain-driven-design
-tags:
-  - event-sourcing
-  - value-objects
-  - source-generator
-  - validation
-  - snapshots
-  - sql
+description: "Use when modelling value objects used by Purview.EventSourcing aggregates - [Scalar] and [ValueObject] from Purview.ValueObjects, OnNormalize and OnValidate, the Create versus Hydrate split for replay, and which shapes a provider can translate in a snapshot query."
+license: MIT
+metadata:
+  package: Purview.EventSourcing
+  category: architecture
 ---
 
 # Event Sourcing Value Objects Skill

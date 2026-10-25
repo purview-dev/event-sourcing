@@ -1,17 +1,10 @@
 ---
 name: event-sourcing-aggregate-validation
-description: "Use when defining event-sourced aggregate validation at command time, hook time, save time, or for computed snapshot/query mirror properties."
-category: architecture
-roles:
-  - architecture
-  - coding
-  - domain-driven-design
-tags:
-  - event-sourcing
-  - aggregate
-  - validation
-  - fluentvalidation
-  - snapshots
+description: "Use when deciding where validation belongs for a Purview.EventSourcing aggregate - command and hook-time invariants, DataAnnotations or FluentValidation at save time via IAggregateValidator, the AggregateInvalid failure case returned by SaveAsync, and computed snapshot mirror properties."
+license: MIT
+metadata:
+  package: Purview.EventSourcing
+  category: architecture
 ---
 
 # Event Sourcing Aggregate Validation Skill
@@ -42,8 +35,9 @@ Use this skill when defining validation strategy for event-sourced aggregates in
 - Keep invariant checks close to mutation points (command/hook layer).
 - Keep structural and shape constraints declarative (DataAnnotations/FluentValidation).
 - Do not silently swallow validation failures.
-- Treat `SaveResult<TAggregate>.IsValid` and `ValidationResult` as first-class outcomes.
-- Use `SaveResult.EnsureValid()` when invalid saves must throw immediately.
+- Treat the `AggregateInvalid` failure case, and the `ValidationResult` it carries, as first-class outcomes.
+- `SaveAsync` returns `Result<SaveOutcome<TAggregate>, AggregateSaveFailure>`; a rejected save is the
+  `AggregateInvalid` case, not an exception. Throw from the call site only if the caller genuinely cannot continue.
 - Preserve replay tolerance by avoiding command-time assumptions in hydration-only paths.
 - For computed snapshot/query mirrors, validate derivation rules, not user-supplied values.
 - If a save-time validator is added, prefer `IAggregateValidator<TAggregate>` over ad-hoc validation inside stores.
@@ -54,7 +48,7 @@ Use this skill when defining validation strategy for event-sourced aggregates in
 - Property transitions are guarded (`On<Property>Changing` / `On<Property>Changed` where needed).
 - Aggregate-level attributes capture simple declarative constraints.
 - Custom FluentValidation rules are used for cross-field/business policies not suited to attributes.
-- Save handlers inspect or enforce `SaveResult.ValidationResult`.
+- Save handlers match the result and act on `AggregateInvalid.ValidationResult`.
 - Query-facing mirror properties are recomputed consistently from canonical state.
 
 ## Output template to use
@@ -63,5 +57,5 @@ Use this skill when defining validation strategy for event-sourced aggregates in
 2. Hook methods and invariants per command (`OnComputing...Event`, `OnRaising...Event`, `OnShouldApply...Event`, `On<Property>Changing`/`Changed`).
 3. Attribute-based constraints and rationale.
 4. FluentValidation rules (if any) and when they execute.
-5. SaveResult handling policy (`IsValid`, `EnsureValid`, error propagation).
+5. Save-result handling policy (matching `AggregateInvalid`, error propagation).
 6. Mirror-property derivation guarantees when query-facing fields exist.
