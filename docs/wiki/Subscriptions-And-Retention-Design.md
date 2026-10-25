@@ -40,7 +40,7 @@ no provider currently persists one:
 - **Cosmos DB** — no event stream at all (`no-event-stream` operational limitation).
 
 So "subscribe to the event stream" is not a single design; it is a choice about what order a
-subscriber is promised. Three options, honestly compared:
+subscriber is promised. Four options, honestly compared:
 
 ### Option A — per-aggregate catch-up, no global order
 
@@ -60,8 +60,8 @@ Each provider gains a monotonic sequence on the event row, and a subscription is
 
 - **Promise**: total order within an aggregate type, or across all of them.
 - **Cost**: a schema change on every provider, and **Azure Table Storage cannot do it** — there is
-  no cross-partition atomic counter, and synthesising one serialises every write. Azure would have
-  to be excluded, which breaks the parity rule the repository holds to.
+  no cross-partition atomic counter, and synthesising one serialises every write. Azure Storage
+  would be left without the capability (though see Option D, which closes that gap by other means).
 - **Weakness**: gap-free sequences and concurrent writers interact badly. A reader that checkpoints
   at sequence *N* can miss a row committed later with a lower sequence, unless reads trail by a
   safety window or the sequence is assigned at commit. This is the classic correctness trap.
@@ -78,10 +78,63 @@ over it, with its own checkpoint and retention.
   enqueued unconditionally, which makes the outbox a full copy of the event stream and doubles
   storage.
 
-**Recommendation: Option A.** It is the only one that is both implementable on every provider with
-an event stream and honest about what it promises. Option B can be added later for the relational
-providers as a stronger, opt-in guarantee reported through `EventStoreCapabilities`, without
-invalidating Option A's contract.
+### Option D — an external ordered log, when one is configured
+
+Ordering does not have to come from the storage provider. Where the deployment already runs an
+ordered log, events are published to it through the existing outbox and subscribers consume from
+there — so a provider that cannot offer a sequence itself, Azure Table Storage included, still gets
+ordered delivery. The capability is reported through `EventStoreCapabilities` and is present only
+when a transport is configured, which is the established way this repository models a capability
+that is not universal.
+
+**Not every broker qualifies.** The requirement is a *log*, not a queue:
+
+| Transport | Ordering | Replay from the start | Verdict |
+| --- | --- | --- | --- |
+| Kafka | Per-partition, total with one partition | Yes — offsets, retention configurable to infinite | Qualifies |
+| Azure Event Hubs | Per-partition sequence numbers | Yes, within retention (1–90 days; longer via Capture) | Qualifies, with a retention ceiling |
+| Azure Service Bus | FIFO per session | **No** — a message is consumed and gone | Does **not** qualify |
+| RabbitMQ (classic queues) | Per-queue | **No** | Does **not** qualify |
+
+Service Bus is the one to be careful about: sessions make it look like an ordering solution, but
+there are no offsets and no replay, so a subscriber added tomorrow sees nothing from today. It
+solves ordered *live delivery* and not catch-up, which is the gap this feature exists to close.
+
+- **Promise**: ordered, low-latency live delivery, at-least-once, with the transport's own
+  checkpointing. Total order across aggregates only on a single partition.
+- **Cost**: no storage schema change. Reuses the transactional outbox for atomicity, so no dual
+  write is introduced — the path is save → outbox (in the save's transaction) → dispatcher →
+  transport.
+- **Weaknesses**, all real:
+  1. **The outbox does not currently preserve order.** `ClaimNextBatchAsync` claims by creation time
+     across *all* messages, with leases and retries, so a failed message is redelivered after later
+     ones. Ordered publication requires leasing per ordering key (the aggregate id) and stalling
+     that key on failure — a genuine change to the outbox, and head-of-line blocking is the hard
+     part of it.
+  2. **Replay from genesis means a second full copy.** If the transport is the history, it must
+     retain everything ever written. Log compaction does not rescue this: keyed on aggregate id it
+     keeps only the latest event per aggregate, which destroys event sourcing. Event Hubs caps at 90
+     days without Capture.
+  3. **Nothing published before the transport was enabled is in it.** Historical catch-up still has
+     to come from the store.
+  4. Total ordering costs a single partition, and therefore a throughput ceiling.
+
+### Recommendation — Option A, with Option D layered on
+
+Option D does not replace Option A; weaknesses 2 and 3 mean a transport cannot be the source of
+history. The two compose:
+
+- **Catch-up** reads history from the event store, per aggregate, in version order (Option A). Works
+  on every provider with an event stream, needs no transport.
+- **Live tail** switches to the transport once a subscription reaches the head (Option D), when one
+  is configured — giving ordered, low-latency delivery to providers that could never offer a
+  sequence themselves.
+
+A deployment with no transport still gets catch-up plus unordered at-least-once live delivery.
+Parity is preserved, and the stronger guarantee is advertised only where it genuinely holds.
+
+Option B remains available later as a store-native strengthening for the relational providers,
+without invalidating Option A's contract.
 
 ## Part 1 — Subscriptions (Option A)
 
@@ -205,18 +258,27 @@ than silently no-op.
 
 ## Provider impact
 
-| Provider | Subscriptions (Option A) | Retention |
-| --- | --- | --- |
-| Azure Storage | Yes — partition scan for discovery | Yes — snapshot-backed, blob snapshots |
-| MongoDB | Yes | Yes |
-| PostgreSQL | Yes | Yes |
-| SQL Server | Yes | Yes |
-| Cosmos DB | **No** — `no-event-stream` | **No** — nothing to prune |
-| InMemory | Yes — needed for the acceptance scenarios | Yes |
+| Provider | Catch-up (Option A) | Ordered live tail (Option D) | Retention |
+| --- | --- | --- | --- |
+| Azure Storage | Yes — partition scan for discovery | With a transport | Yes — snapshot-backed, blob snapshots |
+| MongoDB | Yes | With a transport | Yes |
+| PostgreSQL | Yes | With a transport | Yes |
+| SQL Server | Yes | With a transport | Yes |
+| Cosmos DB | **No** — `no-event-stream` | **No** — nothing to publish | **No** — nothing to prune |
+| InMemory | Yes — needed for the acceptance scenarios | No | Yes |
+
+Ordered live tail is a property of the configured transport, not of the provider, which is why it is
+uniform across every provider that has a stream.
 
 Both features need new flags on `EventStoreCapabilities` (`SupportsSubscriptions`,
-`SupportsRetention`) so an application can discover the truth rather than infer it, in line with how
-every other capability is reported.
+`SupportsOrderedDelivery`, `SupportsRetention`) so an application can discover the truth rather than
+infer it, in line with how every other capability is reported.
+
+**No transport integration exists today.** `IOutboxHandler` is the seam a consumer implements to
+publish, and the repository ships no Kafka, Event Hubs or Service Bus package. Option D therefore
+also decides whether the framework starts shipping transport adapters, or documents the handler
+contract an ordered transport must satisfy and leaves the adapter to the consumer. The second is
+much smaller and avoids a new dependency surface.
 
 ## What the work includes
 
@@ -235,9 +297,16 @@ Beyond the implementation, per the repository's rules:
 
 ## Decisions needed before implementation
 
-1. **Option A, B or C** for ordering. (Recommendation: A.)
-2. Whether a **snapshot store is a prerequisite** for subscriptions, which decides the discovery
+1. **Ordering model.** (Recommendation: A for catch-up, with D layered on for ordered live tail
+   where a transport is configured.)
+2. If Option D is adopted: does the framework **ship transport adapters**, or publish the
+   `IOutboxHandler` contract an ordered transport must satisfy and leave the adapter to the
+   consumer? (Recommendation: the latter — no new dependency surface.)
+3. If Option D is adopted: is **ordered outbox dispatch** in scope? Per-key leasing with head-of-line
+   blocking is the substantial part of the work, and without it publication order is not commit
+   order.
+4. Whether a **snapshot store is a prerequisite** for subscriptions, which decides the discovery
    mechanism.
-3. Whether retention is **scheduled or operator-invoked**, and whether a dry run ships first.
-4. Whether both halves ship together, or **subscriptions first** — they are independent, and
+5. Whether retention is **scheduled or operator-invoked**, and whether a dry run ships first.
+6. Whether both halves ship together, or **subscriptions first** — they are independent, and
    retention is the one that can destroy data.
