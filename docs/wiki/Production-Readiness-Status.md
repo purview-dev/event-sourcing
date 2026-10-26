@@ -12,7 +12,7 @@ what is waiting on a decision. The five design pages hold the *reasoning*; this 
 | Plan | Status | What is left |
 | --- | --- | --- |
 | [Crypto Key Management](Crypto-Key-Management-Design.md) | **Done** | Rotation ships for the two SQL providers only |
-| [Observability Parity](Observability-Parity-Design.md) | **Done, one gap** | No test asserts spans are emitted |
+| [Observability Parity](Observability-Parity-Design.md) | **Done, one gap** | Span emission asserted on SQL Server only; the other three use mocked telemetry |
 | [Durable Admin Audit](Admin-Audit-Durability-Design.md) | **Phases 1–4 done** | Phase 5: retention floor. Nothing deletes an audit entry, ever |
 | [Retention](Retention-Design.md) | **Done** | Nothing schedules marker cleanup or checkpoint removal; both are operator-invoked |
 | [Resilience Testing](Resilience-Testing-Design.md) | **Phases 1–2 done** | Phases 4–5: transport faults, load/soak |
@@ -65,8 +65,9 @@ There is **no Admin API endpoint** for reading the trail, by decision (see decis
   in-memory so they reset on restart.
 - **Key rotation beyond SQL.** Azure Storage, MongoDB and both Key Vault stores do not implement
   `IRotatingEventCryptoKeyStore`.
-- **Span assertions.** The provider fixtures inject mocked telemetry, so a test listening for real
-  activities records nothing. Needs a fixture using the generated telemetry.
+- **Span assertions, on the other three providers.** SQL Server now has a fixture that injects the
+  generated telemetry and a test that listens for the activities; PostgreSQL, MongoDB and Azure
+  Storage still use the mock, so their spans are covered by call-level assertions only.
 - **Ordered live tail.** Option D in the
   [subscriptions design](Subscriptions-And-Retention-Design.md); needs per-key outbox leasing with
   head-of-line blocking.

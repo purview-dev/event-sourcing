@@ -47,6 +47,22 @@ public class SqlServerEventStoreFixture : IAsyncInitializer, IAsyncDisposable
 			payloadProtector
 		).EventStore;
 
+	/// <summary>
+	/// Builds a store wired to the <em>generated</em> telemetry rather than the mock, for tests that
+	/// assert spans are actually emitted.
+	/// </summary>
+	/// <remarks>
+	/// A separate method rather than another optional parameter on <c>CreateEventStore</c>: that
+	/// signature is called from most of the suite, and widening it counts against the class-coupling
+	/// analyzer in every one of those callers.
+	/// </remarks>
+	public SqlServerEventStore<TAggregate> CreateEventStoreWithRealTelemetry<TAggregate>(
+		ISqlServerEventStoreTelemetry telemetry,
+		Guid? runId = null
+	)
+		where TAggregate : class, IAggregate, new() =>
+		CreateEventStoreContext<TAggregate>(runId: runId, realTelemetry: telemetry).EventStore;
+
 	internal (
 		SqlServerEventStore<TAggregate> EventStore,
 		SqlServerEventStoreClient Client,
@@ -58,13 +74,18 @@ public class SqlServerEventStoreFixture : IAsyncInitializer, IAsyncDisposable
 		Guid? runId = null,
 		Action<SqlServerEventStoreOptions>? configureOptions = null,
 		ICurrentTenant? currentTenant = null,
-		IEventPayloadProtector? payloadProtector = null
+		IEventPayloadProtector? payloadProtector = null,
+		ISqlServerEventStoreTelemetry? realTelemetry = null
 	)
 		where TAggregate : class, IAggregate, new()
 	{
 		runId ??= Guid.NewGuid();
 		var cache = CreateDistributedCache();
 		Cache = cache;
+		// The mock is the default because almost every test asserts that the store *calls* telemetry.
+		// A test that asserts spans are actually *emitted* needs the generated implementation instead:
+		// a mock records the call and produces no Activity, so an ActivityListener sees nothing and a
+		// span-name assertion written against it passes while proving nothing.
 		var telemetry = ISqlServerEventStoreTelemetry.Mock();
 		Telemetry = telemetry;
 		_eventNameMapper = new AggregateEventNameMapper();
@@ -90,7 +111,7 @@ public class SqlServerEventStoreFixture : IAsyncInitializer, IAsyncDisposable
 			eventNameMapper: _eventNameMapper,
 			sqlServerOptions: Microsoft.Extensions.Options.Options.Create(options),
 			distributedCache: cache,
-			eventStoreTelemetry: telemetry,
+			eventStoreTelemetry: realTelemetry ?? telemetry,
 			aggregateChangeNotifier: aggregateChangeNotifier ?? IAggregateChangeFeedNotifier<TAggregate>.Mock(),
 			aggregateRequirementsManager: aggregateRequirementsManager,
 			currentTenant: currentTenant,

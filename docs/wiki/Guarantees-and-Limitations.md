@@ -306,6 +306,15 @@ Every provider that persists an event stream emits the same spans - `GetAggregat
 names are a compatibility contract**, like instrument names: a trace query built against one provider
 keeps working when a service moves to another.
 
+**`DeleteAggregate` is emitted only for a permanent delete.** A soft delete appends a `Deleted` event
+through the ordinary save path, so it is traced as `SaveAggregate`. An alert or dashboard that counts
+deletions by span name sees only the permanent ones.
+
+**Span emission is asserted by a test on SQL Server only.** The other provider fixtures inject mocked
+telemetry, which records that the store called telemetry but produces no `Activity`, so a listener
+attached to one sees nothing. Their spans are covered by call-level assertions and compilation - that
+is weaker, and it is a gap rather than parity.
+
 Cosmos DB emits `SnapshotAggregate` and `QuerySnapshots` instead. It persists no event stream and
 delegates aggregate reads and writes to an inner event store, which emits the aggregate-level spans;
 emitting them here as well would double-count every operation in a trace.

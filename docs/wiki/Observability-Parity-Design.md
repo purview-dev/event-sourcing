@@ -1,12 +1,20 @@
 # Observability Parity — Design
 
-> **Status: implemented, with one gap.**
+> **Status: implemented. Span emission is asserted on SQL Server only.**
 >
-> Tracing now exists on every provider. **Span emission is not asserted by any test**: the provider
-> fixtures inject mocked telemetry, so a test listening for real activities records nothing. The
-> wiring is covered only by compilation and by the provider suites exercising the code paths, which
-> is weaker than it should be. Closing it needs a fixture that uses the generated telemetry rather
-> than a mock.
+> Tracing exists on every provider. `SqlServerEventStoreFixture.CreateEventStoreWithRealTelemetry`
+> builds a store wired to the **generated** telemetry rather than the mock, and
+> `SqlServerEventStoreSpanTests` attaches an `ActivityListener` and asserts the spans actually reach
+> it. The other three providers still use the mock everywhere, so their spans are covered by
+> call-level assertions and compilation only — **that gap is real and is not parity**.
+>
+> Why the mock is still the default: it records that the store *called* telemetry, which is what
+> almost every test wants. A span-name assertion written against a mocked store passes vacuously,
+> because the mock returns no `Activity` and the listener sees nothing.
+>
+> **What writing these tests found:** `DeleteAsync` emits `DeleteAggregate` only for a *permanent*
+> delete. A soft delete appends a `Deleted` event through the ordinary save path and is traced as
+> `SaveAggregate`. An alert written on the obvious assumption would never have fired.
 
 ## The problem
 
