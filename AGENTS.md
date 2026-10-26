@@ -34,6 +34,7 @@ This repository contains the `Purview.EventSourcing` framework, its incremental 
 | `src/tests` | Unit, integration, source-generator, sample, admin, and performance projects |
 | `src/tests/SharedTestingFramework` | Shared provider fixtures and Purview.Containers infrastructure |
 | `docs/wiki` | User-facing design, provider, generator, dependency, and release guidance |
+| `docs/wiki/Production-Readiness-Status.md` | Current state of the production-readiness programme: what shipped, what remains, and which decisions block work. Read before planning feature work; update when a plan moves |
 | `.github/workflows` | PR validation, reusable validation/pack, and release workflows |
 | `skills` | Agent skills this repository authors and ships to consumers via the skills CLI |
 | `.agents/skills` | Skills consumed from other repositories, installed by the CLI and gitignored |
@@ -51,7 +52,8 @@ Do not introduce a second version source, dependency-version location, or parall
 2. Confirm behavior from code and tests rather than relying on memory or documentation alone. Documentation describes intent but may lag implementation.
 3. Make the smallest coherent change. Preserve public behavior unless the task explicitly changes it.
 4. Update tests for fixes and behavior changes. Update documentation when public behavior, provider support, configuration, query semantics, generated API shape, or limitations change.
-5. Feature work is not finished until the authored skills in `skills/` and the guides in `docs/wiki` describe it. See [Skills and documentation are part of the feature](#skills-and-documentation-are-part-of-the-feature).
+5. Feature work is not finished until the authored skills in `skills/` and the guides in `docs/wiki` describe it.
+   Where that work is part of the production-readiness programme, update [`docs/wiki/Production-Readiness-Status.md`](docs/wiki/Production-Readiness-Status.md) as well - it is the only place the remaining work is recorded end to end, and a stale entry there is worse than none. See [Skills and documentation are part of the feature](#skills-and-documentation-are-part-of-the-feature).
 6. Run the narrowest meaningful validation first, then broader validation in proportion to risk.
 7. Review the diff for unrelated edits, generated noise, compatibility risks, and missing docs, skills or tests.
 

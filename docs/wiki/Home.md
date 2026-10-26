@@ -30,6 +30,8 @@ This wiki is the project documentation hub for framework features, provider capa
 
 Designs under discussion. Check each page's status banner before relying on it.
 
+**Start here: [Production Readiness Status](Production-Readiness-Status.md)** — what has shipped, what has not, and what is waiting on a decision.
+
 - [Subscriptions and Retention](Subscriptions-And-Retention-Design.md) — subscriptions shipped; the
   ordered live tail remains a proposal
 - [Crypto Key Management](Crypto-Key-Management-Design.md) — local, in-memory and Key Vault key

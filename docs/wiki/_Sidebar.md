@@ -20,6 +20,7 @@
 - [Source Generator Code Fixes](Code-Fixes.md)
 - [SQL Server Guide](SQL-Server-Guide.md)
 - [Release Flow](Release-Flow.md)
+- **[Production Readiness Status](Production-Readiness-Status.md)**
 - _Proposal:_ [Subscriptions and Retention](Subscriptions-And-Retention-Design.md)
 - _Proposal:_ [Crypto Key Management](Crypto-Key-Management-Design.md)
 - _Proposal:_ [Durable Admin Audit](Admin-Audit-Durability-Design.md)
