@@ -192,6 +192,48 @@ public static class ServiceCollectionExtensions
 		}
 
 		/// <summary>
+		/// Registers event-stream retention: the preview, the prune, and optionally a scheduled run.
+		/// </summary>
+		/// <typeparam name = "TAggregate">The aggregate type to prune.</typeparam>
+		/// <param name = "configure">Optional <see cref = "EventRetentionOptions"/> configuration.</param>
+		/// <returns>The <paramref name = "services"/> for chaining.</returns>
+		/// <remarks>
+		/// <para>
+		/// <strong>Nothing is destructive until <see cref = "EventRetentionOptions.Mode"/> says so.</strong>
+		/// It defaults to <see cref = "EventRetentionMode.None"/>, which registers the preview and no prune -
+		/// adding a registration must not start deleting history.
+		/// </para>
+		/// <para>
+		/// Operator-invoked and scheduled are independent flags, so a deployment can enable either,
+		/// both, or neither. Requires the store to implement <see cref = "IEventStreamPruning{T}"/>;
+		/// a provider without it can still preview.
+		/// </para>
+		/// </remarks>
+		public IServiceCollection AddEventStreamRetention<TAggregate>(Action<EventRetentionOptions>? configure = null)
+			where TAggregate : class, IAggregate, new()
+		{
+			services.AddEventStreamRetentionPreview<TAggregate>();
+			services.TryAddScoped<IEventStreamRetention<TAggregate>, EventStreamRetention<TAggregate>>();
+
+			services
+				.AddOptions<EventRetentionOptions>()
+				.Configure(options => configure?.Invoke(options))
+				.Validate(
+					static options =>
+					{
+						options.Validate();
+
+						return true;
+					},
+					"EventRetentionOptions is invalid."
+				);
+
+			services.AddHostedService<EventRetentionHostedService<TAggregate>>();
+
+			return services;
+		}
+
+		/// <summary>
 		/// Registers a subscriber, its catch-up processor, and a hosted loop that drives it.
 		/// </summary>
 		/// <typeparam name = "TAggregate">The aggregate type to subscribe to.</typeparam>

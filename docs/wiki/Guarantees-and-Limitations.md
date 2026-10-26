@@ -256,10 +256,23 @@ destroy another tenant's data rather than expose it.
 
 ### Event-stream retention
 
-**Preview only.** `IEventStreamRetentionPreview<T>.PreviewAsync` reports what an
-`EventRetentionPolicy` would remove and what is holding the rest back. **Nothing prunes an event** -
-the destructive path does not exist, by design: a dry run that reports blockers is how an operator
-learns a policy is wrong before it costs them.
+`IEventStreamRetentionPreview<T>.PreviewAsync` reports what an `EventRetentionPolicy` would remove;
+`IEventStreamRetention<T>.PruneAsync` removes it. The prune decides through the same preview, so
+**what a dry run reported is what a prune does** - run the preview, read the blockers, then prune.
+
+**Nothing is destructive until `EventRetentionOptions.Mode` says so**, and it defaults to `None`:
+adding the registration must not start deleting history. `OperatorInvoked` and `Scheduled` are
+independent flags, so a deployment can enable either, both, or neither. The scheduled run uses
+`TenantScope.System`, because a timer has no signed-in user to take a tenant from.
+
+Every run is logged, per stream rather than per run - a single total cannot answer "what happened to
+this aggregate". A run with `RequireSnapshot` disabled is logged as a **warning** naming the risk:
+that configuration removes events with no snapshot behind them, and the state they carried cannot be
+reconstructed. It is permitted because a deployment may have accepted that, and it is loud because
+nobody should be able to say afterwards that they were not told.
+
+On Azure Storage, pruning an oversized event deletes its blob as well as the pointer row; otherwise
+the blob would leak storage nothing will ever reference again.
 
 A stream is reported as blocked when there is no covering snapshot, when the events are newer than
 `MinimumAge`, when a subscription has not read past the prune point, or when the stream is too short

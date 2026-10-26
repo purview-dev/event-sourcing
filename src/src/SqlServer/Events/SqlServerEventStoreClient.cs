@@ -462,6 +462,29 @@ sealed partial class SqlServerEventStoreClient
 			.ExecuteDeleteAsync(cancellationToken);
 	}
 
+	public async Task<int> DeleteEventsThroughVersionAsync(
+		int eventType,
+		string aggregateId,
+		string aggregateType,
+		long throughVersion,
+		CancellationToken cancellationToken = default
+	)
+	{
+		await EnsureConfiguredAsync(cancellationToken);
+		await using var context = CreateContext();
+
+		// The context carries the tenant query filter, so a stream belonging to another tenant is
+		// not visible here and cannot be deleted by a scope that does not own it.
+		return await context
+			.EventStoreEntities.Where(x =>
+				x.EntityType == eventType
+				&& x.AggregateId == aggregateId
+				&& x.AggregateType == aggregateType
+				&& x.Version <= throughVersion
+			)
+			.ExecuteDeleteAsync(cancellationToken);
+	}
+
 	public async Task<RowData?> GetByIdAsync(string id, CancellationToken cancellationToken = default)
 	{
 		await EnsureConfiguredAsync(cancellationToken);

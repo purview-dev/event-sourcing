@@ -22,7 +22,7 @@ per-registration values.
 | Crypto key rotation | `IRotatingEventCryptoKeyStore` | Yes | Yes | No | No | n/a |
 | Distributed tracing spans | Span names are a contract | Yes | Yes | Yes | Yes | Snapshot/query spans |
 | Durable admin audit log | Contract + in-memory default | `AddPurviewEventSourcingAdminSqlServerAudit()` | `AddPurviewEventSourcingAdminPostgresAudit()` | Not provided | Not provided | n/a |
-| Event-stream retention / pruning | No | No | No | No | No | n/a |
+| Event-stream retention / pruning | Preview, policy, prune orchestration | Yes | Yes | Yes | Yes (incl. blob cleanup) | n/a |
 | Idempotency marker retention | `IIdempotencyMarkerMaintenance` | Yes | Yes | Yes | Yes | n/a |
 | Provider-specific native transaction factory | No | `ISqlServerEventStoreTransactionFactory` | `IPostgresEventStoreTransactionFactory` | No | No | No |
 | Runtime-configured JSON payload indexes | No | Yes (event + snapshot stores, auto-create path) | Yes (GIN + expression indexes on event + snapshot stores) | No | No | Yes (container indexing policy, including composite and spatial paths) |

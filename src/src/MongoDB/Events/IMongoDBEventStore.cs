@@ -16,7 +16,8 @@ namespace Purview.EventSourcing.MongoDB.Events;
 public interface IMongoDBEventStore<T>
 	: INonQueryableEventStore<T>,
 		IAggregateEventHistoryStoreCore<T>,
-		IIdempotencyMarkerMaintenance
+		IIdempotencyMarkerMaintenance,
+		Retention.IEventStreamPruning<T>
 	where T : class, IAggregate, new()
 {
 	//

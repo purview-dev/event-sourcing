@@ -1,11 +1,17 @@
 # Retention — Design
 
-> **Status: phases 1 and 2 implemented.**
+> **Status: implemented.**
 >
-> Idempotency marker cleanup ships for SQL Server, PostgreSQL, Azure Storage and MongoDB, and the
-> event-stream retention **preview** ships provider-neutrally. **Phases 3 to 5 remain proposals** —
-> nothing prunes an event. Decision 2 below is answered by construction: the dry run shipped first.
-> Decisions 1, 3 and 4 are still open and block the destructive path.
+> Marker cleanup, the preview, and the destructive prune all ship. The four decisions below are
+> answered: retention supports **both** operator-invoked and scheduled modes as independent flags
+> (either, both, or neither); the dry run shipped first; `RequireSnapshot = false` **is** permitted
+> but logs a warning naming the risk on every run; and a lagging subscription **blocks** a prune.
+>
+> One gap follows from that last answer: there is no way to retire a subscription, so an abandoned
+> one blocks retention indefinitely. Deleting a subscription's checkpoints is the missing piece.
+>
+> Supersedes Part 2 of [Subscriptions and Retention](Subscriptions-And-Retention-Design.md), which
+> covered event-stream retention only.
 >
 > Supersedes Part 2 of [Subscriptions and Retention](Subscriptions-And-Retention-Design.md), which
 > covered event-stream retention only.
