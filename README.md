@@ -193,7 +193,7 @@ The sample solution demonstrates how the framework is intended to be consumed:
 | `src/tests` | Unit, integration, and source generator test projects |
 | `docs/wiki` | Wiki-style project documentation (`Home.md`, SQL Server guide, release flow, source-generator behaviors) |
 | `Justfile` | Build, test, format, version, pack, and pipeline workflow definitions |
-| `purview-build.json` | Shared `Purview.Build` pipeline configuration (restore, build, lint, tests, pack) |
+| `.config/purview-build.json` | Shared `Purview.Build` pipeline configuration (restore, build, lint, tests, pack) |
 
 ## Development workflow
 

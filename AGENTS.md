@@ -243,7 +243,7 @@ just perf-sql-server
 just current-version
 ```
 
-The repository uses the shared `Purview.Build` pipeline (`purview-build.json` at the root), also driven in CI through the `purview-dev/build` reusable workflows. `just pipeline-pr` installs the pinned `Purview.Build` tool to `.tools/purview-build` when missing.
+The repository uses the shared `Purview.Build` pipeline (`.config/purview-build.json`), also driven in CI through the `purview-dev/build` reusable workflows. `just pipeline-pr` installs the pinned `Purview.Build` tool to `.tools/purview-build` when missing.
 
 Local CI-equivalent validation:
 
