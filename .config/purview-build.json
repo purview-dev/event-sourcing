@@ -87,13 +87,17 @@
 				"README.md"
 			],
 			"purview.eventsourcing.cosmosdb": [
-				"analyzers/dotnet/cs/Purview.EventSourcing.EntityFrameworkCore.SourceGenerator.dll",
 				"lib/$(TFM)/Purview.EventSourcing.CosmosDb.dll",
 				"lib/$(TFM)/Purview.EventSourcing.CosmosDb.xml",
-				"lib/$(TFM)/Purview.EventSourcing.EntityFrameworkCore.dll",
-				"lib/$(TFM)/Purview.EventSourcing.EntityFrameworkCore.xml",
 				"lib/$(TFM)/Purview.EventSourcing.ImplementationShared.dll",
 				"lib/$(TFM)/Purview.EventSourcing.ImplementationShared.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
+			"purview.eventsourcing.entityframeworkcore": [
+				"analyzers/dotnet/cs/Purview.EventSourcing.EntityFrameworkCore.SourceGenerator.dll",
+				"lib/$(TFM)/Purview.EventSourcing.EntityFrameworkCore.dll",
+				"lib/$(TFM)/Purview.EventSourcing.EntityFrameworkCore.xml",
 				"purview-logo-light.png",
 				"README.md"
 			],
@@ -115,9 +119,6 @@
 				"README.md"
 			],
 			"purview.eventsourcing.postgres": [
-				"analyzers/dotnet/cs/Purview.EventSourcing.EntityFrameworkCore.SourceGenerator.dll",
-				"lib/$(TFM)/Purview.EventSourcing.EntityFrameworkCore.dll",
-				"lib/$(TFM)/Purview.EventSourcing.EntityFrameworkCore.xml",
 				"lib/$(TFM)/Purview.EventSourcing.ImplementationShared.dll",
 				"lib/$(TFM)/Purview.EventSourcing.ImplementationShared.xml",
 				"lib/$(TFM)/Purview.EventSourcing.Postgres.dll",
@@ -127,9 +128,6 @@
 				"README.md"
 			],
 			"purview.eventsourcing.sqlserver": [
-				"analyzers/dotnet/cs/Purview.EventSourcing.EntityFrameworkCore.SourceGenerator.dll",
-				"lib/$(TFM)/Purview.EventSourcing.EntityFrameworkCore.dll",
-				"lib/$(TFM)/Purview.EventSourcing.EntityFrameworkCore.xml",
 				"lib/$(TFM)/Purview.EventSourcing.ImplementationShared.dll",
 				"lib/$(TFM)/Purview.EventSourcing.ImplementationShared.xml",
 				"lib/$(TFM)/Purview.EventSourcing.SqlServer.dll",
