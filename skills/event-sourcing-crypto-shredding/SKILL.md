@@ -77,6 +77,26 @@ Pick secret-per-subject when erasure itself must be vault-audited; pick envelope
 population makes that impractical. The envelope store never writes a usable key to the durable
 store, so a stolen database is unreadable without the vault.
 
+### Rotation, where the store supports it
+
+SQL Server and PostgreSQL hold multiple key generations per subject. `ProtectedPayload` records
+which one encrypted it, so rotating never makes existing events unreadable - old generations are
+kept on purpose.
+
+```csharp
+var keyId = await rotatingStore.RotateAsync(dataSubjectId, cancellationToken);
+```
+
+Two things to keep straight:
+
+- **Rotation is not erasure.** `ShredAsync` deletes every generation; rotation adds one. A shred
+  that left an older generation behind would not be an erasure.
+- **Rotation does not re-encrypt history.** It limits what a future key compromise exposes; it does
+  nothing about what an attacker already has.
+
+Elsewhere - Azure Storage, MongoDB, Key Vault, in-memory - the store does not implement
+`IRotatingEventCryptoKeyStore` and payloads carry no key identifier, exactly as before.
+
 ### Caching bounds how fast an erasure takes effect
 
 Keys are cached in process by default - an uncached store makes every protect and unprotect a round

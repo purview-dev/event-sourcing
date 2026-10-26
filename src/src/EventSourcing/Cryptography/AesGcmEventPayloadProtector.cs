@@ -35,7 +35,16 @@ public sealed class AesGcmEventPayloadProtector(IEventCryptoKeyStore keyStore) :
 		ArgumentNullException.ThrowIfNull(payload);
 		ArgumentException.ThrowIfNullOrWhiteSpace(dataSubjectId);
 
-		var key = await keyStore.GetOrCreateAsync(dataSubjectId, cancellationToken);
+		// A rotating store records which generation was used, so a later rotation does not make this
+		// payload unreadable. A store without rotation writes no identifier, which is exactly what
+		// every payload written before rotation existed looks like.
+		string? keyId = null;
+		byte[] key;
+		if (Rotating is { } rotating)
+			(keyId, key) = await rotating.GetCurrentAsync(dataSubjectId, cancellationToken);
+		else
+			key = await keyStore.GetOrCreateAsync(dataSubjectId, cancellationToken);
+
 		var plaintext = Encoding.UTF8.GetBytes(payload);
 
 		var nonce = new byte[AesGcm.NonceByteSizes.MaxSize];
@@ -51,6 +60,7 @@ public sealed class AesGcmEventPayloadProtector(IEventCryptoKeyStore keyStore) :
 			new ProtectedPayload
 			{
 				DataSubjectId = dataSubjectId,
+				KeyId = keyId,
 				Nonce = Convert.ToBase64String(nonce),
 				Tag = Convert.ToBase64String(tag),
 				CipherText = Convert.ToBase64String(cipherText),
@@ -70,7 +80,12 @@ public sealed class AesGcmEventPayloadProtector(IEventCryptoKeyStore keyStore) :
 			EventStoreSerializationHelpers.Deserialize<ProtectedPayload>(payload)
 			?? throw new InvalidOperationException("The payload is marked as protected but could not be read.");
 
-		var key = await keyStore.TryGetAsync(envelope.DataSubjectId, cancellationToken);
+		// A payload carrying a generation must be decrypted with that generation, not the current
+		// one - otherwise every rotation would silently break everything written before it.
+		var key =
+			envelope.KeyId is { } writtenWith && Rotating is { } rotating
+				? await rotating.TryGetAsync(envelope.DataSubjectId, writtenWith, cancellationToken)
+				: await keyStore.TryGetAsync(envelope.DataSubjectId, cancellationToken);
 		if (key is null)
 			// The subject has been erased. Expected, not exceptional: the caller turns this into a
 			// skipped event so replay continues and the gap stays visible.
@@ -86,6 +101,12 @@ public sealed class AesGcmEventPayloadProtector(IEventCryptoKeyStore keyStore) :
 
 		return Encoding.UTF8.GetString(plaintext);
 	}
+
+	// No unwrapping here: a decorator implements the interface and reports whether the store it wraps
+	// actually supports rotation, which is what SupportsRotation is for. Unwrapping would find the
+	// real store and then have to call through the decorator anyway, losing its caching.
+	IRotatingEventCryptoKeyStore? Rotating =>
+		keyStore is IRotatingEventCryptoKeyStore { SupportsRotation: true } rotating ? rotating : null;
 
 	/// <inheritdoc/>
 	public bool IsProtected(string payload) =>

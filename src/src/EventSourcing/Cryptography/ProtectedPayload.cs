@@ -33,6 +33,18 @@ public sealed record ProtectedPayload
 	[JsonPropertyName("sub")]
 	public string DataSubjectId { get; init; } = default!;
 
+	/// <summary>
+	/// The generation of the subject's key the payload was encrypted with.
+	/// </summary>
+	/// <remarks>
+	/// Absent when the key store does not hold multiple generations, which is what every payload
+	/// written before rotation existed looks like. A reader treats a missing identifier as "the
+	/// subject's only key", so the addition is backward compatible and needs no upcaster.
+	/// </remarks>
+	[JsonPropertyName("kid")]
+	[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+	public string? KeyId { get; init; }
+
 	/// <summary>The base64 nonce.</summary>
 	[JsonPropertyName("n")]
 	public string Nonce { get; init; } = default!;

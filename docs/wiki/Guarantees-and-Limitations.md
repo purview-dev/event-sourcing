@@ -133,8 +133,23 @@ until its own entry expires. Treat that duration as a compliance parameter rathe
 turn caching off where an erasure must be immediate everywhere. Key material is never written to a
 distributed cache.
 
-Key rotation is **not** implemented: `ProtectedPayload` records no key identifier, so there is no way to
-tell which key a payload used. See [Crypto Key Management](Crypto-Key-Management-Design.md).
+### Rotation
+
+**SQL Server and PostgreSQL only.** A subject can hold several key generations; the highest is
+current and is used for new payloads. `ProtectedPayload` records which generation it was encrypted
+under (`kid`), so **rotation never makes existing events unreadable** - earlier generations are
+retained deliberately.
+
+Rotation limits the blast radius of a future key compromise. It does **not** re-encrypt history, and
+it is distinct from erasure: `ShredAsync` removes *every* generation, because one left behind would
+mean the subject's older events were still readable.
+
+A payload written before rotation existed carries no `kid`, which a reader treats as "the subject's
+only key" - so the field is backward compatible and needs no upcaster.
+
+A store that cannot hold multiple generations - Azure Storage, MongoDB, both Key Vault stores, and
+the in-memory one - simply does not implement `IRotatingEventCryptoKeyStore`, and payloads are
+written without a key identifier exactly as before.
 
 ## Multi-tenancy
 

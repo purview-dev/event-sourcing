@@ -1,11 +1,12 @@
 # Crypto Key Management — Design
 
-> **Status: mostly implemented.**
+> **Status: implemented.**
 >
-> Phase 1 (the start-up guard), Phase 2 (SQL Server, PostgreSQL, Azure Storage and MongoDB key
-> stores) and Phase 4 (both Key Vault models) have shipped — see
-> [Guarantees and Limitations](Guarantees-and-Limitations.md#key-stores). **Rotation (Phase 5) remains a proposal.** Caching
-> (Phase 3) has shipped, including the evict-before-delete rule.
+> All five phases have shipped — see
+> [Guarantees and Limitations](Guarantees-and-Limitations.md#key-stores). Two deliberate narrowings
+> against the plan below: rotation is an optional `IRotatingEventCryptoKeyStore` rather than a
+> change to `IEventCryptoKeyStore`, so stores adopt it independently and nothing breaks for an
+> existing implementer; and it ships for SQL Server and PostgreSQL only.
 
 ## The problem
 

@@ -29,7 +29,10 @@ namespace Purview.EventSourcing.Cryptography;
 /// legitimately created, which looks exactly like erasure and is far harder to diagnose.
 /// </para>
 /// </remarks>
-public sealed class CachingEventCryptoKeyStore : IEventCryptoKeyStore, IEventCryptoKeyStoreDecorator, IDisposable
+public sealed class CachingEventCryptoKeyStore
+	: IRotatingEventCryptoKeyStore,
+		IEventCryptoKeyStoreDecorator,
+		IDisposable
 {
 	readonly IEventCryptoKeyStore _inner;
 	readonly ICurrentTenant _currentTenant;
@@ -57,6 +60,85 @@ public sealed class CachingEventCryptoKeyStore : IEventCryptoKeyStore, IEventCry
 
 	/// <inheritdoc/>
 	public IEventCryptoKeyStore Inner => _inner;
+
+	/// <inheritdoc/>
+	public bool SupportsRotation => _inner is IRotatingEventCryptoKeyStore { SupportsRotation: true };
+
+	/// <inheritdoc/>
+	/// <remarks>
+	/// The current generation is cached like any other key, so a rotation on another instance takes
+	/// up to <see cref="EventCryptoOptions.KeyCacheDuration"/> to be picked up here. That delays the
+	/// benefit of rotating; it does not break anything, because payloads written under the previous
+	/// generation stay readable.
+	/// </remarks>
+	public async Task<(string KeyId, byte[] Key)> GetCurrentAsync(
+		string dataSubjectId,
+		CancellationToken cancellationToken
+	)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(dataSubjectId);
+
+		var cacheKey = CurrentCacheKeyFor(dataSubjectId);
+		if (_cache.TryGetValue(cacheKey, out (string KeyId, byte[] Key) cached) && cached.Key is not null)
+			return cached;
+
+		var current = await RotatingInner.GetCurrentAsync(dataSubjectId, cancellationToken);
+		_cache.Set(
+			cacheKey,
+			current,
+			new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = _duration, Size = current.Key.Length }
+		);
+
+		return current;
+	}
+
+	/// <inheritdoc/>
+	public async Task<byte[]?> TryGetAsync(string dataSubjectId, string keyId, CancellationToken cancellationToken)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(dataSubjectId);
+		ArgumentException.ThrowIfNullOrWhiteSpace(keyId);
+
+		var cacheKey = GenerationCacheKeyFor(dataSubjectId, keyId);
+		if (_cache.TryGetValue(cacheKey, out byte[]? cached) && cached is not null)
+			return cached;
+
+		var fetched = await RotatingInner.TryGetAsync(dataSubjectId, keyId, cancellationToken);
+		if (fetched is not null)
+			Store(cacheKey, fetched);
+
+		return fetched;
+	}
+
+	/// <inheritdoc/>
+	public async Task<string> RotateAsync(string dataSubjectId, CancellationToken cancellationToken)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(dataSubjectId);
+
+		// Evict the cached current generation before and after, for the same reason as a shred: a
+		// reader racing the rotation can put the previous one back.
+		_cache.Remove(CurrentCacheKeyFor(dataSubjectId));
+		try
+		{
+			return await RotatingInner.RotateAsync(dataSubjectId, cancellationToken);
+		}
+		finally
+		{
+			_cache.Remove(CurrentCacheKeyFor(dataSubjectId));
+			_cache.Remove(CacheKeyFor(dataSubjectId));
+		}
+	}
+
+	IRotatingEventCryptoKeyStore RotatingInner =>
+		_inner as IRotatingEventCryptoKeyStore
+		?? throw new NotSupportedException(
+			$"The configured key store '{_inner.GetType().Name}' does not support key rotation."
+		);
+
+	(string Tenant, string Subject, string Marker) CurrentCacheKeyFor(string dataSubjectId) =>
+		(TenantColumn.Encode(_currentTenant.Current), dataSubjectId, "current");
+
+	(string Tenant, string Subject, string KeyId) GenerationCacheKeyFor(string dataSubjectId, string keyId) =>
+		(TenantColumn.Encode(_currentTenant.Current), dataSubjectId, keyId);
 
 	/// <inheritdoc/>
 	public async Task<byte[]> GetOrCreateAsync(string dataSubjectId, CancellationToken cancellationToken)

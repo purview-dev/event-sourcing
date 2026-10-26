@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Options;
 using Npgsql;
@@ -26,7 +27,10 @@ namespace Purview.EventSourcing.Postgres.Cryptography;
 /// when the last backup containing the key ages out.
 /// </para>
 /// </remarks>
-public sealed partial class PostgresEventCryptoKeyStore : ISuppliedKeyEventCryptoKeyStore, IDisposable
+public sealed partial class PostgresEventCryptoKeyStore
+	: ISuppliedKeyEventCryptoKeyStore,
+		IRotatingEventCryptoKeyStore,
+		IDisposable
 {
 	[GeneratedRegex("^[\\w\\-.]+$", RegexOptions.Compiled)]
 	private static partial Regex ValidIdentifier();
@@ -60,6 +64,9 @@ public sealed partial class PostgresEventCryptoKeyStore : ISuppliedKeyEventCrypt
 	}
 
 	/// <inheritdoc/>
+	public bool SupportsRotation => true;
+
+	/// <inheritdoc/>
 	public Task<byte[]> GetOrCreateAsync(string dataSubjectId, CancellationToken cancellationToken) =>
 		GetOrAddAsync(dataSubjectId, AesGcmEventPayloadProtector.CreateKey(), cancellationToken);
 
@@ -86,9 +93,9 @@ public sealed partial class PostgresEventCryptoKeyStore : ISuppliedKeyEventCrypt
 		// returns the stored row either way, which is the point.
 		await using NpgsqlCommand command = new(
 			$"""
-			INSERT INTO {_schema}.{_table} ("TenantId", "DataSubjectId", "KeyMaterial", "CreatedUtc")
-			VALUES (@tenantId, @subject, @key, @now)
-			ON CONFLICT ("TenantId", "DataSubjectId") DO UPDATE
+			INSERT INTO {_schema}.{_table} ("TenantId", "DataSubjectId", "Generation", "KeyMaterial", "CreatedUtc")
+			VALUES (@tenantId, @subject, 1, @key, @now)
+			ON CONFLICT ("TenantId", "DataSubjectId", "Generation") DO UPDATE
 			SET "KeyMaterial" = {_table}."KeyMaterial"
 			RETURNING "KeyMaterial"
 			""",
@@ -109,7 +116,39 @@ public sealed partial class PostgresEventCryptoKeyStore : ISuppliedKeyEventCrypt
 	/// <inheritdoc/>
 	public async Task<byte[]?> TryGetAsync(string dataSubjectId, CancellationToken cancellationToken)
 	{
+		var current = await TryGetCurrentAsync(dataSubjectId, cancellationToken);
+
+		return current?.Key;
+	}
+
+	/// <inheritdoc/>
+	public async Task<(string KeyId, byte[] Key)> GetCurrentAsync(
+		string dataSubjectId,
+		CancellationToken cancellationToken
+	)
+	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(dataSubjectId);
+
+		var current = await TryGetCurrentAsync(dataSubjectId, cancellationToken);
+		if (current is not null)
+			return current.Value;
+
+		await GetOrAddAsync(dataSubjectId, AesGcmEventPayloadProtector.CreateKey(), cancellationToken);
+
+		return await TryGetCurrentAsync(dataSubjectId, cancellationToken)
+			?? throw new InvalidOperationException(
+				$"The key for data subject '{dataSubjectId}' could not be read back immediately after being created."
+			);
+	}
+
+	/// <inheritdoc/>
+	public async Task<byte[]?> TryGetAsync(string dataSubjectId, string keyId, CancellationToken cancellationToken)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(dataSubjectId);
+		ArgumentException.ThrowIfNullOrWhiteSpace(keyId);
+
+		if (!int.TryParse(keyId, NumberStyles.None, CultureInfo.InvariantCulture, out var generation))
+			return null;
 
 		await EnsureSchemaAsync(cancellationToken);
 
@@ -119,15 +158,92 @@ public sealed partial class PostgresEventCryptoKeyStore : ISuppliedKeyEventCrypt
 		await using NpgsqlCommand command = new(
 			$"""
 			SELECT "KeyMaterial" FROM {_schema}.{_table}
+			WHERE "TenantId" = @tenantId AND "DataSubjectId" = @subject AND "Generation" = @generation
+			""",
+			connection
+		);
+		AddKeyParameters(command, dataSubjectId);
+		command.Parameters.AddWithValue("@generation", generation);
+
+		return await command.ExecuteScalarAsync(cancellationToken) as byte[];
+	}
+
+	/// <inheritdoc/>
+	public async Task<string> RotateAsync(string dataSubjectId, CancellationToken cancellationToken)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(dataSubjectId);
+
+		await EnsureSchemaAsync(cancellationToken);
+
+		// Retried because two concurrent rotations compute the same next generation and one loses on
+		// the primary key. Losing is harmless - the winner's generation becomes current - but the
+		// loser must observe that rather than report a generation it did not create.
+		for (var attempt = 0; attempt < 5; attempt++)
+		{
+			await using NpgsqlConnection connection = new(_connectionString);
+			await connection.OpenAsync(cancellationToken);
+
+			await using NpgsqlCommand command = new(
+				$"""
+				INSERT INTO {_schema}.{_table} ("TenantId", "DataSubjectId", "Generation", "KeyMaterial", "CreatedUtc")
+				SELECT @tenantId, @subject, COALESCE(MAX("Generation"), 0) + 1, @key, @now
+				FROM {_schema}.{_table}
+				WHERE "TenantId" = @tenantId AND "DataSubjectId" = @subject
+				RETURNING "Generation"
+				""",
+				connection
+			);
+			AddKeyParameters(command, dataSubjectId);
+			command.Parameters.AddWithValue("@key", AesGcmEventPayloadProtector.CreateKey());
+			command.Parameters.AddWithValue("@now", DateTimeOffset.UtcNow);
+
+			try
+			{
+				var next = await command.ExecuteScalarAsync(cancellationToken);
+
+				return Convert.ToInt32(next, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture);
+			}
+			catch (PostgresException ex) when (ex.SqlState == "23505")
+			{
+				// Another rotation took this generation; recompute and try again.
+			}
+		}
+
+		throw new InvalidOperationException(
+			$"The key for data subject '{dataSubjectId}' could not be rotated after repeated contention."
+		);
+	}
+
+	async Task<(string KeyId, byte[] Key)?> TryGetCurrentAsync(
+		string dataSubjectId,
+		CancellationToken cancellationToken
+	)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(dataSubjectId);
+
+		await EnsureSchemaAsync(cancellationToken);
+
+		await using NpgsqlConnection connection = new(_connectionString);
+		await connection.OpenAsync(cancellationToken);
+
+		await using NpgsqlCommand command = new(
+			$"""
+			SELECT "Generation", "KeyMaterial" FROM {_schema}.{_table}
 			WHERE "TenantId" = @tenantId AND "DataSubjectId" = @subject
+			ORDER BY "Generation" DESC
+			LIMIT 1
 			""",
 			connection
 		);
 		AddKeyParameters(command, dataSubjectId);
 
-		var result = await command.ExecuteScalarAsync(cancellationToken);
+		await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+		if (!await reader.ReadAsync(cancellationToken))
+			return null;
 
-		return result as byte[];
+		var generation = reader.GetInt32(0);
+
+		return (generation.ToString(CultureInfo.InvariantCulture), (byte[])reader[1]);
 	}
 
 	/// <inheritdoc/>
@@ -178,9 +294,10 @@ public sealed partial class PostgresEventCryptoKeyStore : ISuppliedKeyEventCrypt
 					CREATE TABLE IF NOT EXISTS {_schema}.{_table} (
 						"TenantId" VARCHAR(256) NOT NULL,
 						"DataSubjectId" VARCHAR(256) NOT NULL,
+						"Generation" INTEGER NOT NULL,
 						"KeyMaterial" BYTEA NOT NULL,
 						"CreatedUtc" TIMESTAMPTZ NOT NULL,
-						PRIMARY KEY ("TenantId", "DataSubjectId")
+						PRIMARY KEY ("TenantId", "DataSubjectId", "Generation")
 					);
 					""",
 					connection
