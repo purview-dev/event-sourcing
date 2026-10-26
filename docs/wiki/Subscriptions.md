@@ -128,7 +128,7 @@ at all, so it reads and then writes conditionally on the ETag, retrying on conte
 redelivers — safe, because delivery is at-least-once regardless.
 
 The scope is stored in a single non-null `TenantId` column, with the system scope encoded as the
-empty string by `SubscriptionCheckpointTenantColumn`. That is shared rather than per-provider
+empty string by `TenantColumn`. That is shared rather than per-provider
 because the encoding has to be identical everywhere, and because a nullable column would behave
 differently between the two engines — PostgreSQL treats NULLs as distinct in a unique index, which
 would silently allow duplicate system-scope rows.

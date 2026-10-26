@@ -99,7 +99,7 @@ Every provider with an event stream ships one - `AddSqlServerSubscriptionCheckpo
 `AddMongoDBSubscriptionCheckpoints`. Cosmos DB has no event stream, so there is nothing to
 checkpoint.
 
-If you write your own, encode the scope with `SubscriptionCheckpointTenantColumn` rather than
+If you write your own, encode the scope with `TenantColumn` rather than
 inventing your own scheme, and note two traps the shipped stores had to handle:
 
 - **Do not use a nullable tenant column.** PostgreSQL treats NULLs as distinct in a unique index, so

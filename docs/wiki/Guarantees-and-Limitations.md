@@ -95,6 +95,33 @@ was enabled are **not** retrospectively removed - delete them as part of enablin
 The in-memory store holds live objects rather than serialized payloads, so there is nothing to encrypt
 and crypto-shredding does not apply to it.
 
+### Key stores
+
+Keys are **tenant-scoped**: the same data-subject identifier in two tenants is two different people, so
+they get two different keys, and neither tenant can read or erase the other's.
+
+| Store | Registration | Durable |
+| --- | --- | --- |
+| In-memory | `AddInMemoryEventCryptoShredding()` | **No** - keys are lost on restart |
+| SQL Server | `AddSqlServerEventCryptoShredding()` | Yes |
+| PostgreSQL | `AddPostgresEventCryptoShredding()` | Yes |
+| Azure Storage, MongoDB, Key Vault | Not provided yet | - |
+
+**The host refuses to start with a non-durable key store outside Development.** Losing the keys is
+indistinguishable from erasing every data subject at once, and nothing reports that it happened, so the
+only safe moment to object is before any event has been written under a key that is about to be lost.
+Set `EventStore:Cryptography:AllowNonDurableKeyStore` to override, if that outcome is genuinely
+acceptable. A store declares itself non-durable by implementing `INonDurableEventCryptoKeyStore`, so a
+custom store is covered by the same guard.
+
+**Erasure is only as irreversible as the least-irreversible copy of the key.** A point-in-time restore
+of the key table brings shredded keys back. A deployment that must erase on request has to exclude the
+key table from long-retention backups, or accept that erasure completes only when the last backup
+containing the key ages out. This is an operational control, not something the framework can enforce.
+
+Key rotation is **not** implemented: `ProtectedPayload` records no key identifier, so there is no way to
+tell which key a payload used. See [Crypto Key Management](Crypto-Key-Management-Design.md).
+
 ## Multi-tenancy
 
 Opt-in, and **currently enforced only by the SQL Server and PostgreSQL providers**.

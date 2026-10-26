@@ -1,8 +1,10 @@
 # Crypto Key Management — Design
 
-> **Status: proposal. Nothing on this page is implemented.**
+> **Status: partly implemented.**
 >
-> The only `IEventCryptoKeyStore` that ships today is `InMemoryEventCryptoKeyStore`.
+> Phase 1 (the start-up guard) and Phase 2 (SQL Server and PostgreSQL key stores) have shipped — see
+> [Guarantees and Limitations](Guarantees-and-Limitations.md#key-stores). Caching, the Key Vault
+> store and rotation remain proposals.
 
 ## The problem
 

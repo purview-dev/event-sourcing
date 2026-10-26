@@ -10,7 +10,7 @@ namespace Purview.EventSourcing.Cryptography;
 /// That makes it unusable in production by construction, which is the intent: a key store is the one
 /// component where a convenient default would be actively harmful.
 /// </remarks>
-public sealed class InMemoryEventCryptoKeyStore : IEventCryptoKeyStore
+public sealed class InMemoryEventCryptoKeyStore : IEventCryptoKeyStore, INonDurableEventCryptoKeyStore
 {
 	readonly ConcurrentDictionary<string, byte[]> _keys = new(StringComparer.Ordinal);
 

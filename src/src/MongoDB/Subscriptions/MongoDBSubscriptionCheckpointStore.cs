@@ -3,6 +3,7 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using Purview.EventSourcing.MongoDB.Events;
 using Purview.EventSourcing.Subscriptions;
+using Purview.EventSourcing.Tenancy;
 
 namespace Purview.EventSourcing.MongoDB.Subscriptions;
 
@@ -101,7 +102,7 @@ public sealed class MongoDBSubscriptionCheckpointStore : ISubscriptionCheckpoint
 			new BsonDocument
 			{
 				["s"] = key.SubscriptionName,
-				["t"] = SubscriptionCheckpointTenantColumn.Encode(key.Scope),
+				["t"] = TenantColumn.Encode(key.Scope),
 				["a"] = key.AggregateId,
 			}
 		);

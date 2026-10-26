@@ -3,6 +3,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Options;
 using Purview.EventSourcing.SqlServer.Events;
 using Purview.EventSourcing.Subscriptions;
+using Purview.EventSourcing.Tenancy;
 
 namespace Purview.EventSourcing.SqlServer.Subscriptions;
 
@@ -99,7 +100,7 @@ public sealed partial class SqlServerSubscriptionCheckpointStore(
 	static void AddKeyParameters(SqlCommand command, SubscriptionCheckpointKey key)
 	{
 		command.Parameters.AddWithValue("@name", key.SubscriptionName);
-		command.Parameters.AddWithValue("@tenantId", SubscriptionCheckpointTenantColumn.Encode(key.Scope));
+		command.Parameters.AddWithValue("@tenantId", TenantColumn.Encode(key.Scope));
 		command.Parameters.AddWithValue("@aggregateId", key.AggregateId);
 	}
 

@@ -3,6 +3,7 @@ using Azure;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Options;
 using Purview.EventSourcing.Subscriptions;
+using Purview.EventSourcing.Tenancy;
 
 namespace Purview.EventSourcing.AzureStorage.Subscriptions;
 
@@ -138,7 +139,7 @@ public sealed class AzureStorageSubscriptionCheckpointStore : ISubscriptionCheck
 	// any segment contained the delimiter. Base64Url uses only characters that are legal in a key and
 	// never produces the '|' separator, so the composed key is both legal and unambiguous.
 	static string PartitionKeyFor(SubscriptionCheckpointKey key) =>
-		$"{Encode(key.SubscriptionName)}|{Encode(SubscriptionCheckpointTenantColumn.Encode(key.Scope))}";
+		$"{Encode(key.SubscriptionName)}|{Encode(TenantColumn.Encode(key.Scope))}";
 
 	static string RowKeyFor(SubscriptionCheckpointKey key) => Encode(key.AggregateId);
 

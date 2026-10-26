@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Npgsql;
 using Purview.EventSourcing.Postgres.Events;
 using Purview.EventSourcing.Subscriptions;
+using Purview.EventSourcing.Tenancy;
 
 namespace Purview.EventSourcing.Postgres.Subscriptions;
 
@@ -83,7 +84,7 @@ public sealed partial class PostgresSubscriptionCheckpointStore(
 	static void AddKeyParameters(NpgsqlCommand command, SubscriptionCheckpointKey key)
 	{
 		command.Parameters.AddWithValue("@name", key.SubscriptionName);
-		command.Parameters.AddWithValue("@tenantId", SubscriptionCheckpointTenantColumn.Encode(key.Scope));
+		command.Parameters.AddWithValue("@tenantId", TenantColumn.Encode(key.Scope));
 		command.Parameters.AddWithValue("@aggregateId", key.AggregateId);
 	}
 

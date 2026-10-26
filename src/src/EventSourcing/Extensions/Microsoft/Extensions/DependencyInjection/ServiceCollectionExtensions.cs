@@ -5,6 +5,7 @@ using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.Aggregates.Events.Upcasting;
 using Purview.EventSourcing.ChangeFeed;
+using Purview.EventSourcing.Cryptography;
 using Purview.EventSourcing.EventStores.NullQueryable;
 using Purview.EventSourcing.Manifest;
 using Purview.EventSourcing.Outbox;
@@ -86,6 +87,49 @@ public static class ServiceCollectionExtensions
 				);
 			return services;
 		}
+
+		/// <summary>
+		/// Registers crypto-shredding: a key store, the AES-GCM payload protector, and a start-up
+		/// check that refuses a key store which cannot survive a restart.
+		/// </summary>
+		/// <typeparam name = "TKeyStore">The <see cref = "IEventCryptoKeyStore"/> implementation.</typeparam>
+		/// <param name = "configure">Optional <see cref = "EventCryptoOptions"/> configuration.</param>
+		/// <returns>The <paramref name = "services"/> for chaining.</returns>
+		/// <remarks>
+		/// <para>
+		/// Every provider takes an optional <see cref = "IEventPayloadProtector"/>, so registering it here
+		/// turns protection on for whichever store is configured. Events implementing
+		/// <see cref = "IEventDataSubject"/> are then encrypted under that subject's key.
+		/// </para>
+		/// <para>
+		/// Erasing a subject is only as irreversible as the least-irreversible copy of their key: a
+		/// database restore or a vault's purge protection can both bring one back. See
+		/// <c>docs/wiki/Crypto-Key-Management-Design.md</c>.
+		/// </para>
+		/// </remarks>
+		public IServiceCollection AddEventCryptoShredding<TKeyStore>(Action<EventCryptoOptions>? configure = null)
+			where TKeyStore : class, IEventCryptoKeyStore
+		{
+			services.TryAddSingleton<TKeyStore>();
+			services.TryAddSingleton<IEventCryptoKeyStore>(static provider => provider.GetRequiredService<TKeyStore>());
+			services.TryAddSingleton<IEventPayloadProtector, AesGcmEventPayloadProtector>();
+			services.AddOptions<EventCryptoOptions>().Configure(options => configure?.Invoke(options));
+			services.AddHostedService<NonDurableKeyStoreStartupCheck>();
+
+			return services;
+		}
+
+		/// <summary>
+		/// Registers crypto-shredding with the in-memory key store.
+		/// </summary>
+		/// <param name = "configure">Optional <see cref = "EventCryptoOptions"/> configuration.</param>
+		/// <returns>The <paramref name = "services"/> for chaining.</returns>
+		/// <remarks>
+		/// For tests and local development only. Keys are lost on restart, so the host refuses to start
+		/// outside Development unless <see cref = "EventCryptoOptions.AllowNonDurableKeyStore"/> is set.
+		/// </remarks>
+		public IServiceCollection AddInMemoryEventCryptoShredding(Action<EventCryptoOptions>? configure = null) =>
+			services.AddEventCryptoShredding<InMemoryEventCryptoKeyStore>(configure);
 
 		/// <summary>
 		/// Registers a subscriber, its catch-up processor, and a hosted loop that drives it.

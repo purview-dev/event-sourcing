@@ -38,16 +38,38 @@ not itself be personal data: use a surrogate identifier, never an email address.
 ## Supplying keys
 
 ```csharp
-builder.Services.AddSingleton<IEventCryptoKeyStore, KeyVaultEventCryptoKeyStore>();
-builder.Services.AddSingleton<IEventPayloadProtector, AesGcmEventPayloadProtector>();
+builder.Services.AddSqlServerEventCryptoShredding();   // or AddPostgresEventCryptoShredding()
 ```
 
-`InMemoryEventCryptoKeyStore` ships for local development and tests only: its keys die with the
-process, so every payload becomes unreadable on restart. That is deliberate - a key store is the one
-component where a convenient default would be actively harmful.
+One call registers the key store, the AES-GCM protector and a start-up guard. Every provider takes
+an optional `IEventPayloadProtector`, so registering it turns protection on for whichever store is
+configured.
 
-**The key store is the erasure mechanism.** Back it with something that has its own access control
-and audit trail, and that does not silently restore deleted entries from a backup.
+| Store | Registration | Durable |
+| -- | -- | -- |
+| In-memory | `AddInMemoryEventCryptoShredding()` | **No** |
+| SQL Server | `AddSqlServerEventCryptoShredding()` | Yes |
+| PostgreSQL | `AddPostgresEventCryptoShredding()` | Yes |
+| Azure Storage, MongoDB, Key Vault | not provided yet | - |
+
+**The host refuses to start with a non-durable key store outside Development.** Keys that die with
+the process make every protected payload unreadable - the same outcome as erasing every subject at
+once, with no error and no way back. `EventStore:Cryptography:AllowNonDurableKeyStore` overrides it;
+if you are reaching for that to make a start-up failure go away, register a durable store instead.
+
+Writing your own store? Implement `INonDurableEventCryptoKeyStore` on any test double so the guard
+recognises it, and scope keys by the current tenant - the same subject id in two tenants is two
+different people.
+
+**Erasure is only as irreversible as the least-irreversible copy of the key.** This is the thing
+that fails an audit:
+
+- A point-in-time **database restore** brings shredded keys back. Exclude the key table from
+  long-retention backups, or accept that erasure completes only when the last backup ages out.
+- **Key Vault purge protection** keeps a deleted secret recoverable for the retention window, so a
+  "shredded" subject is not actually erased until it expires.
+
+Neither is something the framework can enforce; both belong in the deployment's runbook.
 
 ## Erasing a subject
 
