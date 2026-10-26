@@ -5,8 +5,7 @@
 > `FaultPlan` and `FaultInjectingEventStore<T>` ship in `SharedTestingFramework`, with the failure
 > invariants as unit tests running on every pull request — see
 > [Shared Testing Framework](Shared-Testing-Framework.md#fault-injection). **Phases 2 to 5 remain
-> proposals**: transport-level faults, the Admin coverage work, the upgrade suite and the load/soak
-> harness do not exist.
+> proposals**: transport-level faults, the Admin coverage work, and the load/soak harness do not exist.
 
 ## The problem
 
@@ -104,8 +103,6 @@ Found during the same assessment, cheaper than the above and arguably higher val
   boundary.
 - **No Admin integration tests** for the MongoDB, Azure or Postgres adapters.
 - **Uneven provider depth** — `SqlServer.IntegrationTests` has 15 files, `AzureStorage.IntegrationTests` 3.
-- **No upgrade test** — nothing proves data written by 1.x reads under 2.0, which matters for a
-  release carrying breaking changes.
 - **Cosmos DB is never validated against the real service**; the vnext emulator cannot run the
   suite. Already documented, still a risk.
 
@@ -115,7 +112,7 @@ Found during the same assessment, cheaper than the above and arguably higher val
 | --- | --- |
 | 1 | `FaultInjectingEventStore<T>` and `FaultPlan`; the first six invariants above as unit tests |
 | 2 | Admin test coverage up to the level its risk warrants |
-| 3 | An upgrade/compatibility suite reading 1.x-shaped data |
+| 3 | ~~An upgrade/compatibility suite~~ - out of scope: 2.0 targets new deployments and supports no migration path |
 | 4 | Transport fault injection in one provider as a pilot, then the rest |
 | 5 | Load and soak harness |
 
@@ -125,6 +122,4 @@ Found during the same assessment, cheaper than the above and arguably higher val
    in the unit project. (Recommendation: `SharedTestingFramework`.)
 2. Which transport-fault tool — Toxiproxy adds a container per suite; SDK-level hooks are
    provider-specific and less realistic.
-3. Whether the upgrade suite needs **committed fixture data** in 1.x shape, which is a maintenance
-   commitment but the only way to test it honestly.
 4. Whether load/soak runs anywhere automatically, or purely on demand.

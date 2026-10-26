@@ -15,7 +15,7 @@ what is waiting on a decision. The five design pages hold the *reasoning*; this 
 | [Observability Parity](Observability-Parity-Design.md) | **Done, one gap** | No test asserts spans are emitted |
 | [Durable Admin Audit](Admin-Audit-Durability-Design.md) | **Partly done** | Phases 3–5: read side, Azure/Mongo loggers, retention |
 | [Retention](Retention-Design.md) | **Done** | Retired subscriptions leave checkpoint rows nothing deletes |
-| [Resilience Testing](Resilience-Testing-Design.md) | **Phase 1 done** | Phases 2–5: transport faults, Admin coverage, upgrade suite, load/soak |
+| [Resilience Testing](Resilience-Testing-Design.md) | **Phase 1 done** | Phases 2–5: transport faults, Admin coverage, load/soak |
 
 Also delivered outside those five: the result/failure model, multi-tenancy, crypto-shredding,
 metrics, principal capture, tenant isolation as a provider contract, the BDTest acceptance suite, and
@@ -88,8 +88,9 @@ surprises.
 - **`.agents/skills/` is tracked** — 59 files, duplicated into `.claude/skills/` — although
   `AGENTS.md` documents it as gitignored.
 - **Cosmos DB is never validated against the real service.** The vnext emulator cannot run the suite.
-- **No upgrade test.** Nothing proves data written by 1.x reads under 2.0, on a branch whose headline
-  change is breaking.
+- **No migration path from 1.x, by decision.** 2.0 targets new deployments. There is deliberately no
+  upgrade suite, and schema changes are not expressed as migrations for existing databases - do not
+  reintroduce either as "missing".
 - **`aggregate-design` and `value-objects` skill bodies** were carried forward during the skills
   migration rather than rethought.
 
