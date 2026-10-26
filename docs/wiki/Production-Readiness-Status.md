@@ -59,8 +59,10 @@ There is **no Admin API endpoint** for reading the trail, by decision (see decis
 
 ### 4. Smaller, already-decided follow-ups
 
-- **Subscription dead-letter.** A permanently failing event stalls its stream forever. Fail-closed
-  was deliberate; an escape hatch that does not lose data silently is still missing.
+- ~~**Subscription dead-letter.**~~ **Done.** Off by default and needs two deliberate steps
+  (`MaxDeliveryAttempts` plus a registered sink); the checkpoint advances only when the sink confirms
+  it recorded the failure. What is *not* done: no durable sink ships, and attempt counts are
+  in-memory so they reset on restart.
 - **Key rotation beyond SQL.** Azure Storage, MongoDB and both Key Vault stores do not implement
   `IRotatingEventCryptoKeyStore`.
 - **Span assertions.** The provider fixtures inject mocked telemetry, so a test listening for real

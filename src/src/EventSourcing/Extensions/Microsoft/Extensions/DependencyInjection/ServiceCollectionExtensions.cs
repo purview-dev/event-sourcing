@@ -280,13 +280,23 @@ public static class ServiceCollectionExtensions
 					EventStoreAggregateStreamDiscovery<TAggregate>
 				>();
 			}
+			// A null object, not an absent registration: the processor always has a sink to call, and
+			// this one accepts nothing, so the default behaviour is unchanged - a failing event stalls
+			// its stream rather than being passed over. An application opts in by registering its own.
+			services.TryAddSingleton<ISubscriptionDeadLetterSink, NoSubscriptionDeadLetterSink>();
+			// Singleton, because the processor is scoped and rebuilt every cycle; a counter inside it
+			// would reset each time and never reach any threshold.
+			services.TryAddSingleton<ISubscriptionDeliveryAttemptTracker, InMemorySubscriptionDeliveryAttemptTracker>();
 			services.TryAddScoped<IEventSubscriptionProcessor<TAggregate>, EventSubscriptionProcessor<TAggregate>>();
 			services.AddHostedService<SubscriptionHostedService<TAggregate>>();
 			services
 				.AddOptions<SubscriptionOptions>()
 				.Configure(options => configure?.Invoke(options))
 				.Validate(
-					static options => options.PollInterval > TimeSpan.Zero && options.CheckpointInterval >= 1,
+					static options =>
+						options.PollInterval > TimeSpan.Zero
+						&& options.CheckpointInterval >= 1
+						&& options.MaxDeliveryAttempts >= 0,
 					"SubscriptionOptions is invalid."
 				);
 			return services;

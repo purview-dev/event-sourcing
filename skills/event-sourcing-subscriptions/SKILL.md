@@ -117,10 +117,48 @@ a position that is already further on and redeliver everything in between.
 If `OnEventAsync` throws, that stream stops at the failing event and retries from there next cycle.
 Other aggregates continue, and `SubscriptionCycleResult.StreamsFaulted` counts it.
 
-The consequence worth planning for: **a permanently failing event stalls that stream forever**, with
-an error logged every cycle. There is no dead-letter path. Catch and record poison events inside the
-subscriber if you need to move past them - the framework will not skip for you, because skipping
-loses data silently.
+The consequence worth planning for: **a permanently failing event stalls that stream forever**, and
+every event behind it with it. Handling poison events inside the subscriber is still the first
+answer. The escape hatch is dead-lettering.
+
+### Dead-lettering needs two deliberate steps
+
+Neither is a default, because an escape hatch that opens too easily turns a visible stall into
+silent data loss:
+
+```csharp
+builder.Services.AddSingleton<ISubscriptionDeadLetterSink, MyDeadLetterSink>();
+builder.Services.AddEventSubscription<Order, OrderProjection>(options => options.MaxDeliveryAttempts = 5);
+```
+
+`MaxDeliveryAttempts` is `0` by default, and the default sink accepts nothing. Set one without the
+other and behaviour is unchanged.
+
+**The sink's return value is the contract.** The checkpoint advances past the event only when
+`DeadLetterAsync` returns `true`. Return `false` - or throw - and the stream stays stalled, which is
+correct: the alternative is losing the event with nothing anywhere recording that it happened. Do
+not return `true` from a sink that failed to write.
+
+```csharp
+public async Task<bool> DeadLetterAsync(DeadLetteredEvent deadLettered, CancellationToken ct)
+{
+    try { await _store.RecordAsync(deadLettered, ct); return true; }
+    catch (Exception ex) { _logger.LogError(ex, "..."); return false; }   // stall, don't skip
+}
+```
+
+`DeadLetteredEvent` **identifies** the event - subscription, tenant scope, aggregate id, version,
+event type, attempts, error - and does not carry the payload. The stream is still the canonical
+record and is not altered, so everything needed to fetch and redeliver it is there. A sink that
+copied the payload would become a second, divergent copy that outlives crypto-shredding.
+
+**Attempts are counted per process, not for all time.** The tracker is in memory, so a restart gives
+a permanently failing event another `MaxDeliveryAttempts` deliveries. That errs toward retrying too
+often rather than abandoning too early; implement `ISubscriptionDeliveryAttemptTracker` over your own
+store if you need exact counts.
+
+`SubscriptionCycleResult.EventsDeadLettered` is worth alerting on. It is zero in a healthy
+deployment, and non-zero means events were not handled and something has to go and look at them.
 
 An unresolvable event type is not a failure. It arrives with `IsUnresolved` set and the subscription
 advances past it, so deleting an event contract does not block the rest of the stream.

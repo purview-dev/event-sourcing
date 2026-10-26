@@ -222,9 +222,16 @@ Not guaranteed, and not configurable:
 - **No ordering between aggregates.** Streams are per-aggregate on every provider and there is no global
   sequence. A projection that depends on the relative order of two different aggregates' events cannot be
   built on a subscription.
-- **No dead-letter path.** A subscriber that throws stops that stream at the failing event and retries it
-  every cycle, indefinitely. This is fail-closed by choice: skipping would lose data silently. An
-  unresolvable event type is not a failure - it is delivered with `IsUnresolved` set and skipped past.
+- **A subscriber that throws stalls that stream**, at the failing event, retried every cycle. This is
+  fail-closed by choice: skipping would lose data silently. An unresolvable event type is not a
+  failure - it is delivered with `IsUnresolved` set and skipped past.
+- **Dead-lettering exists but is off by default**, and needs two deliberate steps: a non-zero
+  `SubscriptionOptions.MaxDeliveryAttempts` *and* a registered `ISubscriptionDeadLetterSink`. The
+  checkpoint advances past a failed event only when the sink returns `true`; a sink that refuses or
+  throws leaves the stream stalled, which is the safe outcome. `DeadLetteredEvent` identifies the
+  event rather than copying its payload, so the stream stays the only copy. **The framework ships no
+  durable sink** - that is the application's - and attempt counts are kept in memory, so a restart
+  grants another `MaxDeliveryAttempts` deliveries.
 - **Durable checkpoints ship for every provider with an event stream** — SQL Server, PostgreSQL, Azure Storage and MongoDB, each via `Add<Provider>SubscriptionCheckpoints()`. Without one the default is in-memory and replays every stream after a restart.
 - **Cosmos DB cannot be subscribed to** — it persists no event stream. Every other provider works, because
   stream discovery reads `IEventStoreCore<T>.GetAggregateIdsAsync`, which every store implements and

@@ -64,9 +64,43 @@ there on the next cycle. Events already delivered stay delivered, other aggregat
 and `SubscriptionCycleResult.StreamsFaulted` counts it.
 
 This is deliberately fail-closed: skipping the event would lose data silently. The consequence is
-that a permanently failing event **stalls that one stream indefinitely**, logging an error every
-cycle. There is currently no dead-letter or skip mechanism — handle poison events inside the
-subscriber, by catching and recording them yourself.
+that a permanently failing event **stalls that one stream indefinitely** — and every event behind it
+— logging an error every cycle. Handling poison events inside the subscriber is still the first
+answer. Dead-lettering is the escape hatch.
+
+### Dead-lettering
+
+Off by default, and it takes **two** deliberate steps to turn on, because an escape hatch that opens
+too easily turns a visible stall into silent data loss:
+
+```csharp
+builder.Services.AddSingleton<ISubscriptionDeadLetterSink, MyDeadLetterSink>();
+builder.Services.AddEventSubscription<Order, OrderProjection>(options => options.MaxDeliveryAttempts = 5);
+```
+
+`SubscriptionOptions.MaxDeliveryAttempts` defaults to `0`, which disables dead-lettering entirely,
+and the default `ISubscriptionDeadLetterSink` accepts nothing and logs a warning when it refuses.
+Setting either one alone changes nothing.
+
+**The sink's return value decides whether the stream moves.** `DeadLetterAsync` returning `true`
+means the failure is durably recorded, and only then does the checkpoint advance past the event.
+Returning `false`, or throwing, leaves the stream stalled — which is correct, because the alternative
+is losing the event with nothing anywhere to say it happened. A sink that throws is logged and
+treated as a refusal; it does not bring the cycle down.
+
+`DeadLetteredEvent` carries the subscription name, tenant scope, aggregate id, aggregate version,
+event type, attempt count and the error text. It **identifies** the event rather than copying it: the
+stream is unaltered and remains canonical, so everything needed to fetch and redeliver the event is
+present, and no second copy of the payload is created that would outlive crypto-shredding.
+
+Attempts are counted by `ISubscriptionDeliveryAttemptTracker`, a singleton because the processor is
+scoped and rebuilt every cycle. The default counts **in memory**, so a restart gives a permanently
+failing event another `MaxDeliveryAttempts` deliveries before it is dead-lettered again. That errs
+toward retrying too often rather than abandoning too early; implement the interface over a store for
+exact counts.
+
+`SubscriptionCycleResult.EventsDeadLettered` reports how many events a cycle gave up on. It is zero
+in a healthy deployment and worth alerting on.
 
 An event whose type can no longer be resolved is *not* a failure: it is delivered with
 `IsUnresolved` set to `true`, and the subscription advances past it. An application that has deleted
@@ -156,7 +190,10 @@ services.AddEventSubscription<Order, OrderProjection>(options => options.PollInt
 - **Durable checkpoints ship for every provider with an event stream** — SQL Server, PostgreSQL, Azure Storage and MongoDB. An InMemory deployment still replays every stream after a restart.
 - **Cosmos DB cannot be subscribed to at all** — it persists no event stream, and `RunCycleAsync`
   throws `NotSupportedException`.
-- **A permanently failing event stalls its stream.** There is no dead-letter path.
+- **A permanently failing event stalls its stream by default.** Dead-lettering exists but is off
+  until both `MaxDeliveryAttempts` and an `ISubscriptionDeadLetterSink` are configured. Delivery
+  attempts are counted in memory, so they reset on restart, and the framework ships no durable sink —
+  the sink is the application's.
 - **Every cycle enumerates every stream** of the aggregate type. There is no global sequence to read
   instead, so this is linear in the number of aggregates rather than in the number of new events.
   Supply a narrower `IAggregateStreamDiscovery<T>` if that is too expensive.
