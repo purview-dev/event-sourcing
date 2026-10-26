@@ -20,7 +20,7 @@ namespace Purview.EventSourcing.SqlServer.Subscriptions;
 public sealed partial class SqlServerSubscriptionCheckpointStore(
 	IOptions<SqlServerSubscriptionCheckpointStoreOptions> checkpointOptions,
 	IOptions<SqlServerEventStoreOptions> eventStoreOptions
-) : ISubscriptionCheckpointStore, IDisposable
+) : ISubscriptionCheckpointStore, ISubscriptionCheckpointMaintenance, IDisposable
 {
 	[GeneratedRegex("^[\\w\\-.]+$", RegexOptions.Compiled)]
 	private static partial Regex ValidIdentifier();
@@ -95,6 +95,55 @@ public sealed partial class SqlServerSubscriptionCheckpointStore(
 		command.Parameters.AddWithValue("@now", DateTimeOffset.UtcNow);
 
 		await command.ExecuteNonQueryAsync(cancellationToken);
+	}
+
+	/// <inheritdoc/>
+	public async Task<int> RemoveSubscriptionAsync(
+		string subscriptionName,
+		TenantScope scope,
+		CancellationToken cancellationToken
+	)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(subscriptionName);
+
+		await EnsureSchemaAsync(cancellationToken);
+
+		await using SqlConnection connection = new(_connectionString);
+		await connection.OpenAsync(cancellationToken);
+
+		// Both columns, always. Deleting on the subscription name alone would remove every tenant's
+		// position and replay all of them on the next cycle.
+		await using SqlCommand command = new(
+			$"""
+			DELETE FROM {_schema}.{_table}
+			WHERE [SubscriptionName] = @name AND [TenantId] = @tenantId
+			""",
+			connection
+		);
+		command.Parameters.AddWithValue("@name", subscriptionName);
+		command.Parameters.AddWithValue("@tenantId", TenantColumn.Encode(scope));
+
+		return await command.ExecuteNonQueryAsync(cancellationToken);
+	}
+
+	/// <inheritdoc/>
+	public async Task<bool> RemoveCheckpointAsync(SubscriptionCheckpointKey key, CancellationToken cancellationToken)
+	{
+		await EnsureSchemaAsync(cancellationToken);
+
+		await using SqlConnection connection = new(_connectionString);
+		await connection.OpenAsync(cancellationToken);
+
+		await using SqlCommand command = new(
+			$"""
+			DELETE FROM {_schema}.{_table}
+			WHERE [SubscriptionName] = @name AND [TenantId] = @tenantId AND [AggregateId] = @aggregateId
+			""",
+			connection
+		);
+		AddKeyParameters(command, key);
+
+		return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
 	}
 
 	static void AddKeyParameters(SqlCommand command, SubscriptionCheckpointKey key)

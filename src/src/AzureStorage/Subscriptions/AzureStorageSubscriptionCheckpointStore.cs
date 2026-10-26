@@ -13,7 +13,10 @@ namespace Purview.EventSourcing.AzureStorage.Subscriptions;
 /// Without a durable store every subscription replays every stream after a restart, so this is what
 /// makes a subscription usable in a deployed application.
 /// </remarks>
-public sealed class AzureStorageSubscriptionCheckpointStore : ISubscriptionCheckpointStore, IDisposable
+public sealed class AzureStorageSubscriptionCheckpointStore
+	: ISubscriptionCheckpointStore,
+		ISubscriptionCheckpointMaintenance,
+		IDisposable
 {
 	readonly TableClient _tableClient;
 	readonly int _maxWriteAttempts;
@@ -101,6 +104,69 @@ public sealed class AzureStorageSubscriptionCheckpointStore : ISubscriptionCheck
 
 		// Leaving the position behind is safe: a position that is behind redelivers, and delivery is
 		// at-least-once already. The next cycle will advance it.
+	}
+
+	/// <inheritdoc/>
+	/// <remarks>
+	/// The partition key is already subscription-and-tenant, so retiring a subscription within one
+	/// scope is exactly one partition. Nothing else can be caught by it, which is a stronger guarantee
+	/// than a predicate over a shared table gives.
+	/// </remarks>
+	public async Task<int> RemoveSubscriptionAsync(
+		string subscriptionName,
+		TenantScope scope,
+		CancellationToken cancellationToken
+	)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(subscriptionName);
+
+		await EnsureTableAsync(cancellationToken);
+
+		var partitionKey = PartitionKeyFor(new(subscriptionName, scope, string.Empty));
+		var filter = TableClient.CreateQueryFilter($"PartitionKey eq {partitionKey}");
+
+		var removed = 0;
+		await foreach (
+			var entity in _tableClient.QueryAsync<CheckpointEntity>(filter, cancellationToken: cancellationToken)
+		)
+		{
+			// Deleted one at a time rather than in a transactional batch: a batch is capped at 100
+			// entities, and a partial failure part-way through a retirement is harmless here - the
+			// rows that remain are simply deleted by the next call.
+			var response = await _tableClient.DeleteEntityAsync(
+				entity.PartitionKey,
+				entity.RowKey,
+				entity.ETag,
+				cancellationToken
+			);
+
+			if (!response.IsError)
+				removed++;
+		}
+
+		return removed;
+	}
+
+	/// <inheritdoc/>
+	public async Task<bool> RemoveCheckpointAsync(SubscriptionCheckpointKey key, CancellationToken cancellationToken)
+	{
+		await EnsureTableAsync(cancellationToken);
+
+		try
+		{
+			var response = await _tableClient.DeleteEntityAsync(
+				PartitionKeyFor(key),
+				RowKeyFor(key),
+				ETag.All,
+				cancellationToken
+			);
+
+			return !response.IsError;
+		}
+		catch (RequestFailedException ex) when (ex.Status == 404)
+		{
+			return false;
+		}
 	}
 
 	async Task<CheckpointEntity?> ReadAsync(SubscriptionCheckpointKey key, CancellationToken cancellationToken)

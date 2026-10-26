@@ -15,6 +15,10 @@
 			Link="Contracts\%(Filename)%(Extension)"
 		/>
 		<Compile
+			Include="..\SharedTestingFramework\Contracts\SubscriptionCheckpoint*.cs"
+			Link="Contracts\%(Filename)%(Extension)"
+		/>
+		<Compile
 			Include="..\SharedTestingFramework\Contracts\SnapshotStore*.cs"
 			Link="Contracts\%(Filename)%(Extension)"
 		/>

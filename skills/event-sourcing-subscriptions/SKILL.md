@@ -163,6 +163,25 @@ deployment, and non-zero means events were not handled and something has to go a
 An unresolvable event type is not a failure. It arrives with `IsUnresolved` set and the subscription
 advances past it, so deleting an event contract does not block the rest of the stream.
 
+## Retiring a subscription leaves rows behind unless you remove them
+
+A checkpoint row exists per subscription, per tenant, per aggregate, on a table that is otherwise
+only ever written to. `ISubscriptionCheckpointMaintenance` - implemented by every store - removes
+them:
+
+```csharp
+await maintenance.RemoveSubscriptionAsync("order-projection", TenantScope.For("acme"), ct);
+```
+
+**Removing a checkpoint for a subscription that is still running redelivers that entire stream.**
+That is safe (delivery is at-least-once, subscribers are idempotent) but not free, which is why
+nothing schedules this.
+
+**Each call names one subscription and one scope, matched exactly.** `TenantScope.System` removes
+the system scope's own rows, not every tenant's - there is no wildcard, because a
+"delete-everything-for-this-subscription" switch is how a deployment replays itself by accident.
+Clearing every tenant means a call per tenant.
+
 ## Gotchas
 
 - **Cosmos DB cannot be subscribed to.** It persists no event stream; `RunCycleAsync` throws

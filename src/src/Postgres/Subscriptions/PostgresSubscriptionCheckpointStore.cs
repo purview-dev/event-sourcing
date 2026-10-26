@@ -20,7 +20,7 @@ namespace Purview.EventSourcing.Postgres.Subscriptions;
 public sealed partial class PostgresSubscriptionCheckpointStore(
 	IOptions<PostgresSubscriptionCheckpointStoreOptions> checkpointOptions,
 	IOptions<PostgresEventStoreOptions> eventStoreOptions
-) : ISubscriptionCheckpointStore, IDisposable
+) : ISubscriptionCheckpointStore, ISubscriptionCheckpointMaintenance, IDisposable
 {
 	[GeneratedRegex("^[\\w\\-.]+$", RegexOptions.Compiled)]
 	private static partial Regex ValidIdentifier();
@@ -79,6 +79,55 @@ public sealed partial class PostgresSubscriptionCheckpointStore(
 		command.Parameters.AddWithValue("@now", DateTimeOffset.UtcNow);
 
 		await command.ExecuteNonQueryAsync(cancellationToken);
+	}
+
+	/// <inheritdoc/>
+	public async Task<int> RemoveSubscriptionAsync(
+		string subscriptionName,
+		TenantScope scope,
+		CancellationToken cancellationToken
+	)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(subscriptionName);
+
+		await EnsureSchemaAsync(cancellationToken);
+
+		await using NpgsqlConnection connection = new(_connectionString);
+		await connection.OpenAsync(cancellationToken);
+
+		// Both columns, always. Deleting on the subscription name alone would remove every tenant's
+		// position and replay all of them on the next cycle.
+		await using NpgsqlCommand command = new(
+			$"""
+			DELETE FROM {_schema}.{_table}
+			WHERE "SubscriptionName" = @name AND "TenantId" = @tenantId
+			""",
+			connection
+		);
+		command.Parameters.AddWithValue("@name", subscriptionName);
+		command.Parameters.AddWithValue("@tenantId", TenantColumn.Encode(scope));
+
+		return await command.ExecuteNonQueryAsync(cancellationToken);
+	}
+
+	/// <inheritdoc/>
+	public async Task<bool> RemoveCheckpointAsync(SubscriptionCheckpointKey key, CancellationToken cancellationToken)
+	{
+		await EnsureSchemaAsync(cancellationToken);
+
+		await using NpgsqlConnection connection = new(_connectionString);
+		await connection.OpenAsync(cancellationToken);
+
+		await using NpgsqlCommand command = new(
+			$"""
+			DELETE FROM {_schema}.{_table}
+			WHERE "SubscriptionName" = @name AND "TenantId" = @tenantId AND "AggregateId" = @aggregateId
+			""",
+			connection
+		);
+		AddKeyParameters(command, key);
+
+		return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
 	}
 
 	static void AddKeyParameters(NpgsqlCommand command, SubscriptionCheckpointKey key)

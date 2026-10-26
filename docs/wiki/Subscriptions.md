@@ -183,6 +183,31 @@ Bind from `EventStore:Subscriptions`, or configure inline:
 services.AddEventSubscription<Order, OrderProjection>(options => options.PollInterval = TimeSpan.FromSeconds(1));
 ```
 
+## Retiring a subscription
+
+A checkpoint row exists per subscription, per tenant, per aggregate, and nothing removed them
+before — a retired subscription left one behind for every stream it had ever read, forever, on a
+table that is otherwise only written to.
+
+`ISubscriptionCheckpointMaintenance` is implemented by every checkpoint store, including the
+in-memory one. Cast the store, or resolve it, and call it when a subscription is decommissioned:
+
+```csharp
+var removed = await maintenance.RemoveSubscriptionAsync("order-projection", TenantScope.For("acme"), ct);
+await maintenance.RemoveCheckpointAsync(new("order-projection", scope, prunedAggregateId), ct);
+```
+
+Two properties worth knowing:
+
+- **Removing a checkpoint is not neutral.** A subscription that is still running and loses its
+  position restarts that stream from version 1 and redelivers every event in it. Delivery is
+  at-least-once and subscribers must be idempotent, so that is a cost rather than a corruption — and
+  it is why this is operator-invoked and nothing schedules it.
+- **There is deliberately no wildcard.** Each call names one subscription *and* one `TenantScope`,
+  matched exactly. `TenantScope.System` removes the system scope's own rows, not every tenant's;
+  clearing every tenant means calling it per tenant. A "delete everything for this subscription"
+  switch is how a deployment replays itself by accident.
+
 ## Limitations
 
 - **No global ordering**, and no ordered live tail. Both are discussed in

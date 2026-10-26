@@ -10,7 +10,9 @@ namespace Purview.EventSourcing.Subscriptions;
 /// That is correct but rarely desirable: use this for tests and local development, and register a
 /// durable store in a deployed application.
 /// </remarks>
-public sealed class InMemorySubscriptionCheckpointStore : ISubscriptionCheckpointStore
+public sealed class InMemorySubscriptionCheckpointStore
+	: ISubscriptionCheckpointStore,
+		ISubscriptionCheckpointMaintenance
 {
 	readonly ConcurrentDictionary<SubscriptionCheckpointKey, long> _checkpoints = new();
 
@@ -26,4 +28,32 @@ public sealed class InMemorySubscriptionCheckpointStore : ISubscriptionCheckpoin
 
 		return Task.CompletedTask;
 	}
+
+	/// <inheritdoc/>
+	public Task<int> RemoveSubscriptionAsync(
+		string subscriptionName,
+		Tenancy.TenantScope scope,
+		CancellationToken cancellationToken
+	)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(subscriptionName);
+
+		var removed = 0;
+		foreach (var key in _checkpoints.Keys)
+		{
+			// Scope matched exactly, the same way a read matches it. A subscription name alone would
+			// remove every tenant's position, which is not what the caller asked for.
+			if (!string.Equals(key.SubscriptionName, subscriptionName, StringComparison.Ordinal) || key.Scope != scope)
+				continue;
+
+			if (_checkpoints.TryRemove(key, out _))
+				removed++;
+		}
+
+		return Task.FromResult(removed);
+	}
+
+	/// <inheritdoc/>
+	public Task<bool> RemoveCheckpointAsync(SubscriptionCheckpointKey key, CancellationToken cancellationToken) =>
+		Task.FromResult(_checkpoints.TryRemove(key, out _));
 }

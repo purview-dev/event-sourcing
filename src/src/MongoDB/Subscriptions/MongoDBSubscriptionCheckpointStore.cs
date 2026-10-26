@@ -14,7 +14,10 @@ namespace Purview.EventSourcing.MongoDB.Subscriptions;
 /// Without a durable store every subscription replays every stream after a restart, so this is what
 /// makes a subscription usable in a deployed application.
 /// </remarks>
-public sealed class MongoDBSubscriptionCheckpointStore : ISubscriptionCheckpointStore, IDisposable
+public sealed class MongoDBSubscriptionCheckpointStore
+	: ISubscriptionCheckpointStore,
+		ISubscriptionCheckpointMaintenance,
+		IDisposable
 {
 	const string VersionField = "v";
 	const string UpdatedUtcField = "u";
@@ -92,6 +95,35 @@ public sealed class MongoDBSubscriptionCheckpointStore : ISubscriptionCheckpoint
 			// already recorded, or another writer created the row first. Both mean the stored
 			// position is already at least as far on as this one, so there is nothing to do.
 		}
+	}
+
+	/// <inheritdoc/>
+	public async Task<int> RemoveSubscriptionAsync(
+		string subscriptionName,
+		TenantScope scope,
+		CancellationToken cancellationToken
+	)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(subscriptionName);
+
+		// Both components of the compound _id, always. Matching on the subscription name alone would
+		// remove every tenant's position and replay all of them on the next cycle.
+		var filter = Builders<BsonDocument>.Filter.And(
+			Builders<BsonDocument>.Filter.Eq("_id.s", subscriptionName),
+			Builders<BsonDocument>.Filter.Eq("_id.t", TenantColumn.Encode(scope))
+		);
+
+		var result = await _collection.DeleteManyAsync(filter, cancellationToken);
+
+		return result.IsAcknowledged ? (int)result.DeletedCount : 0;
+	}
+
+	/// <inheritdoc/>
+	public async Task<bool> RemoveCheckpointAsync(SubscriptionCheckpointKey key, CancellationToken cancellationToken)
+	{
+		var result = await _collection.DeleteOneAsync(Filter(key), cancellationToken);
+
+		return result.IsAcknowledged && result.DeletedCount > 0;
 	}
 
 	// A compound _id rather than a delimited string: it is unique by definition and cannot be made

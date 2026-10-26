@@ -14,7 +14,7 @@ what is waiting on a decision. The five design pages hold the *reasoning*; this 
 | [Crypto Key Management](Crypto-Key-Management-Design.md) | **Done** | Rotation ships for the two SQL providers only |
 | [Observability Parity](Observability-Parity-Design.md) | **Done, one gap** | No test asserts spans are emitted |
 | [Durable Admin Audit](Admin-Audit-Durability-Design.md) | **Phases 1–4 done** | Phase 5: retention floor. Nothing deletes an audit entry, ever |
-| [Retention](Retention-Design.md) | **Done** | Retired subscriptions leave checkpoint rows nothing deletes |
+| [Retention](Retention-Design.md) | **Done** | Nothing schedules marker cleanup or checkpoint removal; both are operator-invoked |
 | [Resilience Testing](Resilience-Testing-Design.md) | **Phases 1–2 done** | Phases 4–5: transport faults, load/soak |
 
 Also delivered outside those five: the result/failure model, multi-tenancy, crypto-shredding,

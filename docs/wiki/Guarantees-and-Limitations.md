@@ -233,6 +233,11 @@ Not guaranteed, and not configurable:
   durable sink** - that is the application's - and attempt counts are kept in memory, so a restart
   grants another `MaxDeliveryAttempts` deliveries.
 - **Durable checkpoints ship for every provider with an event stream** — SQL Server, PostgreSQL, Azure Storage and MongoDB, each via `Add<Provider>SubscriptionCheckpoints()`. Without one the default is in-memory and replays every stream after a restart.
+- **Checkpoint rows can be removed when a subscription is retired.** Every checkpoint store implements
+  `ISubscriptionCheckpointMaintenance`. It is operator-invoked, never scheduled: removing a position
+  for a subscription that is still running redelivers that whole stream. Each call names one
+  subscription *and* one `TenantScope`, matched exactly — `TenantScope.System` is a scope, not a
+  wildcard for every tenant.
 - **Cosmos DB cannot be subscribed to** — it persists no event stream. Every other provider works, because
   stream discovery reads `IEventStoreCore<T>.GetAggregateIdsAsync`, which every store implements and
   tenant-filters.

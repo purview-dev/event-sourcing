@@ -18,6 +18,7 @@ per-registration values.
 | Transactional outbox (atomic with events) | No | Yes (`AddSqlServerOutbox<THandler>`) | Yes (`AddPostgresOutbox<THandler>`) | No | No | No |
 | [Subscriptions](Subscriptions.md) (catch-up over the event stream) | Contracts + `AddEventSubscription` | Yes | Yes | Yes | Yes | No (no event stream) |
 | Durable subscription checkpoints | In-memory only (replays after restart) | `AddSqlServerSubscriptionCheckpoints()` | `AddPostgresSubscriptionCheckpoints()` | `AddAzureStorageSubscriptionCheckpoints()` | `AddMongoDBSubscriptionCheckpoints()` | n/a |
+| Checkpoint removal (`ISubscriptionCheckpointMaintenance`) | Yes, operator-invoked | Yes | Yes | Yes (whole-partition delete) | Yes | n/a |
 | Durable crypto-shredding key store | In-memory only (refused outside Development) | `AddSqlServerEventCryptoShredding()` | `AddPostgresEventCryptoShredding()` | `AddAzureStorageEventCryptoShredding()` | `AddMongoDBEventCryptoShredding()` | n/a |
 | Crypto key rotation | `IRotatingEventCryptoKeyStore` | Yes | Yes | No | No | n/a |
 | Distributed tracing spans | Span names are a contract | Yes | Yes | Yes | Yes | Snapshot/query spans |
