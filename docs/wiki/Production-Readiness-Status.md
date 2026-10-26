@@ -15,7 +15,7 @@ what is waiting on a decision. The five design pages hold the *reasoning*; this 
 | [Observability Parity](Observability-Parity-Design.md) | **Done, one gap** | Span emission asserted on SQL Server only; the other three use mocked telemetry |
 | [Durable Admin Audit](Admin-Audit-Durability-Design.md) | **Phases 1–4 done** | Phase 5: retention floor. Nothing deletes an audit entry, ever |
 | [Retention](Retention-Design.md) | **Done** | Nothing schedules marker cleanup or checkpoint removal; both are operator-invoked |
-| [Resilience Testing](Resilience-Testing-Design.md) | **Phases 1–2 done** | Phases 4–5: transport faults, load/soak |
+| [Resilience Testing](Resilience-Testing-Design.md) | **Phases 1, 2, 4 (pilot) done** | Transport faults wired for SQL Server only; no load/soak harness |
 
 Also delivered outside those five: the result/failure model, multi-tenancy, crypto-shredding,
 metrics, principal capture, tenant isolation as a provider contract, the BDTest acceptance suite, and
@@ -36,14 +36,18 @@ Three things grow without bound, and the first is the cheapest and safest to fix
 Verified absent: no `PruneAsync`, no `EventRetentionPolicy`, no marker cleanup. The transactional
 outbox's `CleanupAsync` is the only retention that exists, and is the precedent to follow.
 
-### 2. Resilience testing — the failure modes that corrupt an event store are untested
+### 2. Resilience testing — mostly closed
 
-~1,460 tests, all happy path and expected failures. Nothing covers a save that commits events then
-fails the snapshot, a lost response causing a retry, a lease expiring mid-dispatch, or real write
-contention. Verified absent: no fault injection of any kind.
+Three layers now exist:
 
-Phase 1 (`FaultInjectingEventStore<T>` plus the seven invariants) is the valuable part and runs in
-the unit suite.
+| Layer | What | Where it runs |
+| --- | --- | --- |
+| Store boundary | `FaultInjectingEventStore<T>` + seven invariants | Unit suite, every PR |
+| Admin surface | `AdminEndpointSecurityContractTests` over the whole mapped endpoint set | Unit suite, every PR |
+| Transport | `FaultingTcpProxy` severs the connection beneath the SDK | SQL Server integration only |
+
+Still missing: **load and soak** — nothing asserts the invariants still hold *while* under
+concurrent load — and transport faults for PostgreSQL, MongoDB and Azure Storage.
 
 ### 3. Admin audit, phase 5 only
 

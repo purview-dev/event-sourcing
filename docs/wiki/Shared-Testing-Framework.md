@@ -182,6 +182,30 @@ every pull request with no infrastructure: events survive a lost response, a ret
 double-apply, a failed save leaves nothing behind, versions stay contiguous across a failure, and
 every one of those holds inside a tenant scope.
 
+### Transport faults
+
+`FaultInjectingEventStore<T>` fails at the store boundary. `FaultingTcpProxy` fails *below* it: it
+sits between the client and the container and severs the connection on command, so the paths that
+only run when the network misbehaves can be tested at all.
+
+```csharp
+await using var proxy = FaultingTcpProxy.Start(host, port);
+proxy.ResetRepliesFromConnection = 1;   // the write lands; the reply never arrives
+proxy.ResetAfterBytesSent = 256;        // a half-written request
+```
+
+Point the store's connection string at `proxy.Port` on loopback, and **disable the SDK's own connect
+retries** — otherwise the test measures the retry policy rather than what the stream looks like
+afterwards.
+
+Deterministic for the same reason `FaultPlan` is: it faults the *nth* connection or after an exact
+byte count, not at random. Toxiproxy was the alternative and was not taken — probabilistic toxics
+turn a real defect into an intermittent annoyance, and it would add a container and a dependency.
+
+It forwards bytes and is **not protocol-aware**: enough to sever a connection convincingly, nowhere
+near enough to corrupt one in a protocol-aware way. `SqlServerTransportFaultTests` is the only suite
+wired to it so far.
+
 ## Environment notes
 
 - Integration suites start their containers through [Purview.Containers](https://www.nuget.org/packages/Purview.Containers),

@@ -5,8 +5,9 @@
 > `FaultPlan` and `FaultInjectingEventStore<T>` ship in `SharedTestingFramework`, with the failure
 > invariants as unit tests running on every pull request — see
 > [Shared Testing Framework](Shared-Testing-Framework.md#fault-injection). Phase 2 (Admin endpoint
-> security contract tests) is also implemented. **Phases 4 and 5 remain proposals**: transport-level
-> faults and the load/soak harness do not exist.
+> security contract tests) is implemented, and phase 4 is piloted: `FaultingTcpProxy` severs the
+> connection beneath the SDK, exercised by `SqlServerTransportFaultTests`. **Phase 5 (load and soak)
+> remains a proposal**, and transport faults are wired for SQL Server only.
 
 ## The problem
 
@@ -46,12 +47,32 @@ produces duplicates).
 This covers the framework's own logic — retry behaviour, transaction rollback, outbox state
 transitions — without a container. Fast enough to live in the unit suite.
 
-### 2. Fault injection at the transport
+### 2. Fault injection at the transport — implemented, SQL Server only
 
 Some failures only exist below the abstraction: a connection reset mid-read, a partial write, a
-server-side timeout. These need a proxy between the client and the container (Toxiproxy, or the
-provider SDK's own fault hooks) and belong in the integration suites, gated behind a category so
-they do not run on every PR.
+response that stops arriving. `FaultingTcpProxy` sits between the client and the container and
+severs the connection on command:
+
+```csharp
+proxy.ResetRepliesFromConnection = 1;   // the write lands; the reply never arrives
+proxy.ResetAfterBytesSent = 256;        // a half-written request
+```
+
+The store's connection string is rewritten to point at the proxy's loopback port, with the SDK's own
+connect retries disabled — otherwise these become tests of the retry policy rather than of what the
+stream looks like afterwards.
+
+**Written here rather than adding Toxiproxy.** Toxiproxy's toxics are probabilistic, and a test that
+fails a random write turns a real defect into an intermittent annoyance nobody trusts. This faults
+the *nth* connection or after an exact byte count, so a failure reproduces — the same reasoning that
+made `FaultPlan` schedule by call number. It is also a container and a NuGet dependency this
+repository then does not need.
+
+It is **not** protocol-aware: it forwards bytes and knows nothing about TDS or the PostgreSQL wire
+protocol. Enough to sever a connection convincingly, nowhere near enough to corrupt one in a
+protocol-aware way.
+
+`SqlServerTransportFaultTests` is the pilot. The other providers are not wired to it.
 
 ### 3. Load and soak
 
@@ -121,8 +142,8 @@ Found during the same assessment, cheaper than the above and arguably higher val
 | 1 | `FaultInjectingEventStore<T>` and `FaultPlan`; the first six invariants above as unit tests |
 | 2 | **Done.** `AdminEndpointSecurityContractTests` asserts the security properties of the whole mapped endpoint set, so an endpoint added later is covered without anyone remembering |
 | 3 | ~~An upgrade/compatibility suite~~ - out of scope: 2.0 targets new deployments and supports no migration path |
-| 4 | Transport fault injection in one provider as a pilot, then the rest |
-| 5 | Load and soak harness |
+| 4 | **Pilot done.** `FaultingTcpProxy` plus `SqlServerTransportFaultTests`. PostgreSQL, MongoDB and Azure Storage are not wired to it |
+| 5 | Load and soak harness — **not implemented** |
 
 ## Decisions needed
 
