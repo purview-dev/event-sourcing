@@ -31,7 +31,15 @@ This wiki is the project documentation hub for framework features, provider capa
 Designs under discussion. Check each page's status banner before relying on it.
 
 - [Subscriptions and Retention](Subscriptions-And-Retention-Design.md) — subscriptions shipped; the
-  retention half and the ordered live tail remain proposals
+  ordered live tail remains a proposal
+- [Crypto Key Management](Crypto-Key-Management-Design.md) — local, in-memory and Key Vault key
+  stores, plus rotation. **Blocking: crypto-shredding has no production key store today**
+- [Durable Admin Audit](Admin-Audit-Durability-Design.md) — the audit trail currently dies with the
+  process
+- [Retention](Retention-Design.md) — event streams and idempotency markers both grow without bound
+- [Observability Parity](Observability-Parity-Design.md) — distributed tracing exists on two
+  providers of five
+- [Resilience Testing](Resilience-Testing-Design.md) — fault injection, load and soak
 
 ## Feature highlights
 

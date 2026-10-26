@@ -7,8 +7,10 @@
 > from the sketches below; this page is kept for the *reasoning*, particularly the ordering analysis
 > and the options that were rejected.
 >
-> **Part 2, retention, remains a proposal.** No type, option or method in that section exists. The
-> ordered live tail described in Option D is not implemented either.
+> **Part 2, retention, has been superseded by [Retention](Retention-Design.md)**, which covers
+> idempotency markers and the outbox alongside event streams, and sets out an operating model. The
+> section below is kept for its interaction analysis. The ordered live tail described in Option D is
+> not implemented either.
 
 ## What already exists, and what is missing
 

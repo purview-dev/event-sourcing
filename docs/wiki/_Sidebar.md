@@ -21,3 +21,8 @@
 - [SQL Server Guide](SQL-Server-Guide.md)
 - [Release Flow](Release-Flow.md)
 - _Proposal:_ [Subscriptions and Retention](Subscriptions-And-Retention-Design.md)
+- _Proposal:_ [Crypto Key Management](Crypto-Key-Management-Design.md)
+- _Proposal:_ [Durable Admin Audit](Admin-Audit-Durability-Design.md)
+- _Proposal:_ [Retention](Retention-Design.md)
+- _Proposal:_ [Observability Parity](Observability-Parity-Design.md)
+- _Proposal:_ [Resilience Testing](Resilience-Testing-Design.md)
