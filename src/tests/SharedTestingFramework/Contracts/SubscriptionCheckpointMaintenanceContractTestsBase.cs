@@ -66,6 +66,11 @@ public abstract class SubscriptionCheckpointMaintenanceContractTestsBase
 		await store.SetAsync(acme, 10, cancellationToken);
 		await store.SetAsync(globex, 20, cancellationToken);
 
+		// Asserted before the delete so a failure says which half broke. Without it, a write that
+		// never landed is indistinguishable from a delete that took one row too many, and the two
+		// call for completely different fixes.
+		await Assert.That(await store.GetAsync(globex, cancellationToken)).IsEqualTo(20);
+
 		await Maintenance(store).RemoveSubscriptionAsync(subscription, TenantScope.For("acme"), cancellationToken);
 
 		await Assert.That(await store.GetAsync(acme, cancellationToken)).IsNull();
@@ -90,6 +95,10 @@ public abstract class SubscriptionCheckpointMaintenanceContractTestsBase
 
 		await store.SetAsync(system, 10, cancellationToken);
 		await store.SetAsync(acme, 20, cancellationToken);
+
+		// See the note on the tenant test above: this separates "the write never landed" from "the
+		// delete over-matched".
+		await Assert.That(await store.GetAsync(acme, cancellationToken)).IsEqualTo(20);
 
 		await Maintenance(store).RemoveSubscriptionAsync(subscription, TenantScope.System, cancellationToken);
 

@@ -48,7 +48,8 @@ Designs under discussion. Check each page's status banner before relying on it.
 - **Core framework (`Purview.EventSourcing`)**
   - `AggregateBase`, `IEventStore`, `IQueryableEventStore`, and `IEventStoreTransactionFactory`.
   - [Subscriptions](Subscriptions.md): catch-up reads over the event stream, including events written
-    before the subscriber existed.
+    before the subscriber existed, with opt-in dead-lettering and checkpoint removal for retired
+    subscriptions.
   - [Transaction guarantees](Transaction-Guarantees.md): atomic requirements, best-effort fallback, and failure
     behavior.
   - [Snapshot schema versioning](Snapshot-Schema-Versioning.md): compatibility detection and event-replay rebuilds.
