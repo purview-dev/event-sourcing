@@ -10,6 +10,7 @@ using Purview.EventSourcing.Cryptography;
 using Purview.EventSourcing.EventStores.NullQueryable;
 using Purview.EventSourcing.Manifest;
 using Purview.EventSourcing.Outbox;
+using Purview.EventSourcing.Retention;
 using Purview.EventSourcing.Services;
 using Purview.EventSourcing.Subscriptions;
 
@@ -148,6 +149,47 @@ public static class ServiceCollectionExtensions
 		/// </remarks>
 		public IServiceCollection AddInMemoryEventCryptoShredding(Action<EventCryptoOptions>? configure = null) =>
 			services.AddEventCryptoShredding<InMemoryEventCryptoKeyStore>(configure);
+
+		/// <summary>
+		/// Registers the event-stream retention preview for an aggregate type.
+		/// </summary>
+		/// <typeparam name = "TAggregate">The aggregate type to evaluate.</typeparam>
+		/// <returns>The <paramref name = "services"/> for chaining.</returns>
+		/// <remarks>
+		/// <para>
+		/// Preview only - nothing here removes an event. It reports what a policy would prune and what
+		/// is holding the rest back, so a policy can be found to be wrong before it costs anything.
+		/// </para>
+		/// <para>
+		/// It reads every stream of the aggregate type, because the snapshot version is only knowable
+		/// from the aggregate itself. Run it deliberately, not on a timer.
+		/// </para>
+		/// <para>
+		/// Subscription lag is checked against the subscriptions registered <em>in this process</em>.
+		/// One running elsewhere is invisible here, so a deployment that spreads subscriptions across
+		/// hosts must evaluate retention where they all are.
+		/// </para>
+		/// </remarks>
+		public IServiceCollection AddEventStreamRetentionPreview<TAggregate>()
+			where TAggregate : class, IAggregate, new()
+		{
+			services.TryAddScoped<IEventStreamRetentionPreview<TAggregate>, EventStreamRetentionPreview<TAggregate>>();
+
+			// Discovery is shared with subscriptions; register the default when nothing supplied one.
+			var hasDiscovery = services.Any(descriptor =>
+				descriptor.ServiceType == typeof(IAggregateStreamDiscovery<TAggregate>)
+				|| descriptor.ServiceType == typeof(IAggregateStreamDiscovery<>)
+			);
+			if (!hasDiscovery)
+			{
+				services.AddScoped<
+					IAggregateStreamDiscovery<TAggregate>,
+					EventStoreAggregateStreamDiscovery<TAggregate>
+				>();
+			}
+
+			return services;
+		}
 
 		/// <summary>
 		/// Registers a subscriber, its catch-up processor, and a hosted loop that drives it.

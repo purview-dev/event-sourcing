@@ -14,7 +14,7 @@ what is waiting on a decision. The five design pages hold the *reasoning*; this 
 | [Crypto Key Management](Crypto-Key-Management-Design.md) | **Done** | Rotation ships for the two SQL providers only |
 | [Observability Parity](Observability-Parity-Design.md) | **Done, one gap** | No test asserts spans are emitted |
 | [Durable Admin Audit](Admin-Audit-Durability-Design.md) | **Partly done** | Phases 3–5: read side, Azure/Mongo loggers, retention |
-| [Retention](Retention-Design.md) | **Phase 1 done** | Phases 2–5: event-stream retention |
+| [Retention](Retention-Design.md) | **Phases 1–2 done** | Phases 3–5: the destructive prune |
 | [Resilience Testing](Resilience-Testing-Design.md) | **Not started** | All five phases |
 
 Also delivered outside those five: the result/failure model, multi-tenancy, crypto-shredding,
@@ -31,7 +31,7 @@ Three things grow without bound, and the first is the cheapest and safest to fix
 | --- | --- | --- |
 | ~~Idempotency markers~~ | **Done** | `IIdempotencyMarkerMaintenance`, all four providers. Nothing schedules it yet |
 | **Admin audit entries** | Low | Added by the audit work; needs a *minimum* retention floor rather than a maximum |
-| **Event streams** | **High** | The only operation that can destroy business state. Requires a covering snapshot, and `RequireSnapshot` must not be defeasible |
+| **Event streams** | **High** | Preview ships; **nothing prunes**. Requires a covering snapshot, and `RequireSnapshot` must not be defeasible |
 
 Verified absent: no `PruneAsync`, no `EventRetentionPolicy`, no marker cleanup. The transactional
 outbox's `CleanupAsync` is the only retention that exists, and is the precedent to follow.
@@ -69,7 +69,7 @@ Each design page ends with its own list. These are the ones that stop work start
 | # | Decision | My recommendation |
 | --- | --- | --- |
 | 1 | Retention: **scheduled or operator-invoked**? | Operator-invoked first, behind the Admin permission and audited |
-| 2 | Retention: does a **dry run ship before** the destructive path? | Yes |
+| ~~2~~ | ~~Retention: does a **dry run ship before** the destructive path?~~ | **Answered: the preview shipped first** |
 | 3 | Retention: is `RequireSnapshot = false` permitted at all? | No, or behind a second explicit opt-in |
 | 4 | Retention: **blocked by** a lagging subscription checkpoint, or warn? | Blocked |
 | 5 | Resilience: does fault injection live in `SharedTestingFramework`? | Yes, so provider suites can reuse it |

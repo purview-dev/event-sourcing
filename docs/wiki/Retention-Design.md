@@ -1,11 +1,11 @@
 # Retention — Design
 
-> **Status: phase 1 implemented.**
+> **Status: phases 1 and 2 implemented.**
 >
-> Idempotency marker cleanup ships for SQL Server, PostgreSQL, Azure Storage and MongoDB — the safe
-> half, separable precisely because deleting an expired marker cannot lose data. **Phases 2 to 5
-> remain proposals**: event-stream retention, the dry run, the destructive prune and the scheduled
-> service do not exist, and the four decisions below are still open.
+> Idempotency marker cleanup ships for SQL Server, PostgreSQL, Azure Storage and MongoDB, and the
+> event-stream retention **preview** ships provider-neutrally. **Phases 3 to 5 remain proposals** —
+> nothing prunes an event. Decision 2 below is answered by construction: the dry run shipped first.
+> Decisions 1, 3 and 4 are still open and block the destructive path.
 >
 > Supersedes Part 2 of [Subscriptions and Retention](Subscriptions-And-Retention-Design.md), which
 > covered event-stream retention only.

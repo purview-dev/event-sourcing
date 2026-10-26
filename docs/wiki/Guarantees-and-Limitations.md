@@ -254,6 +254,24 @@ destroy another tenant's data rather than expose it.
 
 **Nothing invokes it.** There is no scheduled cleanup; call it from a maintenance job.
 
+### Event-stream retention
+
+**Preview only.** `IEventStreamRetentionPreview<T>.PreviewAsync` reports what an
+`EventRetentionPolicy` would remove and what is holding the rest back. **Nothing prunes an event** -
+the destructive path does not exist, by design: a dry run that reports blockers is how an operator
+learns a policy is wrong before it costs them.
+
+A stream is reported as blocked when there is no covering snapshot, when the events are newer than
+`MinimumAge`, when a subscription has not read past the prune point, or when the stream is too short
+for the `RetainedVersions` margin. The prune point is the most conservative version all the rules
+allow, never the most generous.
+
+Two limits worth knowing. The preview **reads every stream** of the aggregate type, because a
+snapshot version is only knowable from the aggregate - run it deliberately, not on a timer. And
+subscription lag is checked against the subscriptions **registered in this process**: one running on
+another host is invisible, so a deployment that spreads subscriptions across hosts must evaluate
+retention where they all are.
+
 Event-stream **retention** is not implemented. Streams grow without bound; nothing removes an event.
 
 ## Tracing
