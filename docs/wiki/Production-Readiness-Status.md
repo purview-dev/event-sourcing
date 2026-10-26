@@ -14,7 +14,7 @@ what is waiting on a decision. The five design pages hold the *reasoning*; this 
 | [Crypto Key Management](Crypto-Key-Management-Design.md) | **Done** | Rotation ships for the two SQL providers only |
 | [Observability Parity](Observability-Parity-Design.md) | **Done, one gap** | No test asserts spans are emitted |
 | [Durable Admin Audit](Admin-Audit-Durability-Design.md) | **Partly done** | Phases 3–5: read side, Azure/Mongo loggers, retention |
-| [Retention](Retention-Design.md) | **Done** | No way to retire a subscription, which blocks retention indefinitely |
+| [Retention](Retention-Design.md) | **Done** | Retired subscriptions leave checkpoint rows nothing deletes |
 | [Resilience Testing](Resilience-Testing-Design.md) | **Phase 1 done** | Phases 2–5: transport faults, Admin coverage, upgrade suite, load/soak |
 
 Also delivered outside those five: the result/failure model, multi-tenancy, crypto-shredding,

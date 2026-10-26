@@ -7,8 +7,10 @@
 > (either, both, or neither); the dry run shipped first; `RequireSnapshot = false` **is** permitted
 > but logs a warning naming the risk on every run; and a lagging subscription **blocks** a prune.
 >
-> One gap follows from that last answer: there is no way to retire a subscription, so an abandoned
-> one blocks retention indefinitely. Deleting a subscription's checkpoints is the missing piece.
+> A subscription only blocks while it is registered: the lagging check reads the registered
+> `IEventSubscriber<T>` instances, so one whose code has been removed contributes no name and cannot
+> hold retention back. What does linger is its checkpoint rows, which nothing deletes - storage
+> waste rather than a block.
 >
 > Supersedes Part 2 of [Subscriptions and Retention](Subscriptions-And-Retention-Design.md), which
 > covered event-stream retention only.
