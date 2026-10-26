@@ -15,7 +15,7 @@ what is waiting on a decision. The five design pages hold the *reasoning*; this 
 | [Observability Parity](Observability-Parity-Design.md) | **Done, one gap** | No test asserts spans are emitted |
 | [Durable Admin Audit](Admin-Audit-Durability-Design.md) | **Partly done** | Phases 3–5: read side, Azure/Mongo loggers, retention |
 | [Retention](Retention-Design.md) | **Done** | Retired subscriptions leave checkpoint rows nothing deletes |
-| [Resilience Testing](Resilience-Testing-Design.md) | **Phase 1 done** | Phases 2–5: transport faults, Admin coverage, load/soak |
+| [Resilience Testing](Resilience-Testing-Design.md) | **Phases 1–2 done** | Phases 4–5: transport faults, load/soak |
 
 Also delivered outside those five: the result/failure model, multi-tenancy, crypto-shredding,
 metrics, principal capture, tenant isolation as a provider contract, the BDTest acceptance suite, and
@@ -80,9 +80,6 @@ Each design page ends with its own list. These are the ones that stop work start
 Found while doing other work, deliberately not acted on. Recorded so they are not rediscovered as
 surprises.
 
-- **`PostgresOutboxStore` has an unguarded `CREATE TABLE IF NOT EXISTS` race.** The same defect that
-  was fixed in the subscription checkpoint and crypto key stores: PostgreSQL races on the table's
-  implicit row type and raises `23505`. A real latent bug in shipped code.
 - **Azure Storage blob-backed snapshots are not directly tenant-filtered.** Protected transitively,
   which is weaker than it sounds.
 - **`.agents/skills/` is tracked** — 59 files, duplicated into `.claude/skills/` — although

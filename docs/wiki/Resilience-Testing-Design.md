@@ -4,8 +4,9 @@
 >
 > `FaultPlan` and `FaultInjectingEventStore<T>` ship in `SharedTestingFramework`, with the failure
 > invariants as unit tests running on every pull request — see
-> [Shared Testing Framework](Shared-Testing-Framework.md#fault-injection). **Phases 2 to 5 remain
-> proposals**: transport-level faults, the Admin coverage work, and the load/soak harness do not exist.
+> [Shared Testing Framework](Shared-Testing-Framework.md#fault-injection). Phase 2 (Admin endpoint
+> security contract tests) is also implemented. **Phases 4 and 5 remain proposals**: transport-level
+> faults and the load/soak harness do not exist.
 
 ## The problem
 
@@ -98,9 +99,16 @@ same reasoning that keeps the provider integration suites out of PR validation.
 
 Found during the same assessment, cheaper than the above and arguably higher value per hour:
 
-- **Admin surface is thinly tested relative to its risk** — 7 files in `Admin.UnitTests` for the
-  whole API and authorization model; `Admin.SqlServer.UnitTests` has 2. This is the security
-  boundary.
+- **Admin surface is thinly tested relative to its risk** — partly closed. The per-endpoint tests
+  cover the endpoints that exist today; `AdminEndpointSecurityContractTests` now covers the *set*,
+  enumerating `EndpointDataSource` and asserting that every Admin endpoint requires authorization,
+  **names a policy**, sits under the configured prefix, and refuses a principal entitled to nothing.
+
+  The middle one is the assertion that bites. The route group applies a blanket
+  `RequireAuthorization()`, which is authentication only — any signed-in caller passes it. An
+  endpoint that forgets its own `RequireAuthorization(policyName)` therefore stays "protected" to
+  every other test while being readable by anyone who can log in. Verified by removing one, which
+  failed that test and nothing else.
 - **No Admin integration tests** for the MongoDB, Azure or Postgres adapters.
 - **Uneven provider depth** — `SqlServer.IntegrationTests` has 15 files, `AzureStorage.IntegrationTests` 3.
 - **Cosmos DB is never validated against the real service**; the vnext emulator cannot run the
@@ -111,7 +119,7 @@ Found during the same assessment, cheaper than the above and arguably higher val
 | Phase | Work |
 | --- | --- |
 | 1 | `FaultInjectingEventStore<T>` and `FaultPlan`; the first six invariants above as unit tests |
-| 2 | Admin test coverage up to the level its risk warrants |
+| 2 | **Done.** `AdminEndpointSecurityContractTests` asserts the security properties of the whole mapped endpoint set, so an endpoint added later is covered without anyone remembering |
 | 3 | ~~An upgrade/compatibility suite~~ - out of scope: 2.0 targets new deployments and supports no migration path |
 | 4 | Transport fault injection in one provider as a pilot, then the rest |
 | 5 | Load and soak harness |
