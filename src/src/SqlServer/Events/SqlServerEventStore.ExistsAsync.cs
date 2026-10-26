@@ -1,18 +1,18 @@
-﻿namespace Purview.EventSourcing.SqlServer.Events;
+namespace Purview.EventSourcing.SqlServer.Events;
 
 partial class SqlServerEventStore<T>
 {
 	///<inheritdoc/>
-	public async Task<ExistsState> ExistsAsync(string aggregateId, CancellationToken cancellationToken = default)
+	public async Task<AggregateExistence> ExistsAsync(string aggregateId, CancellationToken cancellationToken = default)
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(aggregateId, nameof(aggregateId));
 
 		var streamVersion = await GetStreamVersionAsync(aggregateId, false, cancellationToken);
 		return streamVersion == null
-			? ExistsState.DoesNotExist
-			: new ExistsState
+			? AggregateExistence.DoesNotExist
+			: new AggregateExistence
 			{
-				Status = streamVersion.IsDeleted ? ExistsStatus.ExistsInDeletedState : ExistsStatus.Exists,
+				Status = streamVersion.IsDeleted ? ExistenceStatus.ExistsInDeletedState : ExistenceStatus.Exists,
 				Version = streamVersion.Version,
 			};
 	}

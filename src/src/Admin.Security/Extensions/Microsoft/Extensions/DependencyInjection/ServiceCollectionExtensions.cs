@@ -1,9 +1,9 @@
 using System.ComponentModel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Purview.EventSourcing.Admin.Abstractions.Services;
 using Purview.EventSourcing.Admin.Security.Handlers;
 using Purview.EventSourcing.Admin.Security.Providers;
+using Purview.EventSourcing.Admin.Services;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -30,8 +30,13 @@ public static class ServiceCollectionExtensions
 			services.AddScoped<IAuthorizationHandler, AdminFeatureAuthorizationHandler>();
 			services.AddScoped<IAuthorizationHandler, AggregateTypeAccessHandler>();
 
-			// Default in-memory audit logger; applications may replace it with a durable implementation.
-			services.TryAddSingleton<IAdminAuditLogger, InMemoryAdminAuditLogger>();
+			// Registered under the sink key: the unkeyed IAdminAuditLogger is a decorator that stamps
+			// the tenant and correlation identifier, so a durable logger replaces this sink rather
+			// than the decorator in front of it. Applications may replace it with a durable one.
+			services.TryAddKeyedSingleton<IAdminAuditLogger, InMemoryAdminAuditLogger>(AdminAuditKeys.Sink);
+
+			// TryAdd: a host entitling administrators differently registers its own resolver first.
+			services.TryAddSingleton<IAdminTenantResolver>(new ClaimsAdminTenantResolver());
 
 			return services;
 		}

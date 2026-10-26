@@ -86,7 +86,11 @@ public sealed class AggregateSourceGeneratorIncrementalTests : AggregateSourceGe
 
 		var reasons = StepReasons(result.Runs[1], "GetAggregateTargets");
 		await Assert.That(reasons.Length).IsEqualTo(2);
-		await Assert.That(reasons.All(static reason => reason == StepReason.Cached)).IsTrue();
+		// Cached or Unchanged: the post-initialization attribute trees make Roslyn's internal
+		// Compilation step Modified on an identical rerun, so the attribute transform re-runs and
+		// reports Unchanged. That it is never Modified is what proves AggregateTarget's value
+		// equality keeps downstream stages from being invalidated.
+		await Assert.That(reasons.All(static reason => reason is StepReason.Cached or StepReason.Unchanged)).IsTrue();
 	}
 
 	[Test]

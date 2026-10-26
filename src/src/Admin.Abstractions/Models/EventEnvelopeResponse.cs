@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace Purview.EventSourcing.Admin.Abstractions.Models;
+namespace Purview.EventSourcing.Admin.Models;
 
 /// <summary>
 /// Represents a single event together with its metadata and raw JSON payload.

@@ -36,7 +36,8 @@ sealed class IndexModel(IQueryableEventStore customerStore, IQueryableEventStore
 			PageSize = DefaultPageSize;
 
 		var ct = HttpContext.RequestAborted;
-		CurrentCustomer = await customerStore.GetAsync<CustomerAggregate>(customerId, ct);
+		var currentCustomerResult = await customerStore.GetAsync<CustomerAggregate>(customerId, ct);
+		CurrentCustomer = currentCustomerResult.IsSuccess ? currentCustomerResult.Value : null;
 
 		var skipCount = (Page - 1) * PageSize;
 		ContinuationRequest request = new()

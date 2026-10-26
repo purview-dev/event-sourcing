@@ -8,7 +8,7 @@ namespace Purview.EventSourcing.Admin.Site.Pages;
 /// Page model for the admin portal home page that searches for aggregates.
 /// </summary>
 /// <param name="adminApiClient">The generated Admin API client used to search aggregates.</param>
-public class AdminIndexModel(AdminApiClient adminApiClient) : PageModel
+sealed class AdminIndexModel(AdminApiClient adminApiClient) : PageModel
 {
 	readonly AdminApiClient _adminAPIClient = adminApiClient ?? throw new ArgumentNullException(nameof(adminApiClient));
 

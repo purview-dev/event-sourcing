@@ -5,14 +5,14 @@ using Purview.EventSourcing.MongoDB;
 using Purview.EventSourcing.MongoDB.Events;
 using Purview.EventSourcing.MongoDB.StorageClient;
 using Purview.EventSourcing.Services;
-using Testcontainers.MongoDb;
+using Purview.EventSourcing.Tenancy;
 using TUnit.Core.Interfaces;
 
 namespace Purview.EventSourcing.Fixtures.MongoDB;
 
 public sealed class MongoDBEventStoreFixture : IAsyncInitializer, IAsyncDisposable
 {
-	readonly MongoDbContainer _mongoDBContainer;
+	readonly MongoDBTestContainer _mongoDBContainer;
 
 	IAggregateEventNameMapper _eventNameMapper = default!;
 
@@ -21,6 +21,9 @@ public sealed class MongoDBEventStoreFixture : IAsyncInitializer, IAsyncDisposab
 		EventStoreOperationContext.RequiresValidPrincipalIdentifierDefault = false;
 		_mongoDBContainer = ContainerHelper.CreateMongoDB();
 	}
+
+	/// <summary>The container connection string, for tests that build their own Mongo client.</summary>
+	public string ConnectionString => _mongoDBContainer.GetConnectionString();
 
 	public IDistributedCacheMock Cache { get; private set; } = default!;
 
@@ -32,10 +35,12 @@ public sealed class MongoDBEventStoreFixture : IAsyncInitializer, IAsyncDisposab
 
 	public MongoDBEventStore<TAggregate> CreateEventStore<TAggregate>(
 		IAggregateChangeFeedNotifier<TAggregate>? aggregateChangeNotifier = null,
-		bool removeFromCacheOnDelete = false
+		bool removeFromCacheOnDelete = false,
+		ICurrentTenant? currentTenant = null,
+		Guid? runId = null
 	)
 		where TAggregate : class, IAggregate, new() =>
-		CreateEventStoreContext(aggregateChangeNotifier, removeFromCacheOnDelete).EventStore;
+		CreateEventStoreContext(aggregateChangeNotifier, removeFromCacheOnDelete, currentTenant, runId).EventStore;
 
 	internal (
 		MongoDBEventStore<TAggregate> EventStore,
@@ -45,11 +50,13 @@ public sealed class MongoDBEventStoreFixture : IAsyncInitializer, IAsyncDisposab
 		MongoDBClient SnapshotClient
 	) CreateEventStoreContext<TAggregate>(
 		IAggregateChangeFeedNotifier<TAggregate>? aggregateChangeNotifier = null,
-		bool removeFromCacheOnDelete = false
+		bool removeFromCacheOnDelete = false,
+		ICurrentTenant? currentTenant = null,
+		Guid? runId = null
 	)
 		where TAggregate : class, IAggregate, new()
 	{
-		var runId = Guid.NewGuid();
+		runId ??= Guid.NewGuid();
 
 		var cache = CreateDistributedCache();
 		Cache = cache;
@@ -82,7 +89,8 @@ public sealed class MongoDBEventStoreFixture : IAsyncInitializer, IAsyncDisposab
 			aggregateChangeNotifier: aggregateChangeNotifier ?? IAggregateChangeFeedNotifier<TAggregate>.Mock(),
 			eventStoreTelemetry: telemetry,
 			mongoDBClientTelemetry: mongoDBClientTelemetry,
-			aggregateRequirementsManager: aggregateRequirementsManager
+			aggregateRequirementsManager: aggregateRequirementsManager,
+			currentTenant: currentTenant
 		);
 
 		MongoDBClient eventClient = new(

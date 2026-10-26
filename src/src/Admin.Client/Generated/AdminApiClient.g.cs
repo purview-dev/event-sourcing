@@ -2070,7 +2070,7 @@ namespace Purview.EventSourcing.Admin.Client
         public bool Rebuilt { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("currentVersion")]
-        public int CurrentVersion { get; set; } = default!;
+        public long CurrentVersion { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -2097,7 +2097,7 @@ namespace Purview.EventSourcing.Admin.Client
         public bool Exists { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("currentVersion")]
-        public int CurrentVersion { get; set; } = default!;
+        public long CurrentVersion { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("schemaVersion")]
         public int SchemaVersion { get; set; } = default!;

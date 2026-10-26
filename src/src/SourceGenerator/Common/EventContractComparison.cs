@@ -47,8 +47,8 @@ static class EventContractComparer
 					Issue(
 						DiagnosticLibrary.EventContractRemoved,
 						[baselineAggregate.AggregateName],
-						EventKey: null,
-						AggregateKey: null
+						eventKey: null,
+						aggregateKey: null
 					)
 				);
 				continue;
@@ -113,12 +113,12 @@ static class EventContractComparer
 							maxCurrentVersion.ToString(System.Globalization.CultureInfo.InvariantCulture),
 							baselineEvent.SchemaVersion.ToString(System.Globalization.CultureInfo.InvariantCulture),
 						],
-						EventKey: EventContractManifestLibrary.CreateEventKey(
+						eventKey: EventContractManifestLibrary.CreateEventKey(
 							baselineAggregate.AggregateNamespace,
 							baselineAggregate.AggregateName,
 							sameName[0].MethodName
 						),
-						AggregateKey: aggregateKey
+						aggregateKey: aggregateKey
 					)
 				);
 				continue;
@@ -132,8 +132,8 @@ static class EventContractComparer
 						baselineEvent.SchemaVersion.ToString(System.Globalization.CultureInfo.InvariantCulture),
 						baselineAggregate.AggregateName,
 					],
-					EventKey: null,
-					AggregateKey: aggregateKey
+					eventKey: null,
+					aggregateKey: aggregateKey
 				)
 			);
 		}
@@ -166,8 +166,8 @@ static class EventContractComparer
 					Issue(
 						DiagnosticLibrary.EventContractFieldRemoved,
 						[baselineField.Name, baselineEvent.EventName, version, aggregate.AggregateName],
-						EventKey: eventKey,
-						AggregateKey: aggregateKey
+						eventKey: eventKey,
+						aggregateKey: aggregateKey
 					)
 				);
 				continue;
@@ -186,8 +186,8 @@ static class EventContractComparer
 							baselineField.Type,
 							currentField.Type,
 						],
-						EventKey: eventKey,
-						AggregateKey: aggregateKey
+						eventKey: eventKey,
+						aggregateKey: aggregateKey
 					)
 				);
 				continue;
@@ -199,8 +199,8 @@ static class EventContractComparer
 					Issue(
 						DiagnosticLibrary.EventContractFieldBecameRequired,
 						[baselineField.Name, baselineEvent.EventName, version, aggregate.AggregateName],
-						EventKey: eventKey,
-						AggregateKey: aggregateKey
+						eventKey: eventKey,
+						aggregateKey: aggregateKey
 					)
 				);
 			}
@@ -219,8 +219,8 @@ static class EventContractComparer
 					Issue(
 						DiagnosticLibrary.EventContractFieldBecameRequired,
 						[currentField.Name, baselineEvent.EventName, version, aggregate.AggregateName],
-						EventKey: eventKey,
-						AggregateKey: aggregateKey
+						eventKey: eventKey,
+						aggregateKey: aggregateKey
 					)
 				);
 			}
@@ -238,7 +238,7 @@ static class EventContractComparer
 	static ContractIssue Issue(
 		DiagnosticDescriptor descriptor,
 		string[] messageArgs,
-		string? EventKey,
-		string? AggregateKey
-	) => new(descriptor, new([.. messageArgs]), EventKey, AggregateKey);
+		string? eventKey,
+		string? aggregateKey
+	) => new(descriptor, new([.. messageArgs]), eventKey, aggregateKey);
 }

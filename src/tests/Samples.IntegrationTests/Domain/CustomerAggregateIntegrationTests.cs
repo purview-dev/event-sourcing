@@ -19,7 +19,8 @@ public sealed class CustomerAggregateIntegrationTests(SqlServerSnapshotEventStor
 		var store = fixture.CreateEventStore<CustomerAggregate>();
 		await store.SaveAsync(customer, cancellationToken);
 
-		var loaded = await store.GetAsync(id, cancellationToken);
+		var loadedResult = await store.GetAsync(id, cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.Name).IsEqualTo("Jane Smith");
@@ -40,9 +41,10 @@ public sealed class CustomerAggregateIntegrationTests(SqlServerSnapshotEventStor
 		var store = fixture.CreateEventStore<CustomerAggregate>();
 		var result = await store.SaveAsync(customer, cancellationToken);
 
-		await Assert.That(result.EnsureValid).ThrowsNothing();
+		await Assert.That(result.IsSuccess).IsTrue();
 
-		var loaded = await store.GetAsync(id, cancellationToken);
+		var loadedResult = await store.GetAsync(id, cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.PhoneNumber).IsEqualTo("+1-555-0199");
@@ -63,7 +65,8 @@ public sealed class CustomerAggregateIntegrationTests(SqlServerSnapshotEventStor
 		var store = fixture.CreateEventStore<CustomerAggregate>();
 		await store.SaveAsync(customer, cancellationToken);
 
-		var loaded = await store.GetAsync(id, cancellationToken);
+		var loadedResult = await store.GetAsync(id, cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.Email).IsEqualTo("v3@test.com");
@@ -81,7 +84,8 @@ public sealed class CustomerAggregateIntegrationTests(SqlServerSnapshotEventStor
 		var store = fixture.CreateEventStore<CustomerAggregate>();
 		await store.SaveAsync(customer, cancellationToken);
 
-		var loaded = await store.GetAsync(id, cancellationToken);
+		var loadedResult = await store.GetAsync(id, cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.IsActive).IsFalse();
@@ -100,7 +104,8 @@ public sealed class CustomerAggregateIntegrationTests(SqlServerSnapshotEventStor
 		var store = fixture.CreateEventStore<CustomerAggregate>();
 		await store.SaveAsync(customer, cancellationToken);
 
-		var loaded = await store.GetAsync(id, cancellationToken);
+		var loadedResult = await store.GetAsync(id, cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.IsActive).IsTrue();
@@ -123,9 +128,10 @@ public sealed class CustomerAggregateIntegrationTests(SqlServerSnapshotEventStor
 		var store = fixture.CreateEventStore<CustomerAggregate>();
 		var result = await store.SaveAsync(customer, cancellationToken);
 
-		await Assert.That(result.EnsureValid).ThrowsNothing();
+		await Assert.That(result.IsSuccess).IsTrue();
 
-		var loaded = await store.GetAsync(id, cancellationToken);
+		var loadedResult = await store.GetAsync(id, cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.Details.SavedVersion).IsEqualTo(3);
@@ -148,7 +154,7 @@ public sealed class CustomerAggregateIntegrationTests(SqlServerSnapshotEventStor
 		await store.SaveAsync(customer, cancellationToken);
 		await store.DeleteAsync(customer, cancellationToken);
 
-		var isDeleted = await store.IsDeletedAsync(id, cancellationToken);
+		var isDeleted = (await store.ExistsAsync(id, cancellationToken)).IsDeleted;
 
 		await Assert.That(isDeleted).IsTrue();
 	}
@@ -167,14 +173,16 @@ public sealed class CustomerAggregateIntegrationTests(SqlServerSnapshotEventStor
 		await store.SaveAsync(customer, cancellationToken);
 		await store.DeleteAsync(customer, cancellationToken);
 
-		var deleted = await store.GetDeletedAsync(id, cancellationToken);
+		var deletedResult = await store.GetDeletedAsync(id, cancellationToken);
+		var deleted = deletedResult.IsSuccess ? deletedResult.Value : null;
 		await store.RestoreAsync(deleted!, cancellationToken);
 
-		var restored = await store.GetAsync(id, cancellationToken);
+		var restoredResult = await store.GetAsync(id, cancellationToken);
+		var restored = restoredResult.IsSuccess ? restoredResult.Value : null;
 
 		await Assert.That(restored).IsNotNull();
 		await Assert.That(restored!.Name).IsEqualTo("Grace");
-		await Assert.That(await store.IsDeletedAsync(id, cancellationToken)).IsFalse();
+		await Assert.That((await store.ExistsAsync(id, cancellationToken)).IsDeleted).IsFalse();
 	}
 
 	#endregion
@@ -195,7 +203,8 @@ public sealed class CustomerAggregateIntegrationTests(SqlServerSnapshotEventStor
 		var store = fixture.CreateEventStore<CustomerAggregate>();
 		await store.SaveAsync(customer, cancellationToken);
 
-		var atVersion1 = await store.GetAtAsync(id, 1, cancellationToken);
+		var atVersion1Result = await store.GetAtAsync(id, 1, cancellationToken);
+		var atVersion1 = atVersion1Result.IsSuccess ? atVersion1Result.Value : null;
 
 		await Assert.That(atVersion1).IsNotNull();
 		await Assert.That(atVersion1!.Email).IsEqualTo("original@test.com");
@@ -222,7 +231,8 @@ public sealed class CustomerAggregateIntegrationTests(SqlServerSnapshotEventStor
 		var store = fixture.CreateSnapshotStore(snapshotStrategy: new AlwaysSnapshotStrategy<CustomerAggregate>());
 		await store.SaveAsync(customer, cancellationToken);
 
-		var loaded = await store.GetAsync(id, cancellationToken);
+		var loadedResult = await store.GetAsync(id, cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.Name).IsEqualTo("Ivan");

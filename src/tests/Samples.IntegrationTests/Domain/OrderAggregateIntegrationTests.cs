@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Purview.EventSourcing.Aggregates.Snapshotting;
 using Purview.EventSourcing.Fixtures.SqlServer;
 using Purview.EventSourcing.Samples.ValueObjects;
@@ -22,6 +23,11 @@ public sealed class OrderAggregateIntegrationTests(SqlServerSnapshotEventStoreFi
 	#region Round-Trip Persistence
 
 	[Test]
+	[SuppressMessage(
+		"Maintainability",
+		"CA1506:Avoid excessive class coupling",
+		Justification = "Test wiring: the store, its infrastructure and the result model are all named here."
+	)]
 	public async Task SaveAsync_GivenDraftOrderWithLineItems_LoadedLineItemsMatch(CancellationToken cancellationToken)
 	{
 		var id = $"{Guid.NewGuid()}";
@@ -30,7 +36,8 @@ public sealed class OrderAggregateIntegrationTests(SqlServerSnapshotEventStoreFi
 		var store = fixture.CreateEventStore<OrderAggregate>();
 		await store.SaveAsync(order, cancellationToken);
 
-		var loaded = await store.GetAsync(id, cancellationToken);
+		var loadedResult = await store.GetAsync(id, cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.CustomerId).IsEqualTo("customer-1");
@@ -56,7 +63,8 @@ public sealed class OrderAggregateIntegrationTests(SqlServerSnapshotEventStoreFi
 		var store = fixture.CreateEventStore<OrderAggregate>();
 		await store.SaveAsync(order, cancellationToken);
 
-		var loaded = await store.GetAsync(id, cancellationToken);
+		var loadedResult = await store.GetAsync(id, cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.Notes).IsEqualTo("Rush delivery");
@@ -72,7 +80,8 @@ public sealed class OrderAggregateIntegrationTests(SqlServerSnapshotEventStoreFi
 		var store = fixture.CreateEventStore<OrderAggregate>();
 		await store.SaveAsync(order, cancellationToken);
 
-		var loaded = await store.GetAsync(id, cancellationToken);
+		var loadedResult = await store.GetAsync(id, cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.Status).IsEqualTo(OrderStatus.Confirmed);
@@ -90,7 +99,8 @@ public sealed class OrderAggregateIntegrationTests(SqlServerSnapshotEventStoreFi
 		var store = fixture.CreateEventStore<OrderAggregate>();
 		await store.SaveAsync(order, cancellationToken);
 
-		var loaded = await store.GetAsync(id, cancellationToken);
+		var loadedResult = await store.GetAsync(id, cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.Status).IsEqualTo(OrderStatus.Shipped);
@@ -111,7 +121,8 @@ public sealed class OrderAggregateIntegrationTests(SqlServerSnapshotEventStoreFi
 		var store = fixture.CreateEventStore<OrderAggregate>();
 		await store.SaveAsync(order, cancellationToken);
 
-		var loaded = await store.GetAsync(id, cancellationToken);
+		var loadedResult = await store.GetAsync(id, cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.Status).IsEqualTo(OrderStatus.Completed);
@@ -131,7 +142,8 @@ public sealed class OrderAggregateIntegrationTests(SqlServerSnapshotEventStoreFi
 		var store = fixture.CreateEventStore<OrderAggregate>();
 		await store.SaveAsync(order, cancellationToken);
 
-		var loaded = await store.GetAsync(id, cancellationToken);
+		var loadedResult = await store.GetAsync(id, cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.Status).IsEqualTo(OrderStatus.Cancelled);
@@ -149,7 +161,8 @@ public sealed class OrderAggregateIntegrationTests(SqlServerSnapshotEventStoreFi
 		var store = fixture.CreateEventStore<OrderAggregate>();
 		await store.SaveAsync(order, cancellationToken);
 
-		var loaded = await store.GetAsync(id, cancellationToken);
+		var loadedResult = await store.GetAsync(id, cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.LineItems).Count().IsEqualTo(1);
@@ -175,7 +188,8 @@ public sealed class OrderAggregateIntegrationTests(SqlServerSnapshotEventStoreFi
 		var store = fixture.CreateEventStore<OrderAggregate>();
 		await store.SaveAsync(order, cancellationToken);
 
-		var loaded = await store.GetAsync(id, cancellationToken);
+		var loadedResult = await store.GetAsync(id, cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.Details.SavedVersion).IsEqualTo(7);
@@ -197,7 +211,8 @@ public sealed class OrderAggregateIntegrationTests(SqlServerSnapshotEventStoreFi
 		await store.SaveAsync(order, cancellationToken);
 
 		// At version 1, only CreateOrder has been applied
-		var atV1 = await store.GetAtAsync(id, 1, cancellationToken);
+		var atV1Result = await store.GetAtAsync(id, 1, cancellationToken);
+		var atV1 = atV1Result.IsSuccess ? atV1Result.Value : null;
 
 		await Assert.That(atV1).IsNotNull();
 		await Assert.That(atV1!.Status).IsEqualTo(OrderStatus.Draft);
@@ -219,7 +234,8 @@ public sealed class OrderAggregateIntegrationTests(SqlServerSnapshotEventStoreFi
 		await store.SaveAsync(order, cancellationToken);
 
 		// At version 3 (after two AddLineItem), status is still Draft
-		var atV3 = await store.GetAtAsync(id, 3, cancellationToken);
+		var atV3Result = await store.GetAtAsync(id, 3, cancellationToken);
+		var atV3 = atV3Result.IsSuccess ? atV3Result.Value : null;
 
 		await Assert.That(atV3).IsNotNull();
 		await Assert.That(atV3!.Status).IsEqualTo(OrderStatus.Draft);
@@ -243,7 +259,8 @@ public sealed class OrderAggregateIntegrationTests(SqlServerSnapshotEventStoreFi
 		var store = fixture.CreateSnapshotStore(snapshotStrategy: new AlwaysSnapshotStrategy<OrderAggregate>());
 		await store.SaveAsync(order, cancellationToken);
 
-		var loaded = await store.GetAsync(id, cancellationToken);
+		var loadedResult = await store.GetAsync(id, cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.Status).IsEqualTo(OrderStatus.Confirmed);

@@ -16,8 +16,8 @@ partial class PostgresEventStore<T>
 	/// <returns>If no <paramref name="versionTo"/> is specified all available events greater than <paramref name="versionFrom"/> are returned.</returns>
 	public async IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync(
 		string aggregateId,
-		int versionFrom,
-		int? versionTo,
+		long versionFrom,
+		long? versionTo,
 		[EnumeratorCancellation] CancellationToken cancellationToken
 	)
 	{
@@ -46,16 +46,20 @@ partial class PostgresEventStore<T>
 		);
 		await foreach (var entity in entities)
 		{
-			var item = DeserializeEvent(entity);
+			var item = await DeserializeEventAsync(entity, cancellationToken);
 			if (item != null)
 				yield return (item.Value, entity.EventType!);
 		}
 	}
 
 	/// <param name="eventRow"></param>
-	EventRecord? DeserializeEvent(PostgresEventStoreClient.RowData eventRow)
+	/// <param name="cancellationToken"></param>
+	async Task<EventRecord?> DeserializeEventAsync(
+		PostgresEventStoreClient.RowData eventRow,
+		CancellationToken cancellationToken
+	)
 	{
-		static UnknownEvent ReturnUnknownEvent(PostgresEventStoreClient.RowData eventRow, int aggregateVersion) =>
+		static UnknownEvent ReturnUnknownEvent(PostgresEventStoreClient.RowData eventRow, long aggregateVersion) =>
 			new()
 			{
 				SchemaVersion = eventRow.SchemaVersion,
@@ -97,7 +101,19 @@ partial class PostgresEventStore<T>
 					Type.GetType(name, throwOnError: false)
 					?? throw new ApplicationException($"Unable to load event type: {name}")
 			);
-			var @event = DeserializeEvent(eventRow.Payload!, runtimeEventType);
+			var payload = eventRow.Payload!;
+			if (_payloadProtector is not null && _payloadProtector.IsProtected(payload))
+			{
+				var unprotected = await _payloadProtector.UnprotectAsync(payload, cancellationToken);
+				if (unprotected is null)
+					// The subject has been erased. Surfaced as an unknown event so replay continues and
+					// the aggregate reports the gap, rather than failing the whole read.
+					return new EventRecord(ReturnUnknownEvent(eventRow, eventRow.Version), metadata);
+
+				payload = unprotected;
+			}
+
+			var @event = DeserializeEvent(payload, runtimeEventType);
 
 			// Apply upcasting chain when a registry is available.
 			if (@event != null && _eventUpcasterRegistry?.CanUpcast(@event) == true)

@@ -12,7 +12,11 @@ namespace Purview.EventSourcing.SqlServer.Events;
 /// </remarks>
 /// <seealso cref="INonQueryableEventStore{T}"/>
 /// <seealso cref="IAggregateEventHistoryStoreCore{T}"/>
-public interface ISqlServerEventStore<T> : INonQueryableEventStore<T>, IAggregateEventHistoryStoreCore<T>
+public interface ISqlServerEventStore<T>
+	: INonQueryableEventStore<T>,
+		IAggregateEventHistoryStoreCore<T>,
+		IIdempotencyMarkerMaintenance,
+		Retention.IEventStreamPruning<T>
 	where T : class, IAggregate, new()
 {
 	//

@@ -1,7 +1,9 @@
-using Purview.EventSourcing.Admin.Abstractions.Models;
-using Purview.EventSourcing.Admin.Abstractions.Queries;
+using Purview.EventSourcing.Admin.Failures;
+using Purview.EventSourcing.Admin.Models;
+using Purview.EventSourcing.Admin.Queries;
+using Purview.Results;
 
-namespace Purview.EventSourcing.Admin.Abstractions.Services;
+namespace Purview.EventSourcing.Admin.Services;
 
 /// <summary>
 /// Queries event streams for the admin portal.
@@ -16,9 +18,10 @@ public interface IAdminEventQueryService
 	/// <param name="query">The event range filter and paging criteria.</param>
 	/// <param name="cancellationToken">The token to monitor for cancellation requests.</param>
 	/// <returns>
-	/// A paged collection of event envelopes for the stream, or <see langword="null"/> when the aggregate stream does not exist.
+	/// A paged collection of event envelopes for the stream, or <see cref="AdminAggregateNotFound"/> when the
+	/// stream does not exist.
 	/// </returns>
-	Task<PagedResult<EventEnvelopeResponse>?> GetRangeAsync(
+	Task<Result<PagedResult<EventEnvelopeResponse>, AdminQueryFailure>> GetRangeAsync(
 		string aggregateType,
 		string aggregateId,
 		EventRangeQuery query,

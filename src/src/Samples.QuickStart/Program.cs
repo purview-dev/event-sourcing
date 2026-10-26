@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
+using Purview.EventSourcing.Failures;
 using Purview.EventSourcing.Samples.Domain;
 using Purview.EventSourcing.Samples.QuickStart.Infrastructure;
+using Purview.Results;
 
 EventStoreOperationContext.RequiresValidPrincipalIdentifierDefault = false;
 
@@ -60,13 +62,10 @@ static async Task RunSuccessfulCheckoutAsync(
 	IEventStoreTransactionFactory transactionFactory
 )
 {
-	var customer = await store.GetAsync<CustomerAggregate>("customer-quickstart");
-	var keyboard = await store.GetAsync<InventoryAggregate>("inventory-keyboard");
-	var dock = await store.GetAsync<InventoryAggregate>("inventory-dock");
-
-	ArgumentNullException.ThrowIfNull(customer);
-	ArgumentNullException.ThrowIfNull(keyboard);
-	ArgumentNullException.ThrowIfNull(dock);
+	// The seeded aggregates must be there; a failure here is a broken sample, not an expected outcome.
+	var customer = (await store.GetAsync<CustomerAggregate>("customer-quickstart")).Value;
+	var keyboard = (await store.GetAsync<InventoryAggregate>("inventory-keyboard")).Value;
+	var dock = (await store.GetAsync<InventoryAggregate>("inventory-dock")).Value;
 
 	var order = await store.CreateAsync<OrderAggregate>("order-success");
 	order
@@ -99,13 +98,10 @@ static async Task RunRollbackDemoAsync(
 	InMemoryFailurePlan failurePlan
 )
 {
-	var customer = await store.GetAsync<CustomerAggregate>("customer-quickstart");
-	var keyboard = await store.GetAsync<InventoryAggregate>("inventory-keyboard");
-	var dock = await store.GetAsync<InventoryAggregate>("inventory-dock");
-
-	ArgumentNullException.ThrowIfNull(customer);
-	ArgumentNullException.ThrowIfNull(keyboard);
-	ArgumentNullException.ThrowIfNull(dock);
+	// The seeded aggregates must be there; a failure here is a broken sample, not an expected outcome.
+	var customer = (await store.GetAsync<CustomerAggregate>("customer-quickstart")).Value;
+	var keyboard = (await store.GetAsync<InventoryAggregate>("inventory-keyboard")).Value;
+	var dock = (await store.GetAsync<InventoryAggregate>("inventory-dock")).Value;
 
 	var order = await store.CreateAsync<OrderAggregate>("order-rollback");
 	order.CreateOrder(customer.Id());
@@ -131,22 +127,24 @@ static async Task RunRollbackDemoAsync(
 	Console.WriteLine("Rollback when one enlisted aggregate fails");
 	Console.WriteLine($"Correlation: {transaction.CorrelationId}");
 	PrintTransactionResult(result);
-	Console.WriteLine($"Rolled-back order persisted: {persistedOrder is not null}");
+	Console.WriteLine($"Rolled-back order persisted: {persistedOrder.IsSuccess}");
 	Console.WriteLine($"Committed order count: {orderCount}");
 	await PrintInventorySnapshotAsync(store, "Committed stock after rollback");
 }
 
 static async Task PrintOrderSnapshotAsync(IQueryableEventStore store, string title, string orderId)
 {
-	var order = await store.GetAsync<OrderAggregate>(orderId);
+	var result = await store.GetAsync<OrderAggregate>(orderId);
 
 	Console.WriteLine(title);
-	if (order is null)
+	if (result.IsFailure)
 	{
 		Console.WriteLine("  (not found)");
 		Console.WriteLine();
 		return;
 	}
+
+	var order = result.Value;
 
 	Console.WriteLine($"  {order.Id()} status={order.Status} total={order.TotalAmount:C}");
 	Console.WriteLine();
@@ -158,11 +156,14 @@ static async Task PrintInventorySnapshotAsync(IQueryableEventStore store, string
 	var dock = await store.GetAsync<InventoryAggregate>("inventory-dock");
 
 	Console.WriteLine(title);
-	Console.WriteLine(
-		$"  inventory-keyboard available={keyboard?.AvailableQuantity} reserved={keyboard?.ReservedQuantity}"
-	);
-	Console.WriteLine($"  inventory-dock     available={dock?.AvailableQuantity} reserved={dock?.ReservedQuantity}");
+	Console.WriteLine($"  inventory-keyboard {Describe(keyboard)}");
+	Console.WriteLine($"  inventory-dock     {Describe(dock)}");
 	Console.WriteLine();
+
+	static string Describe(Result<InventoryAggregate, AggregateReadFailure> result) =>
+		result.IsFailure
+			? "(not found)"
+			: $"available={result.Value.AvailableQuantity} reserved={result.Value.ReservedQuantity}";
 }
 
 static void PrintTransactionResult(TransactionResult result)

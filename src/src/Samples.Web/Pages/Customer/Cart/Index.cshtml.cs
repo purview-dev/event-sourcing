@@ -20,7 +20,11 @@ sealed class IndexModel(IQueryableEventStore customerStore, ICartCheckoutService
 		if (string.IsNullOrEmpty(customerId))
 			return RedirectToPage("/Customer/Index");
 
-		CurrentCustomer = await customerStore.GetAsync<CustomerAggregate>(customerId, HttpContext.RequestAborted);
+		var currentCustomerResult = await customerStore.GetAsync<CustomerAggregate>(
+			customerId,
+			HttpContext.RequestAborted
+		);
+		CurrentCustomer = currentCustomerResult.IsSuccess ? currentCustomerResult.Value : null;
 		CartItems = HttpContext.Session.GetCart();
 		return Page();
 	}

@@ -1,12 +1,14 @@
 using System.Text.Json;
 using Azure;
 using Microsoft.Extensions.Options;
-using Purview.EventSourcing.Admin.Abstractions.Models;
-using Purview.EventSourcing.Admin.Abstractions.Queries;
-using Purview.EventSourcing.Admin.Abstractions.Services;
 using Purview.EventSourcing.Admin.AzureStorage.Internal;
+using Purview.EventSourcing.Admin.Failures;
+using Purview.EventSourcing.Admin.Models;
+using Purview.EventSourcing.Admin.Queries;
+using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.AzureStorage;
 using Purview.EventSourcing.AzureStorage.Entities;
+using Purview.Results;
 
 namespace Purview.EventSourcing.Admin.AzureStorage;
 
@@ -23,7 +25,7 @@ public sealed class AzureStorageAdminEventQueryService(IOptions<AzureStorageEven
 	: IAdminEventQueryService
 {
 	///<inheritdoc/>
-	public async Task<PagedResult<EventEnvelopeResponse>?> GetRangeAsync(
+	public async Task<Result<PagedResult<EventEnvelopeResponse>, AdminQueryFailure>> GetRangeAsync(
 		string aggregateType,
 		string aggregateId,
 		EventRangeQuery query,
@@ -43,7 +45,7 @@ public sealed class AzureStorageAdminEventQueryService(IOptions<AzureStorageEven
 			cancellationToken
 		);
 
-		List<(string AggregateType, int Version, EventEntity Event)> rows = [];
+		List<(string AggregateType, long Version, EventEntity Event)> rows = [];
 		foreach (var tableName in tableNames)
 		{
 			var table = AzureStorageAdminTableHelpers.CreateTableClient(tableService, tableName);
@@ -125,7 +127,7 @@ public sealed class AzureStorageAdminEventQueryService(IOptions<AzureStorageEven
 	static JsonElement ParsePayload(string? payload)
 	{
 		if (string.IsNullOrWhiteSpace(payload))
-			return JsonDocument.Parse("null").RootElement.Clone();
+			return JsonSerializer.SerializeToElement("null");
 
 		using var document = JsonDocument.Parse(payload);
 		return document.RootElement.Clone();

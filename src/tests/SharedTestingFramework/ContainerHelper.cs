@@ -1,102 +1,63 @@
-using DotNet.Testcontainers.Builders;
-using DotNet.Testcontainers.Configurations;
-using DotNet.Testcontainers.Containers;
-using Testcontainers.Azurite;
-using Testcontainers.CosmosDb;
-using Testcontainers.MongoDb;
-using Testcontainers.MsSql;
-using Testcontainers.PostgreSql;
+using Purview.Containers;
+using Purview.Containers.Azurite;
+using Purview.Containers.MsSql;
+using Purview.Containers.PostgreSql;
+using Purview.Containers.Waiting;
 
 namespace Purview.EventSourcing;
 
+/// <summary>
+/// Creates the throwaway containers the integration suites run against, through Purview.Containers -
+/// which selects WSL Containers on a Windows host and Docker everywhere else.
+/// </summary>
 public static partial class ContainerHelper
 {
 	public static AzuriteContainer CreateAzurite(Action<AzuriteBuilder>? config = null)
 	{
-		// Note: Testcontainers.Azurite's default command already binds the emulator to 0.0.0.0 and
-		// WithCommand appends to that default. Do not repeat the --blobHost/--queueHost/--tableHost
-		// flags here: duplicated flags make Azurite fall back to binding 127.0.0.1, which is not
-		// reachable through Docker's published ports.
-		var builder = new AzuriteBuilder($"mcr.microsoft.com/azure-storage/azurite:{AzuriteImageTag}").WithCommand(
+		AzuriteBuilder builder = new($"mcr.microsoft.com/azure-storage/azurite:{AzuriteImageTag}");
+
+		// WithCommand replaces the module's command, so the host bindings it sets are repeated here
+		// alongside --skipApiVersionCheck: the Azure Storage SDK sends a newer x-ms-version than this
+		// Azurite release knows, and rejects every request without it. Each --*Host flag must appear
+		// exactly once - a duplicate makes Azurite fall back to binding 127.0.0.1 inside the container,
+		// which is not reachable through the mapped port.
+		builder.WithCommand(
+			"azurite",
+			"--blobHost",
+			"0.0.0.0",
+			"--queueHost",
+			"0.0.0.0",
+			"--tableHost",
+			"0.0.0.0",
 			"--skipApiVersionCheck"
-		)
-		//.WithWaitStrategy(Wait.ForUnixContainer()
-		//	.UntilPortIsAvailable(10000) // Blob
-		//	.UntilPortIsAvailable(10001) // Queue
-		//	.UntilPortIsAvailable(10002) // Table
-		//)
-		;
+		);
 
 		config?.Invoke(builder);
 
 		return builder.Build();
 	}
 
-	public static CosmosDbContainer CreateCosmosDB(Action<CosmosDbBuilder>? config = null)
+	/// <summary>
+	/// Builds the emulator connection string with the real well-known account key.
+	/// </summary>
+	/// <remarks>
+	/// The module deliberately ships a placeholder for <see cref="AzuriteAccount.Key"/>, so the key is
+	/// supplied here. It is not a secret: it is the published, fixed development key every Azure Storage
+	/// emulator uses.
+	/// </remarks>
+	public static string GetEmulatorConnectionString(this AzuriteContainer container)
 	{
-		var builder = new CosmosDbBuilder($"mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:{CosmosDbImageTag}")
-			.WithWaitStrategy(
-				Wait.ForUnixContainer()
-					.AddCustomWaitStrategy(new CosmosDbWaitUntil(), ws => ws.WithTimeout(TimeSpan.FromMinutes(5)))
-			)
-			//.WithAutoRemove(true)
-			//.WithCleanUp(true)
-			// The emulator must serve plain HTTP: Testcontainers' connection string and the Cosmos SDK
-			// gateway reader both use http:// (the PROTOCOL=https emulator only serves HTTPS and is
-			// unreachable over the published port).
-			.WithEnvironment("AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE", "false");
+		ArgumentNullException.ThrowIfNull(container);
 
-		config?.Invoke(builder);
-
-		return builder.Build();
-	}
-
-	// The vnext-preview CosmosDB emulator's HTTP server starts before the data engine.
-	// A 503 "pgcosmos extension is still starting" means the gateway is up but not ready.
-	// Wait until we get any response other than 503.
-	sealed class CosmosDbWaitUntil : IWaitUntil
-	{
-		public async Task<bool> UntilAsync(IContainer container)
-		{
-			// The emulator serves plain HTTP on the gateway; probe it the same way the Cosmos SDK's
-			// gateway reader connects (via the published port).
-			var endpoint = new UriBuilder(
-				Uri.UriSchemeHttp,
-				container.Hostname,
-				container.GetMappedPublicPort(CosmosDbBuilder.CosmosDbPort)
-			).Uri;
-
-			using HttpClient httpClient = new();
-			try
-			{
-				using var httpResponse = await httpClient.GetAsync(endpoint).ConfigureAwait(false);
-				return httpResponse.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
-			}
-#pragma warning disable CA1031
-			catch
-#pragma warning restore CA1031
-			{
-				return false;
-			}
-		}
-	}
-
-	public static MongoDbContainer CreateMongoDB(Action<MongoDbBuilder>? config = null)
-	{
-		var builder = new MongoDbBuilder($"mongo:{MongoDBImageTag}").WithReplicaSet()
-		//.WithAutoRemove(true)
-		//.WithCleanUp(true)
-		//.WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(27017))
-		;
-
-		config?.Invoke(builder);
-
-		return builder.Build();
+		return container
+			.GetConnectionString()
+			.Replace(AzuriteAccount.Key, AzuriteWellKnownAccountKey, StringComparison.Ordinal);
 	}
 
 	public static MsSqlContainer CreateMsSql(Action<MsSqlBuilder>? config = null)
 	{
 		MsSqlBuilder builder = new($"mcr.microsoft.com/mssql/server:{SqlServerImageTag}");
+		builder.AcceptLicense();
 
 		config?.Invoke(builder);
 
@@ -110,5 +71,46 @@ public static partial class ContainerHelper
 		config?.Invoke(builder);
 
 		return builder.Build();
+	}
+
+	public static MongoDBTestContainer CreateMongoDB(Action<ContainerBuilder>? config = null)
+	{
+		ContainerBuilder builder = new();
+		builder
+			.WithImage($"mongo:{MongoDBImageTag}")
+			// The event store uses transactions, which MongoDB only offers on a replica set.
+			.WithCommand("--replSet", MongoDBReplicaSetName, "--bind_ip_all")
+			.WithPortBinding(MongoDBTestContainer.MongoDBPort, assignRandomHostPort: true)
+			// Not a TCP probe: the host port is forwarded - and so accepts connections - before mongod
+			// itself is listening, and the replica-set initiation that follows would then be refused.
+			// Pinging from inside the container only succeeds once the server answers.
+			.WithWaitStrategy(Wait.ForCommand("mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"));
+
+		config?.Invoke(builder);
+
+		return new(builder.Build());
+	}
+
+	public static CosmosDbTestContainer CreateCosmosDB(Action<ContainerBuilder>? config = null)
+	{
+		ContainerBuilder builder = new();
+		builder
+			.WithImage($"mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:{CosmosDbImageTag}")
+			.WithEnvironment("AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE", "false")
+			.WithPortBinding(CosmosDbTestContainer.CosmosDbPort, assignRandomHostPort: true)
+			.WithStartupTimeout(TimeSpan.FromMinutes(5))
+			// The vnext emulator's HTTP gateway answers before its data engine is up, returning 503
+			// ("pgcosmos extension is still starting"); anything else means it is ready.
+			.WithWaitStrategy(
+				Wait.ForHttp("/")
+					.ForPort(CosmosDbTestContainer.CosmosDbPort)
+					.ForStatusPredicate(static status => status != (int)System.Net.HttpStatusCode.ServiceUnavailable)
+					.AllowInsecureTls()
+					.WithTimeout(TimeSpan.FromMinutes(5))
+			);
+
+		config?.Invoke(builder);
+
+		return new(builder.Build());
 	}
 }

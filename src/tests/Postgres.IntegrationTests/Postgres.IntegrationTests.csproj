@@ -15,12 +15,17 @@
 			Link="Contracts\%(Filename)%(Extension)"
 		/>
 		<Compile
+			Include="..\SharedTestingFramework\Contracts\SubscriptionCheckpoint*.cs"
+			Link="Contracts\%(Filename)%(Extension)"
+		/>
+		<Compile
 			Include="..\SharedTestingFramework\Contracts\SnapshotStore*.cs"
 			Link="Contracts\%(Filename)%(Extension)"
 		/>
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\..\src\Admin.Postgres\Admin.Postgres.csproj" />
 		<ProjectReference Include="..\..\src\Samples\Samples.csproj" />
 		<ProjectReference Include="..\SharedTestingFramework\SharedTestingFramework.csproj" />
 	</ItemGroup>

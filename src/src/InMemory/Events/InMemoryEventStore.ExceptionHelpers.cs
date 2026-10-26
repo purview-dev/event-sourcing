@@ -1,18 +1,24 @@
+using Purview.EventSourcing.Exceptions;
+using Purview.EventSourcing.Failures;
+using Purview.Results;
+
 namespace Purview.EventSourcing.InMemory.Events;
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0060:Remove unused parameter")]
 partial class InMemoryEventStore<T>
 {
+	static readonly string AggregateTypeName = new T().AggregateType;
+
 	static ArgumentNullException NullAggregate(T? aggregate) => new(nameof(aggregate));
 
-	static Exception AggregateIsDeletedException(string aggregateId) =>
-		new($"Aggregate with ID '{aggregateId}' is deleted.");
+	static MissingAggregateIdException MissingAggregateIdException() => new(string.Empty);
 
-	static Exception AggregateNotDeletedException(string aggregateId) =>
-		new($"Aggregate with ID '{aggregateId}' is not deleted.");
+	Result<T, AggregateReadFailure> NotFound(string aggregateId) =>
+		AggregateReadFailure.Failure<T>(new AggregateNotFound(AggregateTypeName, aggregateId));
 
-	static Exception MissingAggregateIdException() => new("Aggregate ID is missing.");
+	Result<T, AggregateReadFailure> Deleted(string aggregateId) =>
+		AggregateReadFailure.Failure<T>(new AggregateDeleted(AggregateTypeName, aggregateId));
 
-	static Exception AggregateLockedException(string aggregateId) =>
-		new($"Aggregate with ID '{aggregateId}' is locked.");
+	Result<T, AggregateReadFailure> NotDeleted(string aggregateId) =>
+		AggregateReadFailure.Failure<T>(new AggregateNotDeleted(AggregateTypeName, aggregateId));
 }

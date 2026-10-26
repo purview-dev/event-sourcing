@@ -1,9 +1,11 @@
 using System.Collections.Concurrent;
-using System.Security.Claims;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
+using Purview.EventSourcing.Failures;
 using Purview.EventSourcing.Services;
+using Purview.EventSourcing.Tenancy;
 using Purview.EventSourcing.Validation;
+using Purview.Results;
 
 namespace Purview.EventSourcing.InMemory.Events;
 
@@ -16,6 +18,9 @@ namespace Purview.EventSourcing.InMemory.Events;
 /// <param name="aggregateRequirementsManager">The manager used to fulfil aggregate requirements.</param>
 /// <param name="validator">Optional <see cref="IAggregateValidator{T}"/> used to validate aggregates before they are saved.</param>
 /// <param name="aggregateIdFactory">Optional factory used to generate aggregate ids when none is supplied.</param>
+/// <param name="principalAccessor">Optional accessor supplying the principal recorded against saved events.</param>
+/// <param name="metrics">Optional metrics recorder; defaults to a no-op.</param>
+/// <param name="currentTenant">Optional tenant scope; defaults to the system scope. Reads fail closed, so an unowned stream is visible only to the system scope.</param>
 /// <remarks>
 /// Aggregates are held in memory and are identified by id in a case-insensitive manner. This store is
 /// intended for testing and single-process scenarios; data is not shared between instances or persisted
@@ -26,14 +31,45 @@ public partial class InMemoryEventStore<T>(
 	ChangeFeed.IAggregateChangeFeedNotifier<T> aggregateChangeNotifier,
 	IAggregateRequirementsManager aggregateRequirementsManager,
 	IAggregateValidator<T>? validator = null,
-	IAggregateIdFactory? aggregateIdFactory = null
+	IAggregateIdFactory? aggregateIdFactory = null,
+	IEventStorePrincipalAccessor? principalAccessor = null,
+	IEventStoreMetrics? metrics = null,
+	ICurrentTenant? currentTenant = null
 ) : IInMemoryEventStore<T>, IDisposable
 	where T : class, IAggregate, new()
 {
 	readonly ConcurrentDictionary<string, T> _aggregates = new(StringComparer.OrdinalIgnoreCase);
-	readonly ConcurrentDictionary<string, ConcurrentDictionary<int, EventRecord>> _events = new();
+	readonly ConcurrentDictionary<string, ConcurrentDictionary<long, EventRecord>> _events = new();
 
 	readonly IAggregateValidator<T>? _validator = validator;
+
+	readonly IEventStorePrincipalAccessor _principalAccessor =
+		principalAccessor ?? new AmbientEventStorePrincipalAccessor();
+
+	readonly IEventStoreMetrics _metrics = metrics ?? NoOpEventStoreMetrics.Instance;
+
+	readonly ICurrentTenant _currentTenant = currentTenant ?? new SystemCurrentTenant();
+
+	// The tenant that owns each stream. Kept beside the data rather than folded into the key so the
+	// system scope can still enumerate every tenant, exactly as the SQL providers allow.
+	readonly ConcurrentDictionary<string, string?> _tenants = new(StringComparer.OrdinalIgnoreCase);
+
+	// Reads fail closed: an unowned stream is visible only to the system scope. Treating it as visible
+	// to every tenant would turn a missed stamp into silent cross-tenant exposure.
+	bool IsVisible(string aggregateId)
+	{
+		var scope = _currentTenant.Current;
+
+		return scope.IsSystem
+			|| (
+				_tenants.TryGetValue(aggregateId, out var owner)
+				&& string.Equals(owner, scope.TenantId, StringComparison.OrdinalIgnoreCase)
+			);
+	}
+
+	// Writes are the one place an unowned stream must be allowed: that is a stream being created, which
+	// has no owner until this save records one.
+	bool CanWrite(string aggregateId) => !_tenants.ContainsKey(aggregateId) || IsVisible(aggregateId);
 
 	/// <summary>
 	/// The aggregates currently held by the store.
@@ -52,23 +88,8 @@ public partial class InMemoryEventStore<T>(
 		return Task.CompletedTask;
 	}
 
-	static Task<bool> ReturnAggregateAsync(bool isDeleted, string aggregateId, EventStoreOperationContext context)
-	{
-		if (isDeleted)
-		{
-#pragma warning disable IDE0010 // Add missing cases
-			switch (context.DeleteMode)
-			{
-				case DeleteHandlingMode.ThrowsException:
-					throw AggregateIsDeletedException(aggregateId);
-				case DeleteHandlingMode.ReturnsNull:
-					return Task.FromResult(false);
-			}
-#pragma warning restore IDE0010 // Add missing cases
-		}
-
-		return Task.FromResult(true);
-	}
+	static bool ReturnAggregate(bool isDeleted, EventStoreOperationContext context) =>
+		!isDeleted || context.DeleteMode == DeleteHandlingMode.ReturnsAggregate;
 
 	///<inheritdoc/>
 	public async Task<T> CreateAsync(string? aggregateId = null, CancellationToken cancellationToken = default)
@@ -93,7 +114,7 @@ public partial class InMemoryEventStore<T>(
 	}
 
 	///<inheritdoc/>
-	public async Task<bool> DeleteAsync(
+	public async Task<Result<SaveOutcome<T>, AggregateDeleteFailure>> DeleteAsync(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -103,17 +124,25 @@ public partial class InMemoryEventStore<T>(
 			throw NullAggregate(aggregate);
 
 		if (aggregate.Details.IsDeleted)
-			throw AggregateIsDeletedException(aggregate.Id());
+		{
+			return AggregateDeleteFailure.Failure<SaveOutcome<T>>(
+				new AggregateAlreadyDeleted(aggregate.AggregateType, aggregate.Id())
+			);
+		}
 
 		operationContext ??= EventStoreOperationContext.DefaultContext();
 
 		if (aggregate.IsNew())
-			return false;
+		{
+			return AggregateDeleteFailure.Failure<SaveOutcome<T>>(
+				new AggregateNotFound(aggregate.AggregateType, aggregate.Id())
+			);
+		}
 
 		if (operationContext.PermanentlyDelete)
 		{
 			RemoveFromCache(aggregate);
-			return true;
+			return new SaveOutcome<T>(aggregate, SaveOutcomeKind.Written);
 		}
 
 		Deleted deleteAggregateEvent = new();
@@ -128,26 +157,42 @@ public partial class InMemoryEventStore<T>(
 		);
 		aggregate.ApplyEvent(deleteAggregateEvent, metadata);
 
-		await AddToCacheAsync(aggregate, new EventRecord(deleteAggregateEvent, metadata));
+		await AddToCacheAsync(aggregate, additionalEvents: new EventRecord(deleteAggregateEvent, metadata));
 
-		return true;
+		return new SaveOutcome<T>(aggregate, SaveOutcomeKind.Written);
 	}
 
 	void RemoveFromCache(T aggregate)
 	{
 		_aggregates.TryRemove(aggregate.Id(), out _);
+		_tenants.TryRemove(aggregate.Id(), out _);
 		if (_events.TryRemove(aggregate.Id(), out var events))
 			events.Clear();
 	}
 
-	Task<T> AddToCacheAsync(T aggregate, params EventRecord[] additionalEvents) =>
-		AddToCache(aggregate, true, additionalEvents);
+	Task<T> AddToCacheAsync(T aggregate, string? userId = null, params EventRecord[] additionalEvents) =>
+		AddToCache(aggregate, true, userId, additionalEvents);
 
-	Task<T> AddToCache(T aggregate, bool fulfilRequirements, params EventRecord[] additionalEvents)
+	Task<T> AddToCache(
+		T aggregate,
+		bool fulfilRequirements,
+		string? userId = null,
+		params EventRecord[] additionalEvents
+	)
 	{
+		// Another tenant writing into an existing stream would silently take ownership of it.
+		if (!CanWrite(aggregate.Id()))
+			throw new Exceptions.ConcurrencyException(aggregate.Id(), $"{Guid.NewGuid()}", 0, 0);
+
 		var events = _events.GetOrAdd(aggregate.Id(), _ => new());
 		var unsavedEvents = aggregate.GetUnsavedEvents();
 		var toPersist = additionalEvents is { Length: > 0 } ? unsavedEvents.Concat(additionalEvents) : unsavedEvents;
+
+		// Events carry the metadata they were recorded with, which predates knowing who is saving.
+		// The persistent providers stamp the user onto the stored row; do the same here so the
+		// in-memory store reports the same metadata on read-back.
+		if (userId != null)
+			toPersist = toPersist.Select(record => record with { Metadata = record.Metadata with { UserId = userId } });
 
 		foreach (var record in toPersist)
 		{
@@ -165,6 +210,7 @@ public partial class InMemoryEventStore<T>(
 
 		aggregate.ClearUnsavedEvents();
 
+		_tenants[aggregate.Id()] = _currentTenant.Current.TenantId;
 		_aggregates.AddOrUpdate(aggregate.Id(), aggregate, (key, existingAggregate) => aggregate);
 
 		if (fulfilRequirements)
@@ -174,21 +220,21 @@ public partial class InMemoryEventStore<T>(
 	}
 
 	///<inheritdoc/>
-	public async Task<ExistsState> ExistsAsync(string aggregateId, CancellationToken cancellationToken = default)
+	public async Task<AggregateExistence> ExistsAsync(string aggregateId, CancellationToken cancellationToken = default)
 	{
 		await Task.CompletedTask;
 
-		return _aggregates.TryGetValue(aggregateId, out var aggregate)
+		return _aggregates.TryGetValue(aggregateId, out var aggregate) && IsVisible(aggregateId)
 			? aggregate.Details.IsDeleted
-				? ExistsState.ExistsInDeletedState with
+				? AggregateExistence.ExistsInDeletedState with
 				{
 					Version = aggregate.Details.CurrentVersion,
 				}
-				: ExistsState.Exists with
+				: AggregateExistence.Exists with
 				{
 					Version = aggregate.Details.CurrentVersion,
 				}
-			: ExistsState.DoesNotExist;
+			: AggregateExistence.DoesNotExist;
 	}
 
 	///<inheritdoc/>
@@ -205,7 +251,7 @@ public partial class InMemoryEventStore<T>(
 		CancellationToken cancellationToken = default
 	)
 	{
-		var results = _aggregates.Values.AsEnumerable();
+		var results = _aggregates.Where(kvp => IsVisible(kvp.Key)).Select(kvp => kvp.Value);
 		if (!includeDeleted)
 			results = results.Where(a => !a.Details.IsDeleted);
 
@@ -213,7 +259,7 @@ public partial class InMemoryEventStore<T>(
 	}
 
 	///<inheritdoc/>
-	public async Task<T?> GetAsync(
+	public async Task<Result<T, AggregateReadFailure>> GetAsync(
 		string aggregateId,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -223,10 +269,15 @@ public partial class InMemoryEventStore<T>(
 
 		operationContext ??= EventStoreOperationContext.DefaultContext();
 
+		// An existing stream owned by another tenant reports as absent, and must not fall through to the
+		// create path below: that would replace the owner's aggregate with an empty one.
+		if (_aggregates.ContainsKey(aggregateId) && !IsVisible(aggregateId))
+			return NotFound(aggregateId);
+
 		if (_aggregates.TryGetValue(aggregateId, out var aggregate))
 		{
-			if (!await ReturnAggregateAsync(aggregate.Details.IsDeleted, aggregateId, operationContext))
-				return null;
+			if (!ReturnAggregate(aggregate.Details.IsDeleted, operationContext))
+				return Deleted(aggregateId);
 
 			// Cache hit: return the aggregate directly. Requirements are fulfilled when the
 			// aggregate is first created/loaded; re-fulfilling here would refresh scoped services
@@ -239,16 +290,16 @@ public partial class InMemoryEventStore<T>(
 	}
 
 	///<inheritdoc/>
-	public async Task<T?> GetAtAsync(
+	public async Task<Result<T, AggregateReadFailure>> GetAtAsync(
 		string aggregateId,
-		int version,
+		long version,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
 	)
 	{
-		var exists = await ExistsAsync(aggregateId, cancellationToken);
-		if (!exists)
-			return null;
+		var existence = await ExistsAsync(aggregateId, cancellationToken);
+		if (!existence.DoesExist)
+			return NotFound(aggregateId);
 
 		T aggregate = new() { Details = new() { Id = aggregateId } };
 
@@ -260,28 +311,33 @@ public partial class InMemoryEventStore<T>(
 	}
 
 	///<inheritdoc/>
-	public async Task<T?> GetDeletedAsync(string aggregateId, CancellationToken cancellationToken = default)
+	public async Task<Result<T, AggregateReadFailure>> GetDeletedAsync(
+		string aggregateId,
+		CancellationToken cancellationToken = default
+	)
 	{
-		var aggregate = await GetAsync(
+		var result = await GetAsync(
 			aggregateId,
 			new() { DeleteMode = DeleteHandlingMode.ReturnsAggregate },
 			cancellationToken
 		);
+		if (result.IsFailure)
+			return result;
 
-		return aggregate == null ? null
-			: aggregate.Details.IsDeleted ? FulfilRequirements(aggregate)
-			: throw AggregateNotDeletedException(aggregateId);
+		var aggregate = result.Value;
+
+		return aggregate.Details.IsDeleted ? FulfilRequirements(aggregate) : NotDeleted(aggregateId);
 	}
 
 	///<inheritdoc/>
 	public IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync(
 		string aggregateId,
-		int versionFrom,
-		int? versionTo,
+		long versionFrom,
+		long? versionTo,
 		CancellationToken cancellationToken
 	)
 	{
-		if (!_events.TryGetValue(aggregateId, out var eventList))
+		if (!IsVisible(aggregateId) || !_events.TryGetValue(aggregateId, out var eventList))
 			return AsyncEnumerable.Empty<(EventRecord EventRecord, string EventType)>();
 
 		// We have some events... so query and return. Materialize once instead of chaining LINQ
@@ -296,7 +352,7 @@ public partial class InMemoryEventStore<T>(
 	}
 
 	///<inheritdoc/>
-	public async Task<T?> GetOrCreateAsync(
+	public async Task<Result<T, AggregateReadFailure>> GetOrCreateAsync(
 		string? aggregateId,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -304,8 +360,8 @@ public partial class InMemoryEventStore<T>(
 	{
 		if (!string.IsNullOrWhiteSpace(aggregateId))
 		{
-			var exists = await ExistsAsync(aggregateId, cancellationToken);
-			if (exists)
+			var existence = await ExistsAsync(aggregateId, cancellationToken);
+			if (existence.DoesExist)
 				return await GetAsync(aggregateId, operationContext, cancellationToken);
 		}
 
@@ -313,12 +369,7 @@ public partial class InMemoryEventStore<T>(
 	}
 
 	///<inheritdoc/>
-	public async Task<bool> IsDeletedAsync(string aggregateId, CancellationToken cancellationToken = default) =>
-		await ExistsAsync(aggregateId, cancellationToken)
-		&& (_aggregates.TryGetValue(aggregateId, out var aggregate) && aggregate.Details.IsDeleted);
-
-	///<inheritdoc/>
-	public async Task<bool> RestoreAsync(
+	public async Task<Result<SaveOutcome<T>, AggregateRestoreFailure>> RestoreAsync(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -328,7 +379,11 @@ public partial class InMemoryEventStore<T>(
 			throw NullAggregate(aggregate);
 
 		if (!aggregate.Details.IsDeleted)
-			throw AggregateNotDeletedException(aggregate.Id());
+		{
+			return AggregateRestoreFailure.Failure<SaveOutcome<T>>(
+				new AggregateNotDeleted(aggregate.AggregateType, aggregate.Id())
+			);
+		}
 
 		Restored restoreAggregateEvent = new();
 		EventMetadata metadata = new(
@@ -343,18 +398,41 @@ public partial class InMemoryEventStore<T>(
 		aggregate.ApplyEvent(restoreAggregateEvent, metadata);
 
 		if (aggregate.IsNew())
-			return false;
+		{
+			return AggregateRestoreFailure.Failure<SaveOutcome<T>>(
+				new AggregateNotFound(aggregate.AggregateType, aggregate.Id())
+			);
+		}
 
-		await AddToCacheAsync(aggregate, new EventRecord(restoreAggregateEvent, metadata));
+		await AddToCacheAsync(aggregate, additionalEvents: new EventRecord(restoreAggregateEvent, metadata));
 
-		return true;
+		return new SaveOutcome<T>(aggregate, SaveOutcomeKind.Written);
 	}
 
 	///<inheritdoc/>
-	public async Task<SaveResult<T>> SaveAsync(
+	public async Task<Result<SaveOutcome<T>, AggregateSaveFailure>> SaveAsync(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
+	)
+	{
+		ArgumentNullException.ThrowIfNull(aggregate);
+
+		// Wrapped rather than inlined: the core has several early returns, and every one of them is an
+		// outcome worth recording.
+		var saveStopwatch = System.Diagnostics.Stopwatch.StartNew();
+		var result = await SaveCoreAsync(aggregate, operationContext, cancellationToken);
+
+		saveStopwatch.Stop();
+		_metrics.RecordSave(saveStopwatch.Elapsed.TotalMilliseconds, typeof(T).Name, result);
+
+		return result;
+	}
+
+	async Task<Result<SaveOutcome<T>, AggregateSaveFailure>> SaveCoreAsync(
+		T aggregate,
+		EventStoreOperationContext? operationContext,
+		CancellationToken cancellationToken
 	)
 	{
 		operationContext ??= EventStoreOperationContext.DefaultContext();
@@ -362,28 +440,21 @@ public partial class InMemoryEventStore<T>(
 		FulfilRequirements(aggregate);
 		var validationResult = await GuardAsync(aggregate, cancellationToken);
 
-		static SaveResult<T> ReturnSaveResult(
-			T a,
-			bool success,
-			bool skipped,
-			ValidationResult? validationResult = null
-		) => new(a, validationResult ?? new ValidationResult(), success, skipped);
-
 		if (!validationResult.IsValid)
-			return ReturnSaveResult(aggregate, false, false, validationResult);
+			return AggregateSaveFailure.Failure<SaveOutcome<T>>(new AggregateInvalid(validationResult));
 
 		if (aggregate.Details.Locked)
 		{
-			return operationContext.LockMode is LockHandlingMode.ThrowsException
-				? throw AggregateLockedException(aggregate.Id())
-				: ReturnSaveResult(aggregate, false, false);
+			return AggregateSaveFailure.Failure<SaveOutcome<T>>(
+				new AggregateLocked(aggregate.AggregateType, aggregate.Id())
+			);
 		}
 
 		if (string.IsNullOrWhiteSpace(aggregate.Details.Id))
 			throw MissingAggregateIdException();
 
 		if (!aggregate.HasUnsavedEvents())
-			return ReturnSaveResult(aggregate, false, true);
+			return new SaveOutcome<T>(aggregate, SaveOutcomeKind.NoChanges);
 
 		var isNew = aggregate.IsNew();
 		var previousAggregateVersion = aggregate.Details.CurrentVersion;
@@ -397,22 +468,26 @@ public partial class InMemoryEventStore<T>(
 		else if (operationContext.NotificationMode.HasFlag(NotificationModes.BeforeSave))
 			await aggregateChangeNotifier.BeforeSaveAsync(aggregate, isNew, cancellationToken);
 
-		if (await IsDeletedAsync(aggregate.Id(), cancellationToken))
+		if (
+			(await ExistsAsync(aggregate.Id(), cancellationToken)).IsDeleted
+			&& !changeEvents.Any(record => record.Event is Restored)
+		)
 		{
-			var throwIfDeleted = !changeEvents.Any(record => record.Event is Restored);
-			if (throwIfDeleted)
-				throw AggregateIsDeletedException(aggregate.Id());
+			return AggregateSaveFailure.Failure<SaveOutcome<T>>(
+				new AggregateDeleted(aggregate.AggregateType, aggregate.Id())
+			);
 		}
 
 		try
 		{
-			var userId = ClaimsPrincipal.Current?.FindFirst(operationContext.ClaimIdentifier)?.Value;
+			var userId = _principalAccessor.GetPrincipal()?.FindFirst(operationContext.ClaimIdentifier)?.Value;
 			if (operationContext.RequiresValidPrincipalIdentifier && string.IsNullOrWhiteSpace(userId))
 				throw new NullReferenceException(
 					$"Missing ClaimsPrincipal identifier '{operationContext.ClaimIdentifier}'. Unable to save aggregate."
 				);
 
-			await AddToCacheAsync(aggregate);
+			await AddToCacheAsync(aggregate, userId);
+			_metrics.EventsAppended(changeEvents.Length, typeof(T).Name);
 
 			// Mirror the persistence providers: after a successful save the aggregate must
 			// reflect the persisted version so a subsequent mutation on the same instance
@@ -446,10 +521,22 @@ public partial class InMemoryEventStore<T>(
 				await aggregateChangeNotifier.FailureAsync(aggregate, deleteRequested, ex, cancellationToken);
 			}
 
+			if (ex is Exceptions.ConcurrencyException conflict)
+			{
+				return AggregateSaveFailure.Failure<SaveOutcome<T>>(
+					new ConcurrencyConflict(
+						aggregate.AggregateType,
+						aggregate.Id(),
+						conflict.VersionAttempted,
+						conflict.Version
+					)
+				);
+			}
+
 			throw;
 		}
 
-		return ReturnSaveResult(aggregate, true, false);
+		return new SaveOutcome<T>(aggregate, SaveOutcomeKind.Written);
 	}
 
 	/// <summary>

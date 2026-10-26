@@ -53,7 +53,7 @@ static class ManifestTestHelpers
 		if (markerIndex < 0)
 			throw new InvalidOperationException($"Generated source does not contain '{marker}'.");
 
-		var valueStart = generatedSource.IndexOf('"', markerIndex) + 1;
+		var valueStart = generatedSource.IndexOf('"', markerIndex, StringComparison.Ordinal) + 1;
 		var valueEnd = FindClosingQuote(generatedSource, valueStart);
 		if (valueStart <= markerIndex || valueEnd <= valueStart)
 			throw new InvalidOperationException("Generated manifest constant is malformed.");

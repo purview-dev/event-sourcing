@@ -100,8 +100,10 @@ static class BenchmarkRunExporter
 
 			if (denominator is null || numerator is null)
 			{
-				run.Warnings.Add(
-					$"Ratio check '{ratioPolicy.NumeratorBenchmark}/{ratioPolicy.DenominatorBenchmark}' for '{ratioPolicy.ScenarioPattern}' could not be evaluated (missing case)."
+				// A policy naming a scenario the suite does not run is a configuration bug: the guarantee it
+				// describes is silently unchecked, which is worse than having no policy at all.
+				run.Failures.Add(
+					$"Ratio check '{ratioPolicy.NumeratorBenchmark}/{ratioPolicy.DenominatorBenchmark}' for '{ratioPolicy.ScenarioPattern}' could not be evaluated: no such case."
 				);
 				continue;
 			}
@@ -118,6 +120,9 @@ static class BenchmarkRunExporter
 			}
 		}
 	}
+
+	// Means below this are dominated by measurement noise rather than by the code under test.
+	const double MinimumComparableMeanMilliseconds = 0.01;
 
 	static void ApplyPreviousComparison(BenchmarkSuiteRun run, BenchmarkSuitePolicy policy)
 	{
@@ -139,14 +144,22 @@ static class BenchmarkRunExporter
 
 			if (policy.DefaultMaxMeanRegressionPercent is double maxMeanPercent)
 			{
-				if (previous.MeanMilliseconds > 0)
+				// Below this, run-to-run jitter dwarfs any real change: a 1µs benchmark moving by a few
+				// hundred nanoseconds is a 50% "regression" that means nothing.
+				if (previous.MeanMilliseconds < MinimumComparableMeanMilliseconds)
+				{
+					run.Warnings.Add(
+						$"[{caseRecord.Name}] mean of {previous.MeanMilliseconds:G3}ms is below the {MinimumComparableMeanMilliseconds:G3}ms comparison floor; regression check skipped."
+					);
+				}
+				else
 				{
 					var regression =
 						(caseRecord.MeanMilliseconds - previous.MeanMilliseconds) / previous.MeanMilliseconds;
 					if (regression > maxMeanPercent / 100d)
 					{
 						run.Failures.Add(
-							$"[{caseRecord.Name}] mean regressed by {regression:P0} vs previous run ({previous.MeanMilliseconds:F2}ms -> {caseRecord.MeanMilliseconds:F2}ms), exceeding the {maxMeanPercent:P0} threshold."
+							$"[{caseRecord.Name}] mean regressed by {regression:P0} vs previous run ({previous.MeanMilliseconds:G3}ms -> {caseRecord.MeanMilliseconds:G3}ms), exceeding the {maxMeanPercent:N0}% threshold."
 						);
 					}
 				}
@@ -164,7 +177,7 @@ static class BenchmarkRunExporter
 					if (regression > maxAllocationPercent / 100d)
 					{
 						run.Failures.Add(
-							$"[{caseRecord.Name}] allocations regressed by {regression:P0} vs previous run ({previousAllocation:N0}B -> {currentAllocation:N0}B), exceeding the {maxAllocationPercent:P0} threshold."
+							$"[{caseRecord.Name}] allocations regressed by {regression:P0} vs previous run ({previousAllocation:N0}B -> {currentAllocation:N0}B), exceeding the {maxAllocationPercent:N0}% threshold."
 						);
 					}
 				}

@@ -1,6 +1,6 @@
 namespace Purview.EventSourcing.SqlServer.Client;
 
-sealed record SnapshotStorageRow(string Id, string AggregateType, string Payload);
+sealed record SnapshotStorageRow(string Id, string AggregateType, string Payload, string? TenantId = null);
 
 sealed class SnapshotQueryRow<TAggregate>
 	where TAggregate : class
@@ -10,6 +10,11 @@ sealed class SnapshotQueryRow<TAggregate>
 	public required string AggregateType { get; set; }
 
 	public required TAggregate Payload { get; set; }
+
+	/// <summary>
+	/// The tenant that owns the snapshot; null in a single-tenant deployment.
+	/// </summary>
+	public string? TenantId { get; set; }
 }
 
 sealed record SqlServerClientOptions(string ConnectionString, bool UseDataCompression)

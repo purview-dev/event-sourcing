@@ -73,6 +73,8 @@ public sealed partial class SqlServerOutboxStore(
 			{
 				await EnsureSchemaAsync(token);
 
+				// Without READPAST a concurrent claim blocks on the same rows, then re-applies the
+				// outer UPDATE once the first commits - handing both dispatchers the same batch.
 				await using SqlCommand command = new(
 					$"""
 					UPDATE {_schema}.{_table}
@@ -82,7 +84,7 @@ public sealed partial class SqlServerOutboxStore(
 						INSERTED.[State], INSERTED.[AttemptCount], INSERTED.[NextAttemptUtc], INSERTED.[DispatchedUtc],
 						INSERTED.[LeaseExpiresUtc], INSERTED.[LastError]
 					WHERE [Id] IN (
-						SELECT TOP (@batch) [Id] FROM {_schema}.{_table}
+						SELECT TOP (@batch) [Id] FROM {_schema}.{_table} WITH (UPDLOCK, READPAST, ROWLOCK)
 						WHERE ([State] = 0 OR [State] = 2)
 						  AND ([LeaseExpiresUtc] IS NULL OR [LeaseExpiresUtc] < @now)
 						  AND ([NextAttemptUtc] IS NULL OR [NextAttemptUtc] <= @now)

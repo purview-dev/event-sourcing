@@ -14,7 +14,8 @@ sealed class IndexModel(IQueryableEventStore store) : EventSourcingPageModel
 		if (string.IsNullOrEmpty(customerId))
 			return RedirectToPage("/Customer/Index");
 
-		CurrentCustomer = await store.GetAsync<CustomerAggregate>(customerId, HttpContext.RequestAborted);
+		var currentCustomerResult = await store.GetAsync<CustomerAggregate>(customerId, HttpContext.RequestAborted);
+		CurrentCustomer = currentCustomerResult.IsSuccess ? currentCustomerResult.Value : null;
 		return Page();
 	}
 
@@ -30,14 +31,15 @@ sealed class IndexModel(IQueryableEventStore store) : EventSourcingPageModel
 			return RedirectToPage();
 		}
 
-		var customer = await store.GetAsync<CustomerAggregate>(customerId, HttpContext.RequestAborted);
+		var customerResult = await store.GetAsync<CustomerAggregate>(customerId, HttpContext.RequestAborted);
+		var customer = customerResult.IsSuccess ? customerResult.Value : null;
 		return customer == null
 			? NotFound()
 			: await TrySaveAsync(
 				async () =>
 				{
 					customer.ChangeName(newName.Trim());
-					await store.SaveAsync(customer, HttpContext.RequestAborted);
+					return await store.SaveAsync(customer, HttpContext.RequestAborted);
 				},
 				"Name updated.",
 				RedirectToPage()
@@ -50,14 +52,15 @@ sealed class IndexModel(IQueryableEventStore store) : EventSourcingPageModel
 		if (string.IsNullOrEmpty(customerId))
 			return RedirectToPage("/Customer/Index");
 
-		var customer = await store.GetAsync<CustomerAggregate>(customerId, HttpContext.RequestAborted);
+		var customerResult = await store.GetAsync<CustomerAggregate>(customerId, HttpContext.RequestAborted);
+		var customer = customerResult.IsSuccess ? customerResult.Value : null;
 		return customer == null
 			? NotFound()
 			: await TrySaveAsync(
 				async () =>
 				{
 					customer.ChangeEmail(newEmail);
-					await store.SaveAsync(customer, HttpContext.RequestAborted);
+					return await store.SaveAsync(customer, HttpContext.RequestAborted);
 				},
 				"Email updated.",
 				RedirectToPage()
@@ -70,14 +73,15 @@ sealed class IndexModel(IQueryableEventStore store) : EventSourcingPageModel
 		if (string.IsNullOrEmpty(customerId))
 			return RedirectToPage("/Customer/Index");
 
-		var customer = await store.GetAsync<CustomerAggregate>(customerId, HttpContext.RequestAborted);
+		var customerResult = await store.GetAsync<CustomerAggregate>(customerId, HttpContext.RequestAborted);
+		var customer = customerResult.IsSuccess ? customerResult.Value : null;
 		return customer == null
 			? NotFound()
 			: await TrySaveAsync(
 				async () =>
 				{
 					customer.ChangePhoneNumber(string.IsNullOrWhiteSpace(phoneNumber) ? null : phoneNumber.Trim());
-					await store.SaveAsync(customer, HttpContext.RequestAborted);
+					return await store.SaveAsync(customer, HttpContext.RequestAborted);
 				},
 				"Phone number updated.",
 				RedirectToPage()
@@ -102,14 +106,15 @@ sealed class IndexModel(IQueryableEventStore store) : EventSourcingPageModel
 			return RedirectToPage();
 		}
 
-		var customer = await store.GetAsync<CustomerAggregate>(customerId, HttpContext.RequestAborted);
+		var customerResult = await store.GetAsync<CustomerAggregate>(customerId, HttpContext.RequestAborted);
+		var customer = customerResult.IsSuccess ? customerResult.Value : null;
 		return customer == null
 			? NotFound()
 			: await TrySaveAsync(
 				async () =>
 				{
 					customer.UpdateDetails(name: newName, email: newEmail, phoneNumber: phoneNumber);
-					await store.SaveAsync(customer, HttpContext.RequestAborted);
+					return await store.SaveAsync(customer, HttpContext.RequestAborted);
 				},
 				"Profile updated.",
 				RedirectToPage()

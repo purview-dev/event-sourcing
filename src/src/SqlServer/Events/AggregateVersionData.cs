@@ -12,7 +12,7 @@ namespace Purview.EventSourcing.SqlServer.Events;
 /// <param name="SavedVersion">The version of the aggregate persisted in the event store.</param>
 /// <param name="SnapshotVersion">The version of the aggregate captured in the latest snapshot.</param>
 /// <param name="CurrentVersion">The current version of the aggregate, including unsaved events.</param>
-public record struct AggregateVersionData(int SavedVersion, int SnapshotVersion, int CurrentVersion)
+public record struct AggregateVersionData(long SavedVersion, long SnapshotVersion, long CurrentVersion)
 {
 	/// <summary>
 	/// Creates an <see cref="AggregateVersionData"/> instance from the specified aggregate's details.

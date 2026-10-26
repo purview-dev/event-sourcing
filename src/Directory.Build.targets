@@ -20,6 +20,10 @@
 		<ItemGroup>
 			<!-- This filter is the key - only PrivateAssets=All references are bundled -->
 			<_ReferenceCopyLocalPaths Include="@(ReferenceCopyLocalPaths->WithMetadataValue('ReferenceSourceTarget', 'ProjectReference')->WithMetadataValue('PrivateAssets', 'All'))" />
+			<!-- A build-time-only component opts out with Pack="false" on its ProjectReference. Without
+			     this every analyzer-typed reference is bundled, including ones that exist purely to
+			     generate this repository's own source and have no meaning to a consumer. -->
+			<_ReferenceCopyLocalPaths Remove="@(_ReferenceCopyLocalPaths->WithMetadataValue('Pack', 'false'))" />
 		</ItemGroup>
 
 		<ItemGroup>

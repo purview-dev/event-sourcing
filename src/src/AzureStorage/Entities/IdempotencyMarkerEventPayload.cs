@@ -1,4 +1,4 @@
-﻿namespace Purview.EventSourcing.AzureStorage.Entities;
+namespace Purview.EventSourcing.AzureStorage.Entities;
 
 /// <summary>
 /// The payload stored on an <see cref="IdempotencyMarkerEntity"/>.
@@ -16,5 +16,5 @@ public sealed class IdempotencyMarkerEventPayload
 		"CA1819:Properties should not return arrays",
 		Justification = "This is a DTO."
 	)]
-	public int[] EventIds { get; set; } = default!;
+	public long[] EventIds { get; set; } = default!;
 }

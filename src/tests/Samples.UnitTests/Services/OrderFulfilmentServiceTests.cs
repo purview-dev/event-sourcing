@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using Purview.EventSourcing.Aggregates;
+using Purview.EventSourcing.Failures;
 using Purview.EventSourcing.Samples.Domain;
 using Purview.EventSourcing.Samples.ValueObjects;
 
@@ -61,7 +62,11 @@ public sealed class OrderFulfilmentServiceTests
 		var store = IQueryableEventStore.Mock();
 		store
 			.GetAsync<CustomerAggregate>(Is("missing"), Any<EventStoreOperationContext?>(), Is(cancellationToken))
-			.Returns((CustomerAggregate?)null);
+			.Returns(
+				AggregateReadFailure.Failure<CustomerAggregate>(
+					new AggregateNotFound(nameof(CustomerAggregate), "missing")
+				)
+			);
 
 		var result = await CreateService(store: store).PlaceOrderAsync("missing", "inv-1", 1, null, cancellationToken);
 
@@ -97,7 +102,11 @@ public sealed class OrderFulfilmentServiceTests
 			.Returns(customer);
 		store
 			.GetAsync<InventoryAggregate>(Is("missing-inv"), Any<EventStoreOperationContext?>(), Is(cancellationToken))
-			.Returns((InventoryAggregate?)null);
+			.Returns(
+				AggregateReadFailure.Failure<InventoryAggregate>(
+					new AggregateNotFound(nameof(InventoryAggregate), "missing")
+				)
+			);
 
 		var result = await CreateService(store: store)
 			.PlaceOrderAsync(customer.Id(), "missing-inv", 1, null, cancellationToken);
@@ -128,6 +137,11 @@ public sealed class OrderFulfilmentServiceTests
 	}
 
 	[Test]
+	[SuppressMessage(
+		"Maintainability",
+		"CA1506:Avoid excessive class coupling",
+		Justification = "Test wiring: the store, its infrastructure and the result model are all named here."
+	)]
 	public async Task PlaceOrderAsync_GivenValidData_ReturnsSuccess(CancellationToken cancellationToken)
 	{
 		var customer = ActiveCustomer();
@@ -227,6 +241,11 @@ public sealed class OrderFulfilmentServiceTests
 	}
 
 	[Test]
+	[SuppressMessage(
+		"Maintainability",
+		"CA1506:Avoid excessive class coupling",
+		Justification = "Test wiring: the store, its infrastructure and the result model are all named here."
+	)]
 	public async Task PlaceOrderAsync_WhenTransactionCommitFails_DoesNotCancelOrderInMemory(
 		CancellationToken cancellationToken
 	)

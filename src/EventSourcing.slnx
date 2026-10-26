@@ -2,17 +2,19 @@
 	<Folder Name="/Solution Items/">
 		<File Path="../global.json" />
 		<File Path="../nuget.config" />
+		<File Path="../.config/purview-build.json" />
 		<File Path="../.editorconfig" />
 		<File Path="../Directory.Packages.props" />
 		<File Path="../package.json" />
-		<File Path="../purview-build.json" />
 		<File Path="Directory.Build.props" />
 		<File Path="Directory.Build.targets" />
 	</Folder>
 	<Folder Name="/src/">
+		<Project Path="src/EntityFrameworkCore/EntityFrameworkCore.csproj" />
 		<Project Path="src/EntityFrameworkCore.SourceGenerator/EntityFrameworkCore.SourceGenerator.csproj" />
 		<Project Path="src/EventSourcing/EventSourcing.csproj" />
 		<Project Path="src/SourceGenerator.CodeFixes/SourceGenerator.CodeFixes.csproj" />
+		<Project Path="src/MirrorGenerator/MirrorGenerator.csproj" />
 		<Project Path="src/SourceGenerator/SourceGenerator.csproj" />
 	</Folder>
 	<Folder Name="/src/admin/">
@@ -27,6 +29,7 @@
 		<Project Path="src/Admin.SqlServer/Admin.SqlServer.csproj" />
 	</Folder>
 	<Folder Name="/src/implementations/">
+		<Project Path="src/AzureKeyVault/AzureKeyVault.csproj" />
 		<Project Path="src/AzureStorage/AzureStorage.csproj" />
 		<Project Path="src/CosmosDb/CosmosDb.csproj" />
 		<Project Path="src/ImplementationShared/ImplementationShared.csproj" />
@@ -53,9 +56,11 @@
 	<Folder Name="/tests/">
 		<Project Path="tests/Capabilities.UnitTests/Capabilities.UnitTests.csproj" />
 		<Project Path="tests/EntityFrameworkCore.SourceGenerator.UnitTests/EntityFrameworkCore.SourceGenerator.UnitTests.csproj" />
+		<Project Path="tests/EventSourcing.AcceptanceTests/EventSourcing.AcceptanceTests.csproj" />
 		<Project Path="tests/EventSourcing.UnitTests/EventSourcing.UnitTests.csproj" />
 		<Project Path="tests/SharedTestingFramework/SharedTestingFramework.csproj" />
 		<Project Path="tests/SourceGenerator.CodeFixes.UnitTests/SourceGenerator.CodeFixes.UnitTests.csproj" />
+		<Project Path="tests/Skills.UnitTests/Skills.UnitTests.csproj" />
 		<Project Path="tests/SourceGenerator.UnitTests/SourceGenerator.UnitTests.csproj" />
 	</Folder>
 	<Folder Name="/tests/admin/">

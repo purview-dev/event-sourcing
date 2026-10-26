@@ -1,4 +1,4 @@
-﻿using Purview.EventSourcing.Aggregates.Exceptions;
+using Purview.EventSourcing.Aggregates.Exceptions;
 
 namespace Purview.EventSourcing.Aggregates;
 
@@ -33,7 +33,7 @@ public sealed class AggregateDetails : ICloneable
 	/// The version of the snapshot that has been saved, if there are any events that are un-saved, or the snapshot doesn't
 	/// contain more recent events then this value may not reflect the latest version of the aggregate.
 	/// </summary>
-	public int SnapshotVersion { get; set; }
+	public long SnapshotVersion { get; set; }
 
 	/// <summary>
 	/// The version of this instance that has been saved to the <see cref="IEventStore{T}"/>.
@@ -45,7 +45,7 @@ public sealed class AggregateDetails : ICloneable
 	/// represents all of the persisted events.
 	/// </para>
 	/// </remarks>
-	public int SavedVersion { get; set; }
+	public long SavedVersion { get; set; }
 
 	/// <summary>
 	/// The current version of this instance of the <see cref="IAggregate"/>,
@@ -53,7 +53,7 @@ public sealed class AggregateDetails : ICloneable
 	/// </summary>
 	/// <remarks>While the events maybe unsaved, they are still applied and therefore
 	/// used to update this value.</remarks>
-	public int CurrentVersion { get; set; }
+	public long CurrentVersion { get; set; }
 
 	/// <summary>
 	/// Indicates if the aggregate is in a deleted state.

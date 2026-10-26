@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup Label="NuGet Package Values">
+		<IsPackable>true</IsPackable>
+		<Title>Purview Event Sourcing Entity Framework Core Support</Title>
+		<Description>Shared Entity Framework Core mapping, conversion, and query translation used by the Purview EventSourcing SQL Server, PostgreSQL, and Cosmos DB providers.</Description>
+		<PackageTags>$(PackageTags);purview;dotnet;event-sourcing;event-store;entity-framework-core;efcore;snapshot;</PackageTags>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.EntityFrameworkCore" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\EventSourcing\EventSourcing.csproj" />
+		<!-- Packaged here rather than by each provider: NuGet dedupes by package identity, so a consumer
+		     referencing two EF providers loads the generator once. Bundling it per provider made the
+		     generator run twice and fail the consumer's build with CS0579 on its post-init output. -->
+		<ProjectReference
+			Include="..\EntityFrameworkCore.SourceGenerator\EntityFrameworkCore.SourceGenerator.csproj"
+			PrivateAssets="all"
+			ReferenceOutputAssembly="false"
+			OutputItemType="Analyzer"
+		/>
+	</ItemGroup>
+</Project>

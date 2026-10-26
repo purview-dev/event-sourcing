@@ -1,4 +1,4 @@
-﻿using Purview.EventSourcing.Fixtures.SqlServer;
+using Purview.EventSourcing.Fixtures.SqlServer;
 
 namespace Purview.EventSourcing.Samples.ValueObjects;
 
@@ -30,7 +30,8 @@ public class UserCaptureTests(SqlServerSnapshotEventStoreFixture fixture)
 
 		// Act
 		await eventStore.SnapshotAsync(aggregate, cancellationToken);
-		var retrievedAggregate = await eventStore.GetAsync(aggregate.Id(), cancellationToken);
+		var retrievedAggregateResult = await eventStore.GetAsync(aggregate.Id(), cancellationToken);
+		var retrievedAggregate = retrievedAggregateResult.IsSuccess ? retrievedAggregateResult.Value : null;
 
 		// Assert
 		await Assert.That(retrievedAggregate).IsNotNull();

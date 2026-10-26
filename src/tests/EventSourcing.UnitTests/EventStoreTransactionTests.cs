@@ -2,7 +2,9 @@ using System.Data;
 using System.Data.Common;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Test;
+using Purview.EventSourcing.Failures;
 using Purview.EventSourcing.Internal;
+using Purview.Results;
 using ValidationFailure = Purview.EventSourcing.Validation.ValidationFailure;
 using ValidationResult = Purview.EventSourcing.Validation.ValidationResult;
 
@@ -48,7 +50,7 @@ public sealed class EventStoreTransactionTests
 		var eventStore = IEventStore.Mock();
 		eventStore
 			.SaveAsync(Any<TestAggregate>(), Any<EventStoreOperationContext?>(), Any<CancellationToken>())
-			.Returns(new SaveResult<TestAggregate>(aggregate, new ValidationResult(), true, false));
+			.Returns(new SaveOutcome<TestAggregate>(aggregate, SaveOutcomeKind.Written));
 
 		await using EventStoreTransaction transaction = new();
 		transaction.Enlist(aggregate, eventStore);
@@ -81,12 +83,12 @@ public sealed class EventStoreTransactionTests
 		var store1 = IEventStore.Mock();
 		store1
 			.SaveAsync(Any<TestAggregate>(), Any<EventStoreOperationContext?>(), Any<CancellationToken>())
-			.Returns(new SaveResult<TestAggregate>(agg1, new ValidationResult(), true, false));
+			.Returns(new SaveOutcome<TestAggregate>(agg1, SaveOutcomeKind.Written));
 
 		var store2 = IEventStore.Mock();
 		store2
 			.SaveAsync(Any<TestAggregate>(), Any<EventStoreOperationContext?>(), Any<CancellationToken>())
-			.Returns(new SaveResult<TestAggregate>(agg2, new ValidationResult(), true, false));
+			.Returns(new SaveOutcome<TestAggregate>(agg2, SaveOutcomeKind.Written));
 
 		await using EventStoreTransaction transaction = new();
 		transaction.Enlist(agg1, store1);
@@ -120,12 +122,12 @@ public sealed class EventStoreTransactionTests
 		var store1 = IEventStore.Mock();
 		store1
 			.SaveAsync(Any<TestAggregate>(), Any<EventStoreOperationContext?>(), Any<CancellationToken>())
-			.Returns((agg, _, _) => new SaveResult<TestAggregate>(agg, new ValidationResult(), true, false));
+			.Returns((agg, _, _) => new SaveOutcome<TestAggregate>(agg, SaveOutcomeKind.Written));
 
 		var store2 = IEventStore.Mock();
 		store2
 			.SaveAsync(Any<TestAggregate>(), Any<EventStoreOperationContext?>(), Any<CancellationToken>())
-			.Returns((agg, _, _) => new SaveResult<TestAggregate>(agg, new ValidationResult(), true, false));
+			.Returns((agg, _, _) => new SaveOutcome<TestAggregate>(agg, SaveOutcomeKind.Written));
 
 		await using EventStoreTransaction transaction = new(correlationId);
 		transaction.Enlist(agg1, store1);
@@ -196,7 +198,7 @@ public sealed class EventStoreTransactionTests
 		var eventStore = IEventStore.Mock();
 		eventStore
 			.SaveAsync(Any<TestAggregate>(), Any<EventStoreOperationContext?>(), Any<CancellationToken>())
-			.Returns(new SaveResult<TestAggregate>(aggregate, new ValidationResult(), true, false));
+			.Returns(new SaveOutcome<TestAggregate>(aggregate, SaveOutcomeKind.Written));
 
 		await using EventStoreTransaction transaction = new();
 		transaction.Enlist(aggregate, eventStore);
@@ -218,7 +220,7 @@ public sealed class EventStoreTransactionTests
 		var eventStore = IEventStore.Mock();
 		eventStore
 			.SaveAsync(Any<TestAggregate>(), Any<EventStoreOperationContext?>(), Any<CancellationToken>())
-			.Returns(new SaveResult<TestAggregate>(aggregate, new ValidationResult(), true, false));
+			.Returns(new SaveOutcome<TestAggregate>(aggregate, SaveOutcomeKind.Written));
 
 		await using EventStoreTransaction transaction = new();
 		transaction.Enlist(aggregate, eventStore);
@@ -341,9 +343,7 @@ public sealed class EventStoreTransactionTests
 		var nonTransactionalStore = IEventStore.Mock();
 		nonTransactionalStore
 			.SaveAsync(Any<TestAggregate>(), Any<EventStoreOperationContext?>(), Any<CancellationToken>())
-			.Returns(
-				(aggregate, _, _) => new SaveResult<TestAggregate>(aggregate, new ValidationResult(), true, false)
-			);
+			.Returns((aggregate, _, _) => new SaveOutcome<TestAggregate>(aggregate, SaveOutcomeKind.Written));
 
 		await using EventStoreTransaction transaction = new("mixed");
 		transaction.Enlist(agg1, (IEventStore)transactionalStore);
@@ -425,7 +425,7 @@ public sealed class EventStoreTransactionTests
 		FakeTransactionalEventStore successfulStore = new("sqlserver:primary");
 		FakeTransactionalEventStore failingStore = new(
 			"sqlserver:primary",
-			new SaveBehavior(false, false, new InvalidOperationException("boom"))
+			new SaveBehavior(SaveOutcomeKind.Written, new InvalidOperationException("boom"))
 		);
 
 		await using EventStoreTransaction transaction = new("rollback");
@@ -504,7 +504,7 @@ public sealed class EventStoreTransactionTests
 		var store1 = IEventStore.Mock();
 		store1
 			.SaveAsync(Any<TestAggregate>(), Any<EventStoreOperationContext?>(), Any<CancellationToken>())
-			.Returns(new SaveResult<TestAggregate>(agg1, validationResult, false, false));
+			.Returns(AggregateSaveFailure.Failure<SaveOutcome<TestAggregate>>(new AggregateInvalid(validationResult)));
 
 		var store2 = IEventStore.Mock();
 
@@ -536,12 +536,12 @@ public sealed class EventStoreTransactionTests
 		var store1 = IEventStore.Mock();
 		store1
 			.SaveAsync(Any<TestAggregate>(), Any<EventStoreOperationContext?>(), Any<CancellationToken>())
-			.Returns(new SaveResult<TestAggregate>(agg1, new ValidationResult(), false, true));
+			.Returns(new SaveOutcome<TestAggregate>(agg1, SaveOutcomeKind.NoChanges));
 
 		var store2 = IEventStore.Mock();
 		store2
 			.SaveAsync(Any<TestAggregate>(), Any<EventStoreOperationContext?>(), Any<CancellationToken>())
-			.Returns(new SaveResult<TestAggregate>(agg2, new ValidationResult(), true, false));
+			.Returns(new SaveOutcome<TestAggregate>(agg2, SaveOutcomeKind.Written));
 
 		await using EventStoreTransaction transaction = new();
 		transaction.Enlist(agg1, store1);
@@ -571,7 +571,7 @@ public sealed class EventStoreTransactionTests
 		var eventStore = IEventStore.Mock();
 		eventStore
 			.SaveAsync(Any<TestAggregate>(), Any<EventStoreOperationContext?>(), Any<CancellationToken>())
-			.Returns(new SaveResult<TestAggregate>(aggregate, new ValidationResult(), true, false));
+			.Returns(new SaveOutcome<TestAggregate>(aggregate, SaveOutcomeKind.Written));
 
 		var originalDefaultCorrelationId = EventStoreOperationContext.DefaultContext().CorrelationId;
 
@@ -605,14 +605,18 @@ public sealed class EventStoreTransactionTests
 		CancellationToken cancellationToken
 	)
 	{
-		// Arrange — first aggregate save returns Saved=false, Skipped=false (failure)
+		// Arrange — the first aggregate's save fails
 		var agg = TestHelpers.Aggregate<TestAggregate>(clearEvents: false);
 		agg.Increment();
 
 		var store = IEventStore.Mock();
 		store
 			.SaveAsync(Any<TestAggregate>(), Any<EventStoreOperationContext?>(), Any<CancellationToken>())
-			.Returns(new SaveResult<TestAggregate>(agg, new ValidationResult(), false, false));
+			.Returns(
+				AggregateSaveFailure.Failure<SaveOutcome<TestAggregate>>(
+					new AggregateLocked(agg.AggregateType, agg.Id())
+				)
+			);
 
 		await using EventStoreTransaction transaction = new();
 		transaction.Enlist(agg, store);
@@ -639,7 +643,7 @@ public sealed class EventStoreTransactionTests
 		var eventStore = IEventStore.Mock();
 		eventStore
 			.SaveAsync(Any<TestAggregate>(), Any<EventStoreOperationContext?>(), Any<CancellationToken>())
-			.Returns(new SaveResult<TestAggregate>(aggregate, new ValidationResult(), true, false));
+			.Returns(new SaveOutcome<TestAggregate>(aggregate, SaveOutcomeKind.Written));
 
 		await using EventStoreTransaction transaction = new("transaction-correlation");
 		transaction.Enlist(aggregate, eventStore, customContext);
@@ -686,14 +690,14 @@ public sealed class EventStoreTransactionTests
 		}
 	}
 
-	sealed record SaveBehavior(bool Saved, bool Skipped, Exception? Exception = null);
+	sealed record SaveBehavior(SaveOutcomeKind Kind, Exception? Exception = null);
 
 	sealed class FakeTransactionalEventStore(string transactionBoundaryKey, SaveBehavior? behavior = null)
 		: ITransactionalEventStore<TestAggregate>,
 			IEventStore,
 			IEventStoreImplementationAccessor
 	{
-		readonly SaveBehavior _behavior = behavior ?? new SaveBehavior(true, false);
+		readonly SaveBehavior _behavior = behavior ?? new SaveBehavior(SaveOutcomeKind.Written);
 
 		public int SaveAsyncCalls { get; private set; }
 
@@ -736,7 +740,7 @@ public sealed class EventStoreTransactionTests
 				: Task.FromResult(CreateOperation(aggregate));
 		}
 
-		public Task<SaveResult<TestAggregate>> SaveAsync(
+		public Task<Result<SaveOutcome<TestAggregate>, AggregateSaveFailure>> SaveAsync(
 			TestAggregate aggregate,
 			EventStoreOperationContext? operationContext,
 			CancellationToken _ = default
@@ -751,14 +755,15 @@ public sealed class EventStoreTransactionTests
 				: Task.FromResult(CreateOperation(aggregate).Result);
 		}
 
-		Task<SaveResult<T>> IEventStore.SaveAsync<T>(
+		Task<Result<SaveOutcome<T>, AggregateSaveFailure>> IEventStore.SaveAsync<T>(
 			T aggregate,
 			EventStoreOperationContext? operationContext,
 			CancellationToken cancellationToken
 		)
 		{
 			return aggregate is TestAggregate testAggregate && typeof(T) == typeof(TestAggregate)
-				? (Task<SaveResult<T>>)(object)SaveAsync(testAggregate, operationContext, cancellationToken)
+				? (Task<Result<SaveOutcome<T>, AggregateSaveFailure>>)
+					(object)SaveAsync(testAggregate, operationContext, cancellationToken)
 				: throw new NotSupportedException();
 		}
 
@@ -772,41 +777,38 @@ public sealed class EventStoreTransactionTests
 		Task<T> IEventStore.CreateAsync<T>(string? aggregateId, CancellationToken _) =>
 			throw new NotSupportedException();
 
-		Task<T?> IEventStore.GetOrCreateAsync<T>(
+		Task<Result<T, AggregateReadFailure>> IEventStore.GetOrCreateAsync<T>(
 			string? aggregateId,
 			EventStoreOperationContext? operationContext,
 			CancellationToken _
 		)
 			where T : class => throw new NotSupportedException();
 
-		Task<T?> IEventStore.GetAsync<T>(
+		Task<Result<T, AggregateReadFailure>> IEventStore.GetAsync<T>(
 			string aggregateId,
 			EventStoreOperationContext? operationContext,
 			CancellationToken _
 		)
 			where T : class => throw new NotSupportedException();
 
-		Task<T?> IEventStore.GetAtAsync<T>(
+		Task<Result<T, AggregateReadFailure>> IEventStore.GetAtAsync<T>(
 			string aggregateId,
-			int version,
+			long version,
 			EventStoreOperationContext? operationContext,
 			CancellationToken _
 		)
 			where T : class => throw new NotSupportedException();
 
-		Task<bool> IEventStore.IsDeletedAsync<T>(string aggregateId, CancellationToken _) =>
-			throw new NotSupportedException();
-
-		Task<T?> IEventStore.GetDeletedAsync<T>(string aggregateId, CancellationToken _)
+		Task<Result<T, AggregateReadFailure>> IEventStore.GetDeletedAsync<T>(string aggregateId, CancellationToken _)
 			where T : class => throw new NotSupportedException();
 
-		Task<bool> IEventStore.DeleteAsync<T>(
+		Task<Result<SaveOutcome<T>, AggregateDeleteFailure>> IEventStore.DeleteAsync<T>(
 			T aggregate,
 			EventStoreOperationContext? operationContext,
 			CancellationToken _
 		) => throw new NotSupportedException();
 
-		Task<bool> IEventStore.RestoreAsync<T>(
+		Task<Result<SaveOutcome<T>, AggregateRestoreFailure>> IEventStore.RestoreAsync<T>(
 			T aggregate,
 			EventStoreOperationContext? operationContext,
 			CancellationToken _
@@ -821,21 +823,21 @@ public sealed class EventStoreTransactionTests
 			yield break;
 		}
 
-		Task<ExistsState> IEventStore.ExistsAsync<T>(string aggregateId, CancellationToken _) =>
+		Task<AggregateExistence> IEventStore.ExistsAsync<T>(string aggregateId, CancellationToken _) =>
 			throw new NotSupportedException();
 
 		T IEventStore.FulfilRequirements<T>(T aggregate) => aggregate;
 
 		IAsyncEnumerable<(EventRecord EventRecord, string EventType)> IEventStore.GetEventRangeAsync<T>(
 			string aggregateId,
-			int versionFrom,
-			int? versionTo,
+			long versionFrom,
+			long? versionTo,
 			CancellationToken cancellationToken
 		) => throw new NotSupportedException();
 
 		TransactionalSaveOperation<TestAggregate> CreateOperation(TestAggregate aggregate) =>
 			new(
-				new SaveResult<TestAggregate>(aggregate, new ValidationResult(), _behavior.Saved, _behavior.Skipped),
+				new SaveOutcome<TestAggregate>(aggregate, _behavior.Kind),
 				_ =>
 				{
 					AfterCommitCalls++;
@@ -851,38 +853,37 @@ public sealed class EventStoreTransactionTests
 		public Task<TestAggregate> CreateAsync(string? aggregateId = null, CancellationToken _ = default) =>
 			throw new NotSupportedException();
 
-		public Task<TestAggregate?> GetOrCreateAsync(
+		public Task<Result<TestAggregate, AggregateReadFailure>> GetOrCreateAsync(
 			string? aggregateId,
 			EventStoreOperationContext? operationContext,
 			CancellationToken _ = default
 		) => throw new NotSupportedException();
 
-		public Task<TestAggregate?> GetAsync(
+		public Task<Result<TestAggregate, AggregateReadFailure>> GetAsync(
 			string aggregateId,
 			EventStoreOperationContext? operationContext,
 			CancellationToken _ = default
 		) => throw new NotSupportedException();
 
-		public Task<TestAggregate?> GetAtAsync(
+		public Task<Result<TestAggregate, AggregateReadFailure>> GetAtAsync(
 			string aggregateId,
-			int version,
+			long version,
 			EventStoreOperationContext? operationContext,
 			CancellationToken _ = default
 		) => throw new NotSupportedException();
 
-		public Task<bool> IsDeletedAsync(string aggregateId, CancellationToken _ = default) =>
-			throw new NotSupportedException();
+		public Task<Result<TestAggregate, AggregateReadFailure>> GetDeletedAsync(
+			string aggregateId,
+			CancellationToken _ = default
+		) => throw new NotSupportedException();
 
-		public Task<TestAggregate?> GetDeletedAsync(string aggregateId, CancellationToken _ = default) =>
-			throw new NotSupportedException();
-
-		public Task<bool> DeleteAsync(
+		public Task<Result<SaveOutcome<TestAggregate>, AggregateDeleteFailure>> DeleteAsync(
 			TestAggregate aggregate,
 			EventStoreOperationContext? operationContext,
 			CancellationToken _ = default
 		) => throw new NotSupportedException();
 
-		public Task<bool> RestoreAsync(
+		public Task<Result<SaveOutcome<TestAggregate>, AggregateRestoreFailure>> RestoreAsync(
 			TestAggregate aggregate,
 			EventStoreOperationContext? operationContext,
 			CancellationToken _ = default
@@ -898,15 +899,15 @@ public sealed class EventStoreTransactionTests
 			yield break;
 		}
 
-		public Task<ExistsState> ExistsAsync(string aggregateId, CancellationToken _ = default) =>
+		public Task<AggregateExistence> ExistsAsync(string aggregateId, CancellationToken _ = default) =>
 			throw new NotSupportedException();
 
 		public TestAggregate FulfilRequirements(TestAggregate aggregate) => aggregate;
 
 		public IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync(
 			string aggregateId,
-			int versionFrom,
-			int? versionTo,
+			long versionFrom,
+			long? versionTo,
 			CancellationToken cancellationToken = default
 		) => throw new NotSupportedException();
 	}

@@ -57,7 +57,7 @@ static class SourceGeneratorPerformanceScenarios
 				[System.AttributeUsage(System.AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
 				public sealed class EventAttribute : System.Attribute
 				{
-					public int Version { get; set; } = 1;
+					public long Version { get; set; } = 1;
 					public string? EventName { get; set; }
 					public string? EventNamespace { get; set; }
 				}
@@ -94,7 +94,7 @@ static class SourceGeneratorPerformanceScenarios
 				public sealed class EventContractAttribute : System.Attribute { }
 
 				public readonly record struct EventMetadata(
-					int AggregateVersion,
+					long AggregateVersion,
 					System.DateTimeOffset When,
 					int SchemaVersion,
 					string? IdempotencyId,

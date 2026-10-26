@@ -4,6 +4,7 @@ using Purview.EventSourcing.Aggregates.Snapshotting;
 using Purview.EventSourcing.Internal;
 using Purview.EventSourcing.Postgres.Client;
 using Purview.EventSourcing.Postgres.Snapshots;
+using Purview.EventSourcing.Tenancy;
 
 namespace Purview.EventSourcing.Postgres.Snapshot;
 
@@ -39,13 +40,15 @@ public sealed partial class PostgresSnapshotEventStore<T> : IPostgresSnapshotEve
 	/// <param name="telemetry">The telemetry sink for snapshot operations.</param>
 	/// <param name="snapshotStrategy">Optional strategy controlling when snapshots are written; defaults to snapshotting always.</param>
 	/// <param name="snapshotStrategySelector">Optional selector used to pick a snapshot strategy per aggregate.</param>
+	/// <param name="currentTenant">Optional tenant scope applied to snapshot reads and writes.</param>
 	public PostgresSnapshotEventStore(
 		// Explicitly request a non-queryable event store.
 		INonQueryableEventStore<T> eventStore,
 		IOptions<PostgresSnapshotEventStoreOptions> sqlServerEventStoreOptions,
 		IPostgresSnapshotEventStoreTelemetry telemetry,
 		ISnapshotStrategy<T>? snapshotStrategy = null,
-		ISnapshotStrategySelector? snapshotStrategySelector = null
+		ISnapshotStrategySelector? snapshotStrategySelector = null,
+		ICurrentTenant? currentTenant = null
 	)
 	{
 		_eventStore = eventStore;
@@ -57,7 +60,7 @@ public sealed partial class PostgresSnapshotEventStore<T> : IPostgresSnapshotEve
 		_aggregateName = TypeNameHelper.GetName(_aggregateType, "Aggregate");
 
 		var clientOptions = ResolveClientOptions(_sqlServerEventStoreOptions.Value, _aggregateName);
-		_sqlServerClient = new(clientOptions);
+		_sqlServerClient = new(clientOptions, currentTenant);
 	}
 
 	/// <summary>

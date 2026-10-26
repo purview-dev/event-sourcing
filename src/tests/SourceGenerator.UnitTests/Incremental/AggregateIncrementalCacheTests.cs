@@ -72,10 +72,16 @@ public sealed class AggregateIncrementalCacheTests : AggregateSourceGeneratorTes
 			"GetGenerationConfiguration",
 			"GetGenerationContext_AggregateGenerationCapabilities",
 		];
+		// Cached or Unchanged: the generator emits its own aggregate attributes through
+		// post-initialization output, so Roslyn sees a new SyntaxTree and reports the internal
+		// Compilation step Modified even on a byte-identical rerun. Any stage derived from the
+		// compilation therefore re-runs and reports Unchanged rather than Cached. Unchanged is the
+		// proof that value equality holds; Modified is the regression this guards against.
 		await Assert
 			.That(
 				frameworkStages.All(stage =>
-					second.TryGetValue(stage, out var reasons) && reasons.All(r => r == StepReason.Cached)
+					second.TryGetValue(stage, out var reasons)
+					&& reasons.All(r => r is StepReason.Cached or StepReason.Unchanged)
 				)
 			)
 			.IsTrue();

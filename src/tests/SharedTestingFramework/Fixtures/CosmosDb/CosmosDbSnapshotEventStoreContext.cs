@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.Caching.Distributed;
-using Purview.EventSourcing.Aggregates;
+using Microsoft.Extensions.Caching.Distributed;
 using Purview.EventSourcing.Aggregates.Persistence;
 using Purview.EventSourcing.AzureStorage;
 using Purview.EventSourcing.AzureStorage.StorageClients.Blob;
@@ -14,7 +13,7 @@ namespace Purview.EventSourcing.Fixtures.CosmosDb;
 
 public sealed class CosmosDbSnapshotEventStoreContext(
 	string cosmosDbConnectionString,
-	HttpClient cosmosDbHttpClient,
+	CosmosDbClientOverrides cosmosDbClientOverrides,
 	string azuriteConnectionString
 ) : IAsyncDisposable
 {
@@ -28,8 +27,6 @@ public sealed class CosmosDbSnapshotEventStoreContext(
 	internal AzureTableClient TableClient { get; private set; } = default!;
 
 	internal AzureBlobClient BlobClient { get; private set; } = default!;
-
-	internal CosmosDbClient CosmosDbClient { get; private set; } = default!;
 
 	[System.Diagnostics.CodeAnalysis.SuppressMessage(
 		"Reliability",
@@ -52,24 +49,11 @@ public sealed class CosmosDbSnapshotEventStoreContext(
 			ConnectionMode = Microsoft.Azure.Cosmos.ConnectionMode.Gateway,
 		};
 
-		Microsoft.Azure.Cosmos.CosmosClient cosmosClient = new(
-			config.ConnectionString,
-			clientOptions: new Microsoft.Azure.Cosmos.CosmosClientOptions()
-			{
-				HttpClientFactory = () => cosmosDbHttpClient,
-				ConnectionMode = config.ConnectionMode,
-				LimitToEndpoint = true,
-				Serializer = new CosmosDbClient.CosmosSystemTextJsonSerializer(),
-			}
-		);
-
-		CosmosDbClient = new(config, $"/{nameof(IAggregate.AggregateType)}", null, cosmosClient);
-
 		CosmosDbSnapshotEventStore<PersistenceAggregate> eventStore = new(
 			tableEventStore,
 			Microsoft.Extensions.Options.Options.Create(config),
 			ICosmosDbSnapshotEventStoreTelemetry.Mock(),
-			cosmosClient
+			cosmosDbClientOverrides
 		);
 
 		EventStore = eventStore;
@@ -109,5 +93,9 @@ public sealed class CosmosDbSnapshotEventStoreContext(
 		return eventStore;
 	}
 
-	public async ValueTask DisposeAsync() => await CosmosDbClient.DeleteContainerAsync();
+	public async ValueTask DisposeAsync()
+	{
+		await EventStore.DeleteContainerAsync();
+		await EventStore.DisposeAsync();
+	}
 }

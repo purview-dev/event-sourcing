@@ -101,12 +101,12 @@ public sealed class EventContractManifestTests : AggregateSourceGeneratorTestBas
 	[Test]
 	public async Task Generate_WithManifestEnabled_EmitsDeterministicManifest(CancellationToken cancellationToken)
 	{
-		var first = await GenerateAsync(
+		using var first = await GenerateAsync(
 			OrderAggregateSource,
 			ManifestTestHelpers.WithManifestEnabled(),
 			cancellationToken
 		);
-		var second = await GenerateAsync(
+		using var second = await GenerateAsync(
 			OrderAggregateSource,
 			ManifestTestHelpers.WithManifestEnabled(),
 			cancellationToken
@@ -143,7 +143,7 @@ public sealed class EventContractManifestTests : AggregateSourceGeneratorTestBas
 	[Test]
 	public async Task Generate_WithoutManifestProperty_DoesNotEmitManifest(CancellationToken cancellationToken)
 	{
-		var result = await GenerateAsync(OrderAggregateSource, cancellationToken);
+		using var result = await GenerateAsync(OrderAggregateSource, cancellationToken);
 
 		await Assert.That(ManifestTestHelpers.GetManifestSource(result)).IsEmpty();
 	}
@@ -151,12 +151,12 @@ public sealed class EventContractManifestTests : AggregateSourceGeneratorTestBas
 	[Test]
 	public async Task Generate_ManifestOrderingIsIndependentOfDeclarationOrder(CancellationToken cancellationToken)
 	{
-		var ordered = await GenerateAsync(
+		using var ordered = await GenerateAsync(
 			OrderAggregateSource,
 			ManifestTestHelpers.WithManifestEnabled(),
 			cancellationToken
 		);
-		var reordered = await GenerateAsync(
+		using var reordered = await GenerateAsync(
 			ReorderedAggregateSource,
 			ManifestTestHelpers.WithManifestEnabled(),
 			cancellationToken
@@ -173,7 +173,7 @@ public sealed class EventContractManifestTests : AggregateSourceGeneratorTestBas
 		CancellationToken cancellationToken
 	)
 	{
-		var result = await GenerateAsync(
+		using var result = await GenerateAsync(
 			RichAggregateSource,
 			ManifestTestHelpers.WithManifestEnabled(),
 			cancellationToken
@@ -224,14 +224,14 @@ public sealed class EventContractManifestTests : AggregateSourceGeneratorTestBas
 		CancellationToken cancellationToken
 	)
 	{
-		var baselineRun = await GenerateAsync(
+		using var baselineRun = await GenerateAsync(
 			RichAggregateSource,
 			ManifestTestHelpers.WithManifestEnabled(),
 			cancellationToken
 		);
 		var baselineJson = ManifestTestHelpers.ExtractManifestJson(ManifestTestHelpers.GetManifestSource(baselineRun));
 
-		var result = await GenerateAsync(
+		using var result = await GenerateAsync(
 			RichAggregateSource,
 			ManifestTestHelpers.WithBaseline(baselineJson),
 			cancellationToken

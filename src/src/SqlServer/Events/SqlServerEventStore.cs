@@ -7,8 +7,10 @@ using Microsoft.Extensions.Options;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events.Upcasting;
 using Purview.EventSourcing.Aggregates.Snapshotting;
+using Purview.EventSourcing.Cryptography;
 using Purview.EventSourcing.Internal;
 using Purview.EventSourcing.Services;
+using Purview.EventSourcing.Tenancy;
 using Purview.EventSourcing.Validation;
 
 namespace Purview.EventSourcing.SqlServer.Events;
@@ -50,6 +52,14 @@ public sealed partial class SqlServerEventStore<T> : ISqlServerEventStore<T>, IT
 	readonly IAggregateRequirementsManager _aggregateRequirementsManager;
 	readonly IEventUpcasterRegistry? _eventUpcasterRegistry;
 
+	readonly IEventStorePrincipalAccessor _principalAccessor;
+
+	readonly IEventStoreMetrics _metrics;
+
+	readonly ICurrentTenant _currentTenant;
+
+	readonly IEventPayloadProtector? _payloadProtector;
+
 	readonly string _aggregateTypeFullName;
 	readonly string _aggregateTypeShortName;
 	readonly string _cacheKeyPrefix;
@@ -74,6 +84,10 @@ public sealed partial class SqlServerEventStore<T> : ISqlServerEventStore<T>, IT
 	/// <param name="validator">Optional validator invoked before persisting aggregates.</param>
 	/// <param name="aggregateIdFactory">Optional factory used to generate aggregate ids when none is supplied.</param>
 	/// <param name="eventUpcasterRegistry">Optional registry used to upcast events during reconstitution.</param>
+	/// <param name="principalAccessor">Optional accessor supplying the principal recorded against saved events.</param>
+	/// <param name="metrics">Optional metrics recorder; defaults to a no-op.</param>
+	/// <param name="currentTenant">Optional tenant resolver; defaults to the system scope, which applies no filter.</param>
+	/// <param name="payloadProtector">Optional payload protector; when omitted payloads are stored unencrypted.</param>
 	/// <exception cref="ArgumentNullException">
 	/// Any of <paramref name="eventNameMapper"/>, <paramref name="sqlServerOptions"/>, <paramref name="distributedCache"/>,
 	/// <paramref name="eventStoreTelemetry"/>, <paramref name="aggregateChangeNotifier"/>, or
@@ -88,7 +102,11 @@ public sealed partial class SqlServerEventStore<T> : ISqlServerEventStore<T>, IT
 		IAggregateRequirementsManager aggregateRequirementsManager,
 		IAggregateValidator<T>? validator = null,
 		IAggregateIdFactory? aggregateIdFactory = null,
-		IEventUpcasterRegistry? eventUpcasterRegistry = null
+		IEventUpcasterRegistry? eventUpcasterRegistry = null,
+		IEventStorePrincipalAccessor? principalAccessor = null,
+		IEventStoreMetrics? metrics = null,
+		ICurrentTenant? currentTenant = null,
+		IEventPayloadProtector? payloadProtector = null
 	)
 	{
 		_eventNameMapper = eventNameMapper;
@@ -100,6 +118,10 @@ public sealed partial class SqlServerEventStore<T> : ISqlServerEventStore<T>, IT
 		_aggregateChangeNotifier = aggregateChangeNotifier;
 		_aggregateRequirementsManager = aggregateRequirementsManager;
 		_eventUpcasterRegistry = eventUpcasterRegistry;
+		_principalAccessor = principalAccessor ?? new AmbientEventStorePrincipalAccessor();
+		_metrics = metrics ?? NoOpEventStoreMetrics.Instance;
+		_currentTenant = currentTenant ?? new SystemCurrentTenant();
+		_payloadProtector = payloadProtector;
 
 		_aggregateTypeShortName = typeof(T).Name;
 		_aggregateTypeFullName = typeof(T).FullName ?? _aggregateTypeShortName;
@@ -114,7 +136,7 @@ public sealed partial class SqlServerEventStore<T> : ISqlServerEventStore<T>, IT
 		_snapshotIdPrefix = $"snap_{_aggregateTypeShortName}_";
 
 		var clientOptions = ResolveClientOptions(sqlServerOptions.Value, _aggregateTypeShortName);
-		_client = new SqlServerEventStoreClient(clientOptions);
+		_client = new SqlServerEventStoreClient(clientOptions, _currentTenant);
 	}
 
 	///<inheritdoc/>
@@ -252,26 +274,12 @@ public sealed partial class SqlServerEventStore<T> : ISqlServerEventStore<T>, IT
 		return result;
 	}
 
-	[SuppressMessage("Style", "IDE0010:Add missing cases")]
-	static bool ReturnAggregate(bool isDeleted, string aggregateId, EventStoreOperationContext context)
-	{
-		if (isDeleted)
-		{
-			switch (context.DeleteMode)
-			{
-				case DeleteHandlingMode.ThrowsException:
-					throw AggregateIsDeletedException(aggregateId);
-				case DeleteHandlingMode.ReturnsNull:
-					return false;
-			}
-		}
-
-		return true;
-	}
+	static bool ReturnAggregate(bool isDeleted, EventStoreOperationContext context) =>
+		!isDeleted || context.DeleteMode == DeleteHandlingMode.ReturnsAggregate;
 
 	string CreateStreamVersionId(string aggregateId) => $"s_{_aggregateTypeShortName}_{aggregateId}";
 
-	string CreateEventId(string aggregateId, int version)
+	string CreateEventId(string aggregateId, long version)
 	{
 		var versionText = version.ToString(CultureInfo.InvariantCulture);
 		var padLength = Math.Max(0, _eventStoreOptions.Value.EventSuffixLength - versionText.Length);
@@ -303,7 +311,19 @@ public sealed partial class SqlServerEventStore<T> : ISqlServerEventStore<T>, IT
 	/// </summary>
 	/// <param name="aggregateId">The id of the aggregate.</param>
 	/// <returns>The cache key, derived from the aggregate type's short name and id.</returns>
-	public string CreateCacheKey(string aggregateId) => $"{_cacheKeyPrefix}{aggregateId}".ToUpperInvariant();
+	public string CreateCacheKey(string aggregateId) =>
+		$"{TenantCacheScope()}{_cacheKeyPrefix}{aggregateId}".ToUpperInvariant();
+
+	/// <summary>
+	/// Namespaces a cache key by tenant.
+	/// </summary>
+	/// <remarks>
+	/// The distributed cache is read before the tenant-filtered storage lookup, so an unqualified key
+	/// would let one tenant read another's cached aggregate straight out of a shared cache, bypassing
+	/// every storage filter. The system scope keeps the unqualified key, matching unowned rows.
+	/// </remarks>
+	/// <returns>The tenant prefix, or an empty string under the system scope.</returns>
+	string TenantCacheScope() => _currentTenant.Current.IsSystem ? string.Empty : $"{_currentTenant.Current.TenantId}:";
 
 	//async Task EnsureConfiguredAsync(CancellationToken cancellationToken)
 	//{
@@ -342,7 +362,7 @@ public sealed partial class SqlServerEventStore<T> : ISqlServerEventStore<T>, IT
 		public string Id { get; set; } = default!;
 		public string AggregateId { get; set; } = default!;
 		public string AggregateType { get; set; } = default!;
-		public int Version { get; set; }
+		public long Version { get; set; }
 		public bool IsDeleted { get; set; }
 	}
 }

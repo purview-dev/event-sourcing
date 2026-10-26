@@ -19,7 +19,7 @@ public sealed partial class PostgresOutboxStore(
 	IOptions<PostgresOutboxStoreOptions> outboxOptions,
 	IOptions<PostgresEventStoreOptions> eventStoreOptions,
 	ILogger<PostgresOutboxStore> logger
-) : IOutboxStore
+) : IOutboxStore, IDisposable
 {
 	[GeneratedRegex("^[\\w\\-.]+$", RegexOptions.Compiled)]
 	private static partial Regex ValidIdentifier();
@@ -27,7 +27,11 @@ public sealed partial class PostgresOutboxStore(
 	readonly string _connectionString = ResolveConnectionString(outboxOptions.Value, eventStoreOptions.Value);
 	readonly string _schema = QuoteIdentifier(outboxOptions.Value.SchemaName);
 	readonly string _table = QuoteIdentifier(outboxOptions.Value.TableName);
+	readonly SemaphoreSlim _schemaLock = new(1, 1);
 	bool _schemaEnsured;
+
+	/// <inheritdoc/>
+	public void Dispose() => _schemaLock.Dispose();
 
 	/// <inheritdoc/>
 	public Task<int> EnqueueAsync(OutboxEnvelope message, CancellationToken cancellationToken) =>
@@ -73,6 +77,8 @@ public sealed partial class PostgresOutboxStore(
 			{
 				await EnsureSchemaAsync(token);
 
+				// Without SKIP LOCKED a concurrent claim blocks on the same rows, then re-applies the
+				// outer UPDATE once the first commits - handing both dispatchers the same batch.
 				await using NpgsqlCommand command = new(
 					$"""
 					UPDATE {_schema}.{_table}
@@ -84,6 +90,7 @@ public sealed partial class PostgresOutboxStore(
 						  AND ("NextAttemptUtc" IS NULL OR "NextAttemptUtc" <= @now)
 						ORDER BY "CreatedUtc", "Id"
 						LIMIT @batch
+						FOR UPDATE SKIP LOCKED
 					)
 					RETURNING "Id", "AggregateType", "AggregateId", "EventType", "PayloadJson",
 						"IdempotencyKey", "CorrelationId", "CreatedUtc", "State", "AttemptCount",
@@ -290,36 +297,59 @@ public sealed partial class PostgresOutboxStore(
 
 		if (outboxOptions.Value.AutoCreateTable)
 		{
-			await using NpgsqlConnection connection = new(_connectionString);
-			await connection.OpenAsync(cancellationToken);
+			// CREATE TABLE IF NOT EXISTS is not safe to run concurrently: PostgreSQL still races on
+			// the table's implicit row type and raises 23505 on pg_type_typname_nsp_index. The
+			// semaphore serialises callers in this process; the catch covers a second process, which
+			// no in-process lock can.
+			await _schemaLock.WaitAsync(cancellationToken);
+			try
+			{
+				if (_schemaEnsured)
+					return;
 
-			await using NpgsqlCommand command = new(
-				$"""
-				CREATE TABLE IF NOT EXISTS {_schema}.{_table} (
-					"Id" VARCHAR(64) NOT NULL PRIMARY KEY,
-					"AggregateType" VARCHAR(256) NOT NULL,
-					"AggregateId" VARCHAR(256) NOT NULL,
-					"EventType" VARCHAR(256) NOT NULL,
-					"PayloadJson" TEXT NOT NULL,
-					"IdempotencyKey" VARCHAR(256) NULL,
-					"CorrelationId" VARCHAR(128) NULL,
-					"CreatedUtc" TIMESTAMPTZ NOT NULL,
-					"State" INTEGER NOT NULL,
-					"AttemptCount" INTEGER NOT NULL,
-					"NextAttemptUtc" TIMESTAMPTZ NULL,
-					"DispatchedUtc" TIMESTAMPTZ NULL,
-					"LeaseExpiresUtc" TIMESTAMPTZ NULL,
-					"LeaseOwner" VARCHAR(128) NULL,
-					"LastError" TEXT NULL
+				await using NpgsqlConnection connection = new(_connectionString);
+				await connection.OpenAsync(cancellationToken);
+
+				await using NpgsqlCommand command = new(
+					$"""
+					CREATE TABLE IF NOT EXISTS {_schema}.{_table} (
+						"Id" VARCHAR(64) NOT NULL PRIMARY KEY,
+						"AggregateType" VARCHAR(256) NOT NULL,
+						"AggregateId" VARCHAR(256) NOT NULL,
+						"EventType" VARCHAR(256) NOT NULL,
+						"PayloadJson" TEXT NOT NULL,
+						"IdempotencyKey" VARCHAR(256) NULL,
+						"CorrelationId" VARCHAR(128) NULL,
+						"CreatedUtc" TIMESTAMPTZ NOT NULL,
+						"State" INTEGER NOT NULL,
+						"AttemptCount" INTEGER NOT NULL,
+						"NextAttemptUtc" TIMESTAMPTZ NULL,
+						"DispatchedUtc" TIMESTAMPTZ NULL,
+						"LeaseExpiresUtc" TIMESTAMPTZ NULL,
+						"LeaseOwner" VARCHAR(128) NULL,
+						"LastError" TEXT NULL
+					);
+					CREATE UNIQUE INDEX IF NOT EXISTS UX_{outboxOptions.Value.TableName}_IdempotencyKey
+						ON {_schema}.{_table} ("IdempotencyKey") WHERE "IdempotencyKey" IS NOT NULL;
+					CREATE INDEX IF NOT EXISTS IX_{outboxOptions.Value.TableName}_Dispatch
+						ON {_schema}.{_table} ("State", "LeaseExpiresUtc", "NextAttemptUtc", "CreatedUtc");
+					""",
+					connection
 				);
-				CREATE UNIQUE INDEX IF NOT EXISTS UX_{outboxOptions.Value.TableName}_IdempotencyKey
-					ON {_schema}.{_table} ("IdempotencyKey") WHERE "IdempotencyKey" IS NOT NULL;
-				CREATE INDEX IF NOT EXISTS IX_{outboxOptions.Value.TableName}_Dispatch
-					ON {_schema}.{_table} ("State", "LeaseExpiresUtc", "NextAttemptUtc", "CreatedUtc");
-				""",
-				connection
-			);
-			await command.ExecuteNonQueryAsync(cancellationToken);
+
+				try
+				{
+					await command.ExecuteNonQueryAsync(cancellationToken);
+				}
+				catch (PostgresException ex) when (ex.SqlState is "23505" or "42P07")
+				{
+					// Another writer created it first, which is the outcome we wanted anyway.
+				}
+			}
+			finally
+			{
+				_schemaLock.Release();
+			}
 		}
 
 		_schemaEnsured = true;

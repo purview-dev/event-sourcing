@@ -65,7 +65,8 @@ public sealed class ReportUploadAggregateSnapshotEventStoreTests(SqlServerSnapsh
 
 		await store.SaveAsync(aggregate, cancellationToken);
 
-		var restored = await store.GetAsync(id, cancellationToken: cancellationToken);
+		var restoredResult = await store.GetAsync(id, cancellationToken: cancellationToken);
+		var restored = restoredResult.IsSuccess ? restoredResult.Value : null;
 
 		await Assert.That(restored).IsNotNull();
 		await Assert.That(restored!.ReportSummary).IsNotNull();

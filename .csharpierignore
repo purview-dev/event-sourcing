@@ -1,0 +1,7 @@
+# CSharpier 1.3.0 - the latest release - cannot parse C# 15 union declarations and reports
+# "Was not formatted due to syntax errors" for any file containing one. The compiler accepts them;
+# only the formatter lags. Union declarations are therefore kept in dedicated files, excluded here,
+# and this entry is removed once CSharpier supports the syntax.
+#
+# See docs/wiki/Result-And-Failure-Model.md.
+**/Failures/*Failure.cs

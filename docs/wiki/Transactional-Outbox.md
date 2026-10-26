@@ -83,7 +83,11 @@ Enqueuing with the same `IdempotencyKey` again is a no-op (deduplicated at the s
 ## Concurrent dispatchers
 
 Multiple dispatchers (or hosts) may run concurrently. The lease claim is atomic, so each message is
-claimed by exactly one dispatcher at a time. See `SqlServerOutboxIntegrationTests` and
+claimed by exactly one dispatcher at a time. Disjointness comes from the row lock the claim takes
+while selecting candidates — `FOR UPDATE SKIP LOCKED` on Postgres, `WITH (UPDLOCK, READPAST,
+ROWLOCK)` on SQL Server. Without it a concurrent claim blocks on the same rows and then re-applies
+the update once the first transaction commits, handing both dispatchers the same batch.
+See `SqlServerOutboxIntegrationTests` and
 `PostgresOutboxIntegrationTests` for real-provider coverage of atomic commit/rollback, retry/poison,
 deduplication, and concurrent claim disjointness.
 

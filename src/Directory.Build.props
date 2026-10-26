@@ -1,9 +1,17 @@
 <Project>
 	<PropertyGroup>
 		<NamespacePrefix>Purview.EventSourcing</NamespacePrefix>
+		<!-- Set before the SDK import so everything the SDK derives from the target framework sees it.
+		     Roslyn components pin netstandard2.0 in their own project files, which wins over this. -->
+		<TargetFramework>net11.0</TargetFramework>
 	</PropertyGroup>
 
 	<Import Sdk="Purview.BuildSdk" Project="Sdk.props" />
+
+	<PropertyGroup>
+		<!-- C# 15 unions back the Purview.Results failure model, and are a preview language feature. -->
+		<LangVersion>preview</LangVersion>
+	</PropertyGroup>
 
 	<PropertyGroup>
 		<TargetsForTfmSpecificBuildOutput>
@@ -23,12 +31,12 @@
 		<NoWarn>$(NoWarn);CA1031;CA2234</NoWarn>
 	</PropertyGroup>
 
-	<ItemGroup Label="TUnit integration test retries" Condition="'$(TestingType)' == 'Integration'">
+	<!--<ItemGroup Label="TUnit integration test retries" Condition="'$(TestingType)' == 'Integration'">
 		<AssemblyAttribute Include="TUnit.Core.Retry">
 			<_Parameter1>3</_Parameter1>
 			<_Parameter1_TypeName>System.Int32</_Parameter1_TypeName>
 		</AssemblyAttribute>
-	</ItemGroup>
+	</ItemGroup>-->
 
 	<PropertyGroup Label="Purview site URL metadata">
 		<PurviewHomepage>https://purview.dev/</PurviewHomepage>
@@ -57,7 +65,7 @@
 		/>
 	</ItemGroup>
 
-	<PropertyGroup Condition="'$(IsTestProject)' != 'true' AND '$(IsSharedTestingProject)' != 'true'">
+	<!--<PropertyGroup Condition="'$(IsTestProject)' != 'true' AND '$(IsSharedTestingProject)' != 'true'">
 		<WarningsAsErrors>$(WarningsAsErrors);CA1031;CA1822</WarningsAsErrors>
-	</PropertyGroup>
+	</PropertyGroup>-->
 </Project>

@@ -1,7 +1,9 @@
-using Purview.EventSourcing.Admin.Abstractions.Models;
-using Purview.EventSourcing.Admin.Abstractions.Queries;
+using Purview.EventSourcing.Admin.Failures;
+using Purview.EventSourcing.Admin.Models;
+using Purview.EventSourcing.Admin.Queries;
+using Purview.Results;
 
-namespace Purview.EventSourcing.Admin.Abstractions.Services;
+namespace Purview.EventSourcing.Admin.Services;
 
 /// <summary>
 /// Queries aggregates for the admin portal, providing search and detail retrieval.
@@ -25,8 +27,10 @@ public interface IAdminAggregateQueryService
 	/// <param name="aggregateType">The aggregate type name.</param>
 	/// <param name="aggregateId">The aggregate identifier.</param>
 	/// <param name="cancellationToken">The token to monitor for cancellation requests.</param>
-	/// <returns>The aggregate summary, or <see langword="null"/> if the aggregate does not exist.</returns>
-	Task<AggregateSummaryResponse?> GetAsync(
+	/// <returns>
+	/// The aggregate summary, or <see cref="AdminAggregateNotFound"/> when the aggregate does not exist.
+	/// </returns>
+	Task<Result<AggregateSummaryResponse, AdminQueryFailure>> GetAsync(
 		string aggregateType,
 		string aggregateId,
 		CancellationToken cancellationToken

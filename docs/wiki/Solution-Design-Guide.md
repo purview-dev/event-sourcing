@@ -414,8 +414,9 @@ public sealed class OrderAggregate : AggregateBase
 Do not rely only on save-time validation for user-facing command errors. Put business guard clauses near the command
 method as well so invalid operations fail before an event is created.
 
-`SaveResult<TAggregate>` carries `Saved`, `Skipped`, and `ValidationResult`. Check `IsValid` or call `EnsureValid()`
-when callers need validation failures surfaced as exceptions.
+`SaveAsync` returns `Result<SaveOutcome<TAggregate>, AggregateSaveFailure>`. A success carries the outcome
+(`Written`, `NoChanges` or `AlreadyApplied`); a validation rejection arrives as the `AggregateInvalid` case,
+which carries the `ValidationResult`.
 
 ## Implementation Pattern
 

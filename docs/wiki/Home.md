@@ -11,7 +11,9 @@ This wiki is the project documentation hub for framework features, provider capa
 - [Provider Feature Matrix](Provider-Feature-Matrix.md)
 - [Provider Capabilities](Provider-Capabilities.md)
 - [Transactional Outbox](Transactional-Outbox.md)
+- [Subscriptions](Subscriptions.md)
 - [Transaction Guarantees](Transaction-Guarantees.md)
+- [Result and Failure Model](Result-And-Failure-Model.md)
 - [Event Contract Manifest](Event-Contract-Manifest.md)
 - [Event Versioning Strategy](Event-Versioning-Strategy.md)
 - [Event Versioning Examples](Event-Versioning-Examples.md)
@@ -24,10 +26,30 @@ This wiki is the project documentation hub for framework features, provider capa
 - [Shared Testing Framework](Shared-Testing-Framework.md)
 - [Release Flow](Release-Flow.md)
 
+## Proposals
+
+Designs under discussion. Check each page's status banner before relying on it.
+
+**Start here: [Production Readiness Status](Production-Readiness-Status.md)** — what has shipped, what has not, and what is waiting on a decision.
+
+- [Subscriptions and Retention](Subscriptions-And-Retention-Design.md) — subscriptions shipped; the
+  ordered live tail remains a proposal
+- [Crypto Key Management](Crypto-Key-Management-Design.md) — local, in-memory and Key Vault key
+  stores, plus rotation. **Blocking: crypto-shredding has no production key store today**
+- [Durable Admin Audit](Admin-Audit-Durability-Design.md) — the audit trail currently dies with the
+  process
+- [Retention](Retention-Design.md) — event streams and idempotency markers both grow without bound
+- [Observability Parity](Observability-Parity-Design.md) — distributed tracing exists on two
+  providers of five
+- [Resilience Testing](Resilience-Testing-Design.md) — fault injection, load and soak
+
 ## Feature highlights
 
 - **Core framework (`Purview.EventSourcing`)**
   - `AggregateBase`, `IEventStore`, `IQueryableEventStore`, and `IEventStoreTransactionFactory`.
+  - [Subscriptions](Subscriptions.md): catch-up reads over the event stream, including events written
+    before the subscriber existed, with opt-in dead-lettering and checkpoint removal for retired
+    subscriptions.
   - [Transaction guarantees](Transaction-Guarantees.md): atomic requirements, best-effort fallback, and failure
     behavior.
   - [Snapshot schema versioning](Snapshot-Schema-Versioning.md): compatibility detection and event-replay rebuilds.

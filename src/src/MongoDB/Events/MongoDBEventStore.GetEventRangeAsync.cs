@@ -17,8 +17,8 @@ partial class MongoDBEventStore<T>
 	/// <returns>If no <paramref name="versionFrom"/> is specified all available events greater than <paramref name="versionFrom"/> are returned.</returns>
 	public async IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync(
 		string aggregateId,
-		int versionFrom,
-		int? versionTo,
+		long versionFrom,
+		long? versionTo,
 		[EnumeratorCancellation] CancellationToken cancellationToken
 	)
 	{
@@ -40,7 +40,7 @@ partial class MongoDBEventStore<T>
 		var entities = GetEventRangeEntitiesAsync(aggregateId, versionFrom, versionTo, cancellationToken);
 		await foreach (var entity in entities)
 		{
-			var item = DeserializeEvent(entity);
+			var item = await DeserializeEventAsync(entity, cancellationToken);
 			if (item != null)
 				yield return (item.Value, entity.EventType);
 		}
@@ -48,8 +48,8 @@ partial class MongoDBEventStore<T>
 
 	internal async IAsyncEnumerable<EventEntity> GetEventRangeEntitiesAsync(
 		string aggregateId,
-		int versionFrom,
-		int? versionTo,
+		long versionFrom,
+		long? versionTo,
 		[EnumeratorCancellation] CancellationToken cancellationToken
 	)
 	{
@@ -70,9 +70,10 @@ partial class MongoDBEventStore<T>
 	}
 
 	/// <param name="eventEntity"></param>
-	EventRecord? DeserializeEvent(EventEntity eventEntity)
+	/// <param name="cancellationToken"></param>
+	async Task<EventRecord?> DeserializeEventAsync(EventEntity eventEntity, CancellationToken cancellationToken)
 	{
-		static UnknownEvent ReturnUnknownEvent(EventEntity eventEntity, int aggregateVersion) =>
+		static UnknownEvent ReturnUnknownEvent(EventEntity eventEntity, long aggregateVersion) =>
 			new()
 			{
 				SchemaVersion = eventEntity.SchemaVersion,
@@ -114,7 +115,19 @@ partial class MongoDBEventStore<T>
 					Type.GetType(name, throwOnError: false)
 					?? throw new ApplicationException($"Unable to load event type: {name}")
 			);
-			var @event = DeserializeEvent(eventEntity.Payload, runtimeEventType);
+			var payload = eventEntity.Payload;
+			if (_payloadProtector is not null && _payloadProtector.IsProtected(payload))
+			{
+				var unprotected = await _payloadProtector.UnprotectAsync(payload, cancellationToken);
+				if (unprotected is null)
+					// The subject has been erased. Surfaced as an unknown event so replay continues and
+					// the aggregate reports the gap, rather than failing the whole read.
+					return new EventRecord(ReturnUnknownEvent(eventEntity, eventEntity.Version), metadata);
+
+				payload = unprotected;
+			}
+
+			var @event = DeserializeEvent(payload, runtimeEventType);
 
 			// Apply upcasting chain when a registry is available.
 			if (@event != null && _eventUpcasterRegistry?.CanUpcast(@event) == true)

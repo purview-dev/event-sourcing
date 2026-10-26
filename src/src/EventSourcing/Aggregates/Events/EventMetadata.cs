@@ -5,7 +5,7 @@ namespace Purview.EventSourcing.Aggregates.Events;
 /// it. The struct is immutable and allocation-free.
 /// </summary>
 public readonly record struct EventMetadata(
-	int AggregateVersion,
+	long AggregateVersion,
 	DateTimeOffset When,
 	int SchemaVersion,
 	string? IdempotencyId,

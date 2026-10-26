@@ -12,7 +12,11 @@ namespace Purview.EventSourcing.AzureStorage;
 /// The concrete implementation, <see cref="TableEventStore{T}"/>, persists events to Azure Table Storage
 /// and snapshots and large events to Azure Blob Storage.
 /// </remarks>
-public interface ITableEventStore<T> : INonQueryableEventStore<T>, IAggregateEventHistoryStoreCore<T>
+public interface ITableEventStore<T>
+	: INonQueryableEventStore<T>,
+		IAggregateEventHistoryStoreCore<T>,
+		IIdempotencyMarkerMaintenance,
+		Retention.IEventStreamPruning<T>
 	where T : class, IAggregate, new()
 {
 	//

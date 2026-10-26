@@ -7,10 +7,12 @@ using Microsoft.Extensions.Options;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events.Upcasting;
 using Purview.EventSourcing.Aggregates.Snapshotting;
+using Purview.EventSourcing.Cryptography;
 using Purview.EventSourcing.MongoDB.Events;
 using Purview.EventSourcing.MongoDB.Events.Entities;
 using Purview.EventSourcing.MongoDB.StorageClient;
 using Purview.EventSourcing.Services;
+using Purview.EventSourcing.Tenancy;
 using Purview.EventSourcing.Validation;
 
 namespace Purview.EventSourcing.MongoDB;
@@ -49,6 +51,14 @@ public sealed partial class MongoDBEventStore<T> : IMongoDBEventStore<T>, IDispo
 	readonly IAggregateRequirementsManager _aggregateRequirementsManager;
 	readonly IEventUpcasterRegistry? _eventUpcasterRegistry;
 
+	readonly IEventStorePrincipalAccessor _principalAccessor;
+
+	readonly IEventStoreMetrics _metrics;
+
+	readonly ICurrentTenant _currentTenant;
+
+	readonly IEventPayloadProtector? _payloadProtector;
+
 	readonly string _aggregateTypeFullName;
 	readonly string _aggregateTypeShortName;
 	readonly int _snapshotSchemaVersion = AggregateSnapshotSchema.GetVersion<T>();
@@ -69,6 +79,10 @@ public sealed partial class MongoDBEventStore<T> : IMongoDBEventStore<T>, IDispo
 	/// <param name="validator">Optional <see cref="IAggregateValidator{T}"/> used to validate aggregates before they are saved.</param>
 	/// <param name="aggregateIdFactory">Optional factory used to generate aggregate ids when none is supplied.</param>
 	/// <param name="eventUpcasterRegistry">Optional registry used to upcast legacy events during replay.</param>
+	/// <param name="principalAccessor">Optional accessor supplying the principal recorded against saved events.</param>
+	/// <param name="metrics">Optional metrics recorder; defaults to a no-op.</param>
+	/// <param name="currentTenant">Optional tenant scope. This provider does not enforce tenant isolation and refuses a tenant-scoped operation.</param>
+	/// <param name="payloadProtector">Optional payload protector; when omitted payloads are stored unencrypted.</param>
 	public MongoDBEventStore(
 		IAggregateEventNameMapper eventNameMapper,
 		[NotNull] IOptions<MongoDBEventStoreOptions> mongoDbOptions,
@@ -80,7 +94,11 @@ public sealed partial class MongoDBEventStore<T> : IMongoDBEventStore<T>, IDispo
 		IMongoDBEventStoreStorageNameBuilder? storageNameBuilder = null,
 		IAggregateValidator<T>? validator = null,
 		IAggregateIdFactory? aggregateIdFactory = null,
-		IEventUpcasterRegistry? eventUpcasterRegistry = null
+		IEventUpcasterRegistry? eventUpcasterRegistry = null,
+		IEventStorePrincipalAccessor? principalAccessor = null,
+		IEventStoreMetrics? metrics = null,
+		ICurrentTenant? currentTenant = null,
+		IEventPayloadProtector? payloadProtector = null
 	)
 	{
 		_eventNameMapper = eventNameMapper;
@@ -92,6 +110,10 @@ public sealed partial class MongoDBEventStore<T> : IMongoDBEventStore<T>, IDispo
 		_aggregateChangeNotifier = aggregateChangeNotifier;
 		_aggregateRequirementsManager = aggregateRequirementsManager;
 		_eventUpcasterRegistry = eventUpcasterRegistry;
+		_principalAccessor = principalAccessor ?? new AmbientEventStorePrincipalAccessor();
+		_metrics = metrics ?? NoOpEventStoreMetrics.Instance;
+		_currentTenant = currentTenant ?? new SystemCurrentTenant();
+		_payloadProtector = payloadProtector;
 
 		_aggregateTypeShortName = typeof(T).Name;
 		_aggregateTypeFullName = typeof(T).FullName ?? _aggregateTypeShortName;
@@ -112,7 +134,8 @@ public sealed partial class MongoDBEventStore<T> : IMongoDBEventStore<T>, IDispo
 					?? $"es-{_aggregateTypeShortName}-events",
 				ConnectionString = mongoDbOptions.Value.ConnectionString,
 				ReplicaName = mongoDbOptions.Value.ReplicaName,
-			}
+			},
+			currentTenant: _currentTenant
 		);
 
 		_snapshotClient = new(
@@ -127,7 +150,8 @@ public sealed partial class MongoDBEventStore<T> : IMongoDBEventStore<T>, IDispo
 					?? $"es-{_aggregateTypeShortName}-snapshots",
 				ConnectionString = mongoDbOptions.Value.ConnectionString,
 				ReplicaName = mongoDbOptions.Value.ReplicaName,
-			}
+			},
+			currentTenant: _currentTenant
 		);
 	}
 
@@ -253,27 +277,12 @@ public sealed partial class MongoDBEventStore<T> : IMongoDBEventStore<T>, IDispo
 		return result;
 	}
 
-	static bool ReturnAggregate(bool isDeleted, string aggregateId, EventStoreOperationContext context)
-	{
-		if (isDeleted)
-		{
-#pragma warning disable IDE0010 // Add missing cases
-			switch (context.DeleteMode)
-			{
-				case DeleteHandlingMode.ThrowsException:
-					throw AggregateIsDeletedException(aggregateId);
-				case DeleteHandlingMode.ReturnsNull:
-					return false;
-			}
-#pragma warning restore IDE0010 // Add missing cases
-		}
-
-		return true;
-	}
+	static bool ReturnAggregate(bool isDeleted, EventStoreOperationContext context) =>
+		!isDeleted || context.DeleteMode == DeleteHandlingMode.ReturnsAggregate;
 
 	string CreateStreamVersionId(string aggregateId) => $"s_{_aggregateTypeShortName}_{aggregateId}";
 
-	string CreateEventId(string aggregateId, int version) =>
+	string CreateEventId(string aggregateId, long version) =>
 		$"e_{_aggregateTypeShortName}_{aggregateId}_{$"{version}".PadLeft(_eventStoreOptions.Value.EventSuffixLength, '0')}";
 
 	string CreateIdempotencyCheckId(string aggregateId, string idempotencyId) =>
@@ -286,7 +295,18 @@ public sealed partial class MongoDBEventStore<T> : IMongoDBEventStore<T>, IDispo
 	/// <param name="aggregateId">The identifier of the aggregate.</param>
 	/// <returns>The case-insensitive cache key used to store and retrieve the aggregate snapshot.</returns>
 	public string CreateCacheKey(string aggregateId) =>
-		$"{_aggregateTypeShortName}:{aggregateId}{AggregateSnapshotSchema.GetStorageSuffix<T>()}".ToLowerInvariant();
+		$"{TenantCacheScope()}{_aggregateTypeShortName}:{aggregateId}{AggregateSnapshotSchema.GetStorageSuffix<T>()}".ToLowerInvariant();
+
+	/// <summary>
+	/// Namespaces a cache key by tenant.
+	/// </summary>
+	/// <remarks>
+	/// The distributed cache is read before the tenant-filtered storage lookup, so an unqualified key
+	/// would let one tenant read another's cached aggregate straight out of a shared cache, bypassing
+	/// every storage filter. The system scope keeps the unqualified key, matching unowned rows.
+	/// </remarks>
+	/// <returns>The tenant prefix, or an empty string under the system scope.</returns>
+	string TenantCacheScope() => _currentTenant.Current.IsSystem ? string.Empty : $"{_currentTenant.Current.TenantId}:";
 #pragma warning restore CA1308 // Normalize strings to uppercase
 
 	/// <summary>

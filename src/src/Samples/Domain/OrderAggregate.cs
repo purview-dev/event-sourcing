@@ -34,12 +34,15 @@ public sealed partial class OrderAggregate : AggregateBase
 
 	/// <summary>
 	/// Updates one or more order details in a single operation, raising a granular event
-	/// for each field that has actually changed. Pass <see langword="null"/> for any field
-	/// that should remain unchanged. To clear notes, use <see cref="UpdateNotes"/> directly.
+	/// for each field that has actually changed. Pass <see langword="null"/> - or, for the shipping
+	/// address, any whitespace - for a field that should remain unchanged. To clear a field, use
+	/// <see cref="SetShippingAddress"/> or <see cref="UpdateNotes"/> directly.
 	/// </summary>
 	public OrderAggregate UpdateDetails(string? shippingAddress = null, string? notes = null)
 	{
-		if (shippingAddress is not null)
+		// A blank address is normalized to an empty string, so accepting one here would raise an event
+		// for what the caller asked to leave alone.
+		if (!string.IsNullOrWhiteSpace(shippingAddress))
 			SetShippingAddress(shippingAddress);
 
 		if (notes is not null)

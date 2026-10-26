@@ -84,10 +84,10 @@ public sealed class EventContractManifestIncrementalTests : AggregateSourceGener
 	[Test]
 	public async Task BaselineContentChange_AffectsOnlyComparisonDiagnostics(CancellationToken cancellationToken)
 	{
-		var compatible = await GenerateAsync(OrderSource, WithBaseline(BaselineV1Json), cancellationToken);
+		using var compatible = await GenerateAsync(OrderSource, WithBaseline(BaselineV1Json), cancellationToken);
 		await Assert.That(compatible).DoesNotHaveDiagnostic("EVENTSTORE035");
 
-		var regressed = await GenerateAsync(OrderSource, WithBaseline(BaselineV2Json), cancellationToken);
+		using var regressed = await GenerateAsync(OrderSource, WithBaseline(BaselineV2Json), cancellationToken);
 		await Assert.That(regressed).HasDiagnostic("EVENTSTORE035");
 
 		var compatibleGenerated = GeneratedAggregateSources(compatible);

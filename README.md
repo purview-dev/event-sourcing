@@ -23,6 +23,7 @@ Purview Event Sourcing is a .NET event sourcing framework for building aggregate
 | `Purview.EventSourcing.AzureStorage` | Azure Table / Blob event store | [`src/src/AzureStorage/Sdk/README.md`](src/src/AzureStorage/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.AzureStorage.svg)](https://www.nuget.org/packages/Purview.EventSourcing.AzureStorage) |
 | `Purview.EventSourcing.MongoDB` | MongoDB event stream and queryable snapshot stores | [`src/src/MongoDB/Sdk/README.md`](src/src/MongoDB/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.MongoDB.svg)](https://www.nuget.org/packages/Purview.EventSourcing.MongoDB) |
 | `Purview.EventSourcing.CosmosDb` | Azure Cosmos DB queryable snapshot store | [`src/src/CosmosDb/Sdk/README.md`](src/src/CosmosDb/Sdk/README.md) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.CosmosDb.svg)](https://www.nuget.org/packages/Purview.EventSourcing.CosmosDb) |
+| `Purview.EventSourcing.EntityFrameworkCore` | Shared Entity Framework Core mapping, conversion, and query translation. Brought in automatically by the SQL Server, PostgreSQL, and Cosmos DB packages; you do not install it directly | (see package source at `src/src/EntityFrameworkCore`) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.EntityFrameworkCore.svg)](https://www.nuget.org/packages/Purview.EventSourcing.EntityFrameworkCore) |
 | `Purview.EventSourcing.InMemory` | In-memory event/snapshot store implementation for local and test scenarios | (see package source at `src/src/InMemory`) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.InMemory.svg)](https://www.nuget.org/packages/Purview.EventSourcing.InMemory) |
 | `Purview.EventSourcing.Validation.FluentValidation` | `FluentValidation` adapter for aggregate save-time validation | (see package source at `src/src/Validation.FluentValidation`) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.Validation.FluentValidation.svg)](https://www.nuget.org/packages/Purview.EventSourcing.Validation.FluentValidation) |
 | `Purview.EventSourcing.Validation.ZodSharp` | `Purview.ZodSharp` adapter for aggregate save-time validation | (see package source at `src/src/Validation.ZodSharp`) | [![NuGet](https://img.shields.io/nuget/v/Purview.EventSourcing.Validation.ZodSharp.svg)](https://www.nuget.org/packages/Purview.EventSourcing.Validation.ZodSharp) |
@@ -102,8 +103,10 @@ public sealed class OrderService(IEventStore store)
 {
     public async Task PlaceOrderAsync(string orderId, string customerId, CancellationToken cancellationToken)
     {
-        var order = await store.GetAsync<OrderAggregate>(orderId, cancellationToken)
-            ?? await store.CreateAsync<OrderAggregate>(orderId, cancellationToken: cancellationToken);
+        var orderResult = await store.GetAsync<OrderAggregate>(orderId, cancellationToken);
+        var order = orderResult.IsSuccess
+            ? orderResult.Value
+            : await store.CreateAsync<OrderAggregate>(orderId, cancellationToken: cancellationToken);
 
         order.CreateOrder(customerId);
         order.AddLineItem("SKU-1", "Demo product", 1, 19.99m);
@@ -190,7 +193,7 @@ The sample solution demonstrates how the framework is intended to be consumed:
 | `src/tests` | Unit, integration, and source generator test projects |
 | `docs/wiki` | Wiki-style project documentation (`Home.md`, SQL Server guide, release flow, source-generator behaviors) |
 | `Justfile` | Build, test, format, version, pack, and pipeline workflow definitions |
-| `purview-build.json` | Shared `Purview.Build` pipeline configuration (restore, build, lint, tests, pack) |
+| `.config/purview-build.json` | Shared `Purview.Build` pipeline configuration (restore, build, lint, tests, pack) |
 
 ## Development workflow
 
@@ -216,8 +219,8 @@ Additional notes:
 
 Releases are fully automated from `main`:
 
-1. Update the package version with the repository release process (changesets).
-2. Review the generated `CHANGELOG.md` and package version changes.
+1. Bump `version` in `package.json`.
+2. Review the change; the GitHub release generates its notes from the commits and pull requests it contains.
 3. Merge to `main`; the `Release` workflow validates, builds, packs, and publishes through the shared `Purview.Build` pipeline.
 4. The pipeline creates the `v<version>` tag and GitHub release, and pushes NuGet packages to nuget.org.
 

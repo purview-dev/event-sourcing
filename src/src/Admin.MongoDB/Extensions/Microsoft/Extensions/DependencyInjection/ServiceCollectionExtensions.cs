@@ -1,7 +1,9 @@
 using System.ComponentModel;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using MongoDB.Driver;
-using Purview.EventSourcing.Admin.Abstractions.Services;
+using Purview.EventSourcing.Admin.MongoDB;
+using Purview.EventSourcing.Admin.Services;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -37,6 +39,51 @@ public static class ServiceCollectionExtensions
 				var mongoClient = sp.GetRequiredService<IMongoClient>();
 				return new MongoDBAdminProjectionService(mongoClient, databaseName);
 			});
+
+			services.TryAddTransient<IAdminStorageProbe>(sp =>
+			{
+				var mongoClient = sp.GetRequiredService<IMongoClient>();
+				return new MongoDBAdminStorageProbe(mongoClient, databaseName);
+			});
+
+			return services;
+		}
+
+		/// <summary>
+		/// Replaces the in-memory audit logger with a durable MongoDB one, and registers the reader
+		/// that reads it back.
+		/// </summary>
+		/// <param name="configure">Optional <see cref="MongoDBAdminAuditLoggerOptions"/> configuration.</param>
+		/// <remarks>
+		/// <para>
+		/// The default audit logger keeps entries in memory, so the record of who read which payload
+		/// dies with the process. In a regulated deployment the audit trail is the control, and this
+		/// is what makes it survive a restart.
+		/// </para>
+		/// <para>
+		/// The failure mode defaults to <c>Fail</c>: an operation that cannot be audited does not
+		/// happen. Set it to <c>Continue</c> where availability matters more than the record.
+		/// </para>
+		/// </remarks>
+		public IServiceCollection AddPurviewEventSourcingAdminMongoDBAudit(
+			Action<MongoDBAdminAuditLoggerOptions>? configure = null
+		)
+		{
+			services.AddKeyedSingleton<IAdminAuditLogger, MongoDBAdminAuditLogger>(AdminAuditKeys.Sink);
+
+			// The reader is registered with the writer, because a trail nothing can read back is not
+			// an audit trail. Scoped: it filters on ICurrentTenant, which is resolved per request.
+			services.AddScoped<IAdminAuditEntryReader, MongoDBAdminAuditEntryReader>();
+
+			services
+				.AddOptions<MongoDBAdminAuditLoggerOptions>()
+				.Configure<IConfiguration>(
+					(options, configuration) =>
+					{
+						configuration.GetSection(MongoDBAdminAuditLoggerOptions.MongoDBAudit).Bind(options);
+						configure?.Invoke(options);
+					}
+				);
 
 			return services;
 		}

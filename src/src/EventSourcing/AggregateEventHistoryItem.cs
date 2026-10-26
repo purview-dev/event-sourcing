@@ -33,7 +33,7 @@ public sealed class AggregateEventHistoryItem
 	/// <summary>
 	/// Gets or sets the aggregate version the event was recorded at.
 	/// </summary>
-	public int AggregateVersion { get; set; }
+	public long AggregateVersion { get; set; }
 
 	/// <summary>
 	/// Gets or sets the UTC timestamp the event was recorded at.

@@ -3,6 +3,7 @@ using MongoDB.Driver;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Snapshotting;
 using Purview.EventSourcing.MongoDB.StorageClient;
+using Purview.EventSourcing.Tenancy;
 
 namespace Purview.EventSourcing.MongoDB.Snapshots;
 
@@ -38,13 +39,15 @@ public sealed partial class MongoDBSnapshotEventStore<T> : IMongoDBSnapshotEvent
 	/// <param name="mongoDBClientTelemetry">The telemetry contract used to trace MongoDB client operations.</param>
 	/// <param name="snapshotStrategy">Optional strategy controlling when snapshots are taken; defaults to always snapshotting.</param>
 	/// <param name="snapshotStrategySelector">Optional selector used to resolve the snapshot strategy for an operation.</param>
+	/// <param name="currentTenant">Optional tenant scope applied to snapshot reads and writes.</param>
 	public MongoDBSnapshotEventStore(
 		Internal.INonQueryableEventStore<T> eventStore,
 		IOptions<MongoDBSnapshotEventStoreOptions> mongoDbOptions,
 		IMongoDBSnapshotEventStoreTelemetry telemetry,
 		IMongoDBClientTelemetry mongoDBClientTelemetry,
 		ISnapshotStrategy<T>? snapshotStrategy = null,
-		ISnapshotStrategySelector? snapshotStrategySelector = null
+		ISnapshotStrategySelector? snapshotStrategySelector = null,
+		ICurrentTenant? currentTenant = null
 	)
 	{
 		_eventStore = eventStore;
@@ -63,7 +66,8 @@ public sealed partial class MongoDBSnapshotEventStore<T> : IMongoDBSnapshotEvent
 				Database = _mongoDBOptions.Value.Database,
 				Collection = collectionName,
 				ApplicationName = _mongoDBOptions.Value.ApplicationName,
-			}
+			},
+			currentTenant: currentTenant
 		);
 	}
 

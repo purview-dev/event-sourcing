@@ -1,11 +1,14 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Purview.EventSourcing.Admin.Abstractions.Models;
-using Purview.EventSourcing.Admin.Abstractions.Services;
+using Purview.EventSourcing.Admin.Failures;
+using Purview.EventSourcing.Admin.Models;
 using Purview.EventSourcing.Admin.Postgres.Internal;
+using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.Postgres.Events;
 using Purview.EventSourcing.Postgres.Events.EntityFramework;
+using Purview.EventSourcing.Tenancy;
+using Purview.Results;
 
 namespace Purview.EventSourcing.Admin.Postgres;
 
@@ -18,11 +21,14 @@ namespace Purview.EventSourcing.Admin.Postgres;
 /// which event versions were applied and which were skipped.
 /// </remarks>
 /// <param name="options">The configured <see cref="PostgresEventStoreOptions"/>.</param>
-public sealed class PostgresAdminProjectionService(IOptions<PostgresEventStoreOptions> options)
-	: IAdminProjectionService
+/// <param name="currentTenant">Optional tenant scope; when omitted the query is not tenant-filtered.</param>
+public sealed class PostgresAdminProjectionService(
+	IOptions<PostgresEventStoreOptions> options,
+	ICurrentTenant? currentTenant = null
+) : IAdminProjectionService
 {
 	///<inheritdoc/>
-	public async Task<ProjectionResponse?> ProjectAtVersionAsync(
+	public async Task<Result<ProjectionResponse, AdminQueryFailure>> ProjectAtVersionAsync(
 		string aggregateType,
 		string aggregateId,
 		long targetVersion,
@@ -76,14 +82,16 @@ public sealed class PostgresAdminProjectionService(IOptions<PostgresEventStoreOp
 		}
 
 		if (rowList.Count == 0)
-			return null;
+			return AdminQueryFailure.Failure<ProjectionResponse>(
+				new AdminAggregateNotFound(aggregateType, aggregateId)
+			);
 
 		var reason =
 			targetVersion > rowList.Last().Version
 				? $"Events projected up to available version {rowList.Last().Version} (target was {targetVersion})"
 				: $"Events projected up to version {targetVersion}";
 
-		var finalState = JsonDocument.Parse(JsonSerializer.Serialize(projectedState)).RootElement.Clone();
+		var finalState = JsonSerializer.SerializeToElement(projectedState);
 
 		return new ProjectionResponse(
 			aggregateType,
@@ -102,7 +110,7 @@ public sealed class PostgresAdminProjectionService(IOptions<PostgresEventStoreOp
 	}
 
 	///<inheritdoc/>
-	public async Task<ProjectionResponse?> ProjectAtTimeAsync(
+	public async Task<Result<ProjectionResponse, AdminQueryFailure>> ProjectAtTimeAsync(
 		string aggregateType,
 		string aggregateId,
 		DateTimeOffset targetUtc,
@@ -158,7 +166,9 @@ public sealed class PostgresAdminProjectionService(IOptions<PostgresEventStoreOp
 		}
 
 		if (rowList.Count == 0)
-			return null;
+			return AdminQueryFailure.Failure<ProjectionResponse>(
+				new AdminAggregateNotFound(aggregateType, aggregateId)
+			);
 
 		var latestTimestamp = rowList.Last().Timestamp;
 		var reason =
@@ -166,7 +176,7 @@ public sealed class PostgresAdminProjectionService(IOptions<PostgresEventStoreOp
 				? $"Events projected up to available timestamp {latestTimestamp:O} (target was {targetUtc:O})"
 				: $"Events projected up to timestamp {targetUtc:O}";
 
-		var finalState = JsonDocument.Parse(JsonSerializer.Serialize(projectedState)).RootElement.Clone();
+		var finalState = JsonSerializer.SerializeToElement(projectedState);
 
 		return new ProjectionResponse(
 			aggregateType,
@@ -184,10 +194,10 @@ public sealed class PostgresAdminProjectionService(IOptions<PostgresEventStoreOp
 		);
 	}
 
-	static EventStoreDbContext CreateContext(PostgresEventStoreOptions options, PostgresAdminTableDescriptor table)
+	EventStoreDbContext CreateContext(PostgresEventStoreOptions options, PostgresAdminTableDescriptor table)
 	{
 		DbContextOptionsBuilder<EventStoreDbContext> builder = new();
 		builder.UseNpgsql(options.ConnectionString);
-		return new EventStoreDbContext(builder.Options, table.SchemaName, table.TableName);
+		return new EventStoreDbContext(builder.Options, table.SchemaName, table.TableName, currentTenant);
 	}
 }
