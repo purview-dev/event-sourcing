@@ -20,6 +20,8 @@ partial class TableEventStore<T>
 		if (aggregate == null)
 			throw NullAggregate(aggregate);
 
+		using var activity = _eventStoreTelemetry.DeleteAggregate(aggregate.Id(), _aggregateTypeFullName);
+
 		if (aggregate.Details.IsDeleted)
 		{
 			return AggregateDeleteFailure.Failure<SaveOutcome<T>>(

@@ -62,6 +62,10 @@ public sealed partial class TableEventStore<T> : ITableEventStore<T>, IAsyncDisp
 
 	// Exposed so the save operation tags metrics with the same value every other provider uses.
 	internal string AggregateTypeShortName => _aggregateTypeShortName;
+
+	internal string AggregateTypeFullName => _aggregateTypeFullName;
+
+	internal ITableEventStoreTelemetry EventStoreTelemetry => _eventStoreTelemetry;
 	readonly TableSaveOperation<T> _saveOperation;
 
 	static readonly ConcurrentDictionary<string, Type> EventTypeCache = new(StringComparer.Ordinal);

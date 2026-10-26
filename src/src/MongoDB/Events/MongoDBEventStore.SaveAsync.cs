@@ -31,6 +31,8 @@ partial class MongoDBEventStore<T>
 		params EventRecord[] additionalEvents
 	)
 	{
+		using var activity = _eventStoreTelemetry.SaveAggregate(aggregate.Id(), _aggregateTypeFullName);
+
 		var saveStopwatch = System.Diagnostics.Stopwatch.StartNew();
 		var preparation = await PrepareSaveAsync(aggregate, operationContext, additionalEvents, cancellationToken);
 		var result = preparation.Terminal ?? await PersistAndNotifyAsync(preparation, cancellationToken);
@@ -41,6 +43,8 @@ partial class MongoDBEventStore<T>
 		// Only a write actually appended events; a no-op or an idempotent replay appended none.
 		if (result.IsSuccess && result.Value.Kind is SaveOutcomeKind.Written)
 			_metrics.EventsAppended(preparation.ChangeEvents.Length, _aggregateTypeShortName);
+		_eventStoreTelemetry.SaveCompleted(activity, preparation.ChangeEvents.Length);
+		_eventStoreTelemetry.AggregateSaved(aggregate.AggregateType);
 
 		return result;
 	}

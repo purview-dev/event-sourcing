@@ -78,6 +78,8 @@ public sealed partial class CosmosDbSnapshotEventStore<T> : ICosmosDbSnapshotEve
 	/// <param name="cancellationToken">A token that can be used to cancel the operation.</param>
 	public async Task SnapshotAsync(T aggregate, CancellationToken cancellationToken = default)
 	{
+		using var activity = _telemetry.SnapshotAggregate(aggregate.Id(), typeof(T).FullName ?? typeof(T).Name);
+
 		ArgumentNullException.ThrowIfNull(aggregate, nameof(aggregate));
 
 		var result = await _cosmosDbClient.UpsertAsync(aggregate, aggregate.Details.Id, cancellationToken);

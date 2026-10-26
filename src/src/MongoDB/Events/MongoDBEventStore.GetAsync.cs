@@ -29,6 +29,7 @@ partial class MongoDBEventStore<T>
 
 		operationContext ??= EventStoreOperationContext.DefaultContext();
 
+		using var activity = _eventStoreTelemetry.GetAggregate(aggregateId, _aggregateTypeFullName);
 		_eventStoreTelemetry.GetAggregateStart(aggregateId, _aggregateTypeFullName);
 		var getStopwatch = System.Diagnostics.Stopwatch.StartNew();
 		try
@@ -226,6 +227,15 @@ partial class MongoDBEventStore<T>
 			eventCount,
 			AggregateVersionData.Create(aggregate)
 		);
+
+		// Activity.Current rather than a parameter: the activity is started by the public operation
+		// and this runs inside it.
+		_eventStoreTelemetry.EventsReconstituted(
+			System.Diagnostics.Activity.Current,
+			eventCount,
+			aggregate.Details.CurrentVersion
+		);
+		_eventStoreTelemetry.AggregateLoaded(aggregate.AggregateType);
 
 		aggregate.Details.SavedVersion = aggregate.Details.CurrentVersion;
 		aggregate.Details.Etag = streamVersion.Version.ToString(CultureInfo.InvariantCulture);

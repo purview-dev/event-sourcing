@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Purview.Telemetry;
 
@@ -11,9 +12,95 @@ namespace Purview.EventSourcing.AzureStorage;
 /// <see cref="LoggerAttribute"/> and <see cref="LogAttribute"/> annotations. Each method describes a single
 /// event-store operation or failure for observability and diagnostics.
 /// </remarks>
+[ActivitySource]
 [Logger]
+[Meter]
 public interface ITableEventStoreTelemetry
 {
+	// Activities (distributed tracing)
+	//
+	// Names and parameters match the SQL Server and PostgreSQL contracts deliberately: a dashboard or
+	// trace query built against one provider has to keep working when the same service moves to
+	// another, so span names are a compatibility contract in the same way instrument names are.
+
+	/// <summary>
+	/// Starts an activity representing a get-aggregate operation.
+	/// </summary>
+	/// <param name="aggregateId">The id of the aggregate being retrieved.</param>
+	/// <param name="aggregateTypeFullName">The full name of the aggregate type.</param>
+	/// <returns>The activity, or <see langword="null"/> when tracing is not enabled.</returns>
+	[Activity]
+	Activity? GetAggregate(string aggregateId, [Baggage] string aggregateTypeFullName);
+
+	/// <summary>
+	/// Starts an activity representing a get-aggregate-at-version operation.
+	/// </summary>
+	/// <param name="aggregateId">The id of the aggregate being retrieved.</param>
+	/// <param name="version">The version of the aggregate being retrieved.</param>
+	/// <param name="aggregateTypeFullName">The full name of the aggregate type.</param>
+	/// <returns>The activity, or <see langword="null"/> when tracing is not enabled.</returns>
+	[Activity]
+	Activity? GetAggregateAtVersion(string aggregateId, long version, [Baggage] string aggregateTypeFullName);
+
+	/// <summary>
+	/// Starts an activity representing a save-aggregate operation.
+	/// </summary>
+	/// <param name="aggregateId">The id of the aggregate being saved.</param>
+	/// <param name="aggregateTypeFullName">The full name of the aggregate type.</param>
+	/// <returns>The activity, or <see langword="null"/> when tracing is not enabled.</returns>
+	[Activity]
+	Activity? SaveAggregate(string aggregateId, [Baggage] string aggregateTypeFullName);
+
+	/// <summary>
+	/// Starts an activity representing a delete-aggregate operation.
+	/// </summary>
+	/// <param name="aggregateId">The id of the aggregate being deleted.</param>
+	/// <param name="aggregateTypeFullName">The full name of the aggregate type.</param>
+	/// <returns>The activity, or <see langword="null"/> when tracing is not enabled.</returns>
+	[Activity]
+	Activity? DeleteAggregate(string aggregateId, [Baggage] string aggregateTypeFullName);
+
+	/// <summary>
+	/// Records the number of events reconstituted when loading an aggregate.
+	/// </summary>
+	/// <param name="activity">The activity to attach the event to.</param>
+	/// <param name="eventCount">The number of events applied.</param>
+	/// <param name="version">The resulting aggregate version.</param>
+	[Event]
+	void EventsReconstituted(Activity? activity, int eventCount, long version);
+
+	/// <summary>
+	/// Records the completion of a save operation.
+	/// </summary>
+	/// <param name="activity">The activity to attach the event to.</param>
+	/// <param name="eventCount">The number of events saved.</param>
+	[Event]
+	void SaveCompleted(Activity? activity, int eventCount);
+
+	// Metrics (counters)
+
+	/// <summary>
+	/// Increments the counter tracking loaded aggregates.
+	/// </summary>
+	/// <param name="aggregateType">The short name of the aggregate type.</param>
+	[AutoCounter]
+	void AggregateLoaded(string aggregateType);
+
+	/// <summary>
+	/// Increments the counter tracking saved aggregates.
+	/// </summary>
+	/// <param name="aggregateType">The short name of the aggregate type.</param>
+	[AutoCounter]
+	void AggregateSaved(string aggregateType);
+
+	/// <summary>
+	/// Increments the counter tracking deleted aggregates.
+	/// </summary>
+	/// <param name="aggregateType">The short name of the aggregate type.</param>
+	[AutoCounter]
+	void AggregateDeletedCounter(string aggregateType);
+
+	// Logging
 	/// <summary>
 	/// Logs that the aggregate was retrieved from the distributed cache.
 	/// </summary>

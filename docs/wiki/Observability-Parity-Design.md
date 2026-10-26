@@ -1,6 +1,12 @@
 # Observability Parity — Design
 
-> **Status: proposal. Nothing on this page is implemented.**
+> **Status: implemented, with one gap.**
+>
+> Tracing now exists on every provider. **Span emission is not asserted by any test**: the provider
+> fixtures inject mocked telemetry, so a test listening for real activities records nothing. The
+> wiring is covered only by compilation and by the provider suites exercising the code paths, which
+> is weaker than it should be. Closing it needs a fixture that uses the generated telemetry rather
+> than a mock.
 
 ## The problem
 
@@ -11,11 +17,10 @@ exists. Measured from the telemetry interfaces in each provider:
 | --- | --- | --- | --- |
 | SQL Server | Yes | Yes | Yes |
 | PostgreSQL | Yes | Yes | Yes |
-| MongoDB | **No** | Yes | Yes |
-| Azure Storage | **No** | Yes | **No** |
-| Cosmos DB | **No** | **No** | Yes |
-| InMemory | **No** | **No** | **No** |
-
+| MongoDB | Yes | Yes | Yes |
+| Azure Storage | Yes | Yes | Yes |
+| Cosmos DB | Yes (snapshot and query spans) | Yes | Yes |
+| InMemory | No, deliberately | No | No |
 The cross-provider `IEventStoreMetrics` — `save.duration`, `get.duration`, `events.appended` — *is*
 uniform, and [Guarantees and Limitations](Guarantees-and-Limitations.md) correctly says so. The gap
 is **distributed tracing**, which exists on two providers of five.

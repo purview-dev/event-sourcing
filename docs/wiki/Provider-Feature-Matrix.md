@@ -20,6 +20,7 @@ per-registration values.
 | Durable subscription checkpoints | In-memory only (replays after restart) | `AddSqlServerSubscriptionCheckpoints()` | `AddPostgresSubscriptionCheckpoints()` | `AddAzureStorageSubscriptionCheckpoints()` | `AddMongoDBSubscriptionCheckpoints()` | n/a |
 | Durable crypto-shredding key store | In-memory only (refused outside Development) | `AddSqlServerEventCryptoShredding()` | `AddPostgresEventCryptoShredding()` | `AddAzureStorageEventCryptoShredding()` | `AddMongoDBEventCryptoShredding()` | n/a |
 | Crypto key rotation | `IRotatingEventCryptoKeyStore` | Yes | Yes | No | No | n/a |
+| Distributed tracing spans | Span names are a contract | Yes | Yes | Yes | Yes | Snapshot/query spans |
 | Event-stream retention / pruning | No | No | No | No | No | n/a |
 | Provider-specific native transaction factory | No | `ISqlServerEventStoreTransactionFactory` | `IPostgresEventStoreTransactionFactory` | No | No | No |
 | Runtime-configured JSON payload indexes | No | Yes (event + snapshot stores, auto-create path) | Yes (GIN + expression indexes on event + snapshot stores) | No | No | Yes (container indexing policy, including composite and spatial paths) |

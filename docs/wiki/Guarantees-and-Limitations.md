@@ -238,6 +238,29 @@ store, so a capability flag could not report it truthfully.
 
 Event-stream **retention** is not implemented. Streams grow without bound; nothing removes an event.
 
+## Tracing
+
+Every provider that persists an event stream emits the same spans - `GetAggregate`,
+`GetAggregateAtVersion`, `SaveAggregate`, `DeleteAggregate` - with the aggregate id and type. **Span
+names are a compatibility contract**, like instrument names: a trace query built against one provider
+keeps working when a service moves to another.
+
+Cosmos DB emits `SnapshotAggregate` and `QuerySnapshots` instead. It persists no event stream and
+delegates aggregate reads and writes to an inner event store, which emits the aggregate-level spans;
+emitting them here as well would double-count every operation in a trace.
+
+The in-memory store emits nothing, deliberately - it exists for tests, and instrumenting it adds noise
+to every test run for no diagnostic value.
+
+Aggregate ids appear in spans on every provider. That has always been true of SQL Server and
+PostgreSQL; the other providers now match rather than diverge. If an aggregate id is sensitive in your
+domain, note that it reaches whatever trace backend you export to, which usually has different
+retention and access rules from the database.
+
+**No test asserts that spans are emitted.** The provider fixtures inject mocked telemetry, so a test
+listening for activities records nothing; the wiring is covered by compilation and by the provider
+suites exercising those paths. See [Observability Parity](Observability-Parity-Design.md).
+
 ## Metrics
 
 Every storage provider records the same instruments on the `Purview.EventSourcing` meter, so a dashboard

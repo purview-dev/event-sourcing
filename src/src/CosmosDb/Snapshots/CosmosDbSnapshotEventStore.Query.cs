@@ -1,4 +1,4 @@
-﻿using System.Linq.Expressions;
+using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 
 namespace Purview.EventSourcing.CosmosDb.Snapshot;
@@ -43,6 +43,8 @@ partial class CosmosDbSnapshotEventStore<T>
 		ArgumentNullException.ThrowIfNull(whereClause, nameof(whereClause));
 		ArgumentNullException.ThrowIfNull(request, nameof(request));
 
+		using var activity = _telemetry.QuerySnapshots("Query", typeof(T).FullName ?? typeof(T).Name);
+
 		return await ExecuteQueryAsync(whereClause, orderByClause, request, cancellationToken);
 	}
 
@@ -53,6 +55,8 @@ partial class CosmosDbSnapshotEventStore<T>
 		CancellationToken cancellationToken = default
 	)
 	{
+		using var activity = _telemetry.QuerySnapshots("List", typeof(T).FullName ?? typeof(T).Name);
+
 		ArgumentNullException.ThrowIfNull(request, nameof(request));
 
 		return await ExecuteQueryAsync(null, orderByClause, request, cancellationToken);
@@ -64,6 +68,8 @@ partial class CosmosDbSnapshotEventStore<T>
 		CancellationToken cancellationToken = default
 	)
 	{
+		using var activity = _telemetry.QuerySnapshots("SingleOrDefault", typeof(T).FullName ?? typeof(T).Name);
+
 		// Leave as 2 as it'll throw when expected.
 		var query = await GetSpecificNumberAsync(whereClause, null, 2, cancellationToken: cancellationToken);
 		return query.SingleOrDefault();
@@ -76,6 +82,8 @@ partial class CosmosDbSnapshotEventStore<T>
 		CancellationToken cancellationToken = default
 	)
 	{
+		using var activity = _telemetry.QuerySnapshots("FirstOrDefault", typeof(T).FullName ?? typeof(T).Name);
+
 		var query = await GetSpecificNumberAsync(whereClause, orderByClause, 1, cancellationToken: cancellationToken);
 		return query.FirstOrDefault();
 	}

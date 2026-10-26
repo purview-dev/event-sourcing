@@ -56,6 +56,7 @@ sealed class TableSaveOperation<T>(
 		params EventRecord[] additionalEvents
 	)
 	{
+		using var activity = store.EventStoreTelemetry.SaveAggregate(aggregate.Id(), store.AggregateTypeFullName);
 		var saveStopwatch = System.Diagnostics.Stopwatch.StartNew();
 		var (saveResult, preparedAggregate, preparedOperationContext, idempotencyId, changeEvents, isNew, marker) =
 			await PrepareSaveAsync(aggregate, operationContext, additionalEvents, cancellationToken);
@@ -78,6 +79,8 @@ sealed class TableSaveOperation<T>(
 		// Only a write actually appended events; a no-op or an idempotent replay appended none.
 		if (result.IsSuccess && result.Value.Kind is SaveOutcomeKind.Written)
 			metrics.EventsAppended(changeEvents.Length, store.AggregateTypeShortName);
+		store.EventStoreTelemetry.SaveCompleted(activity, changeEvents.Length);
+		store.EventStoreTelemetry.AggregateSaved(preparedAggregate.AggregateType);
 
 		return result;
 	}

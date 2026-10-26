@@ -15,6 +15,8 @@ partial class MongoDBEventStore<T>
 		CancellationToken cancellationToken = default
 	)
 	{
+		using var activity = _eventStoreTelemetry.DeleteAggregate(aggregate.Id(), _aggregateTypeFullName);
+
 		if (aggregate == null)
 			throw NullAggregate(aggregate);
 
