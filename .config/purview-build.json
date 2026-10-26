@@ -78,6 +78,12 @@
 				"purview-logo-light.png",
 				"README.md"
 			],
+			"purview.eventsourcing.azurekeyvault": [
+				"lib/$(TFM)/Purview.EventSourcing.AzureKeyVault.dll",
+				"lib/$(TFM)/Purview.EventSourcing.AzureKeyVault.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
 			"purview.eventsourcing.azurestorage": [
 				"lib/$(TFM)/Purview.EventSourcing.AzureStorage.dll",
 				"lib/$(TFM)/Purview.EventSourcing.AzureStorage.xml",

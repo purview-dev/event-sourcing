@@ -29,6 +29,7 @@
 		<Project Path="src/Admin.SqlServer/Admin.SqlServer.csproj" />
 	</Folder>
 	<Folder Name="/src/implementations/">
+		<Project Path="src/AzureKeyVault/AzureKeyVault.csproj" />
 		<Project Path="src/AzureStorage/AzureStorage.csproj" />
 		<Project Path="src/CosmosDb/CosmosDb.csproj" />
 		<Project Path="src/ImplementationShared/ImplementationShared.csproj" />
