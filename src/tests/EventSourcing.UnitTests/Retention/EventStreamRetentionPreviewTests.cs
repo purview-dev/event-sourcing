@@ -70,7 +70,7 @@ public sealed class EventStreamRetentionPreviewTests
 			{
 				RequireSnapshot = false,
 				RetainedVersions = 0,
-				MinimumAge = TimeSpan.FromMilliseconds(1),
+				MinimumAge = Fixture.AgeFloor,
 			}
 		);
 
@@ -92,7 +92,7 @@ public sealed class EventStreamRetentionPreviewTests
 			{
 				RequireSnapshot = false,
 				RetainedVersions = 0,
-				MinimumAge = TimeSpan.FromMilliseconds(1),
+				MinimumAge = Fixture.AgeFloor,
 			}
 		);
 
@@ -109,7 +109,7 @@ public sealed class EventStreamRetentionPreviewTests
 		await using Fixture fixture = new();
 		await fixture.SeedAsync("aggregate-1", events: 10);
 
-		EventRetentionPolicy policy = new() { RequireSnapshot = false, MinimumAge = TimeSpan.FromMilliseconds(1) };
+		EventRetentionPolicy policy = new() { RequireSnapshot = false, MinimumAge = Fixture.AgeFloor };
 
 		var none = await fixture.PreviewAsync(policy with { RetainedVersions = 0 });
 		var margin = await fixture.PreviewAsync(policy with { RetainedVersions = 4 });
@@ -162,6 +162,15 @@ public sealed class EventStreamRetentionPreviewTests
 			_provider = services.BuildServiceProvider();
 		}
 
+		/// <summary>The age floor the tests use, with a margin the clock cannot close.</summary>
+		/// <remarks>
+		/// Events must be provably older than the policy's MinimumAge. Comparing a one-millisecond
+		/// floor against events written microseconds earlier raced the clock - and on Windows, where
+		/// DateTimeOffset.UtcNow advances in ~15ms steps, it was not even close. CI caught it; it
+		/// passed locally by luck.
+		/// </remarks>
+		public static readonly TimeSpan AgeFloor = TimeSpan.FromMilliseconds(1);
+
 		public async Task SeedAsync(string aggregateId, int events)
 		{
 			var store = _provider.GetRequiredService<IInMemoryEventStore<RetentionTestAggregate>>();
@@ -170,6 +179,9 @@ public sealed class EventStreamRetentionPreviewTests
 				aggregate.Touch();
 
 			await store.SaveAsync(aggregate, new() { RequiresValidPrincipalIdentifier = false });
+
+			// Put the events comfortably behind the age floor, clear of clock granularity.
+			await Task.Delay(TimeSpan.FromMilliseconds(60));
 		}
 
 		public Task AdvanceCheckpointAsync(string aggregateId, long version) =>
