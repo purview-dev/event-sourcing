@@ -5,7 +5,7 @@ what is waiting on a decision. The five design pages hold the *reasoning*; this 
 *state*, so it is the one to read first and the one to update when something lands.
 
 **Last verified against the code: 2026-10-26**, on branch
-`feat/2.0-results-tenancy-subscriptions` (PR #60, 25 commits ahead of `main`).
+`feat/2.0-results-tenancy-subscriptions` (PR #60).
 
 ## Where each plan stands
 
@@ -13,7 +13,7 @@ what is waiting on a decision. The five design pages hold the *reasoning*; this 
 | --- | --- | --- |
 | [Crypto Key Management](Crypto-Key-Management-Design.md) | **Done** | Rotation ships for the two SQL providers only |
 | [Observability Parity](Observability-Parity-Design.md) | **Done, one gap** | No test asserts spans are emitted |
-| [Durable Admin Audit](Admin-Audit-Durability-Design.md) | **Partly done** | Phases 3–5: read side, Azure/Mongo loggers, retention |
+| [Durable Admin Audit](Admin-Audit-Durability-Design.md) | **Phases 1–4 done** | Phase 5: retention floor. Nothing deletes an audit entry, ever |
 | [Retention](Retention-Design.md) | **Done** | Retired subscriptions leave checkpoint rows nothing deletes |
 | [Resilience Testing](Resilience-Testing-Design.md) | **Phases 1–2 done** | Phases 4–5: transport faults, load/soak |
 
@@ -30,7 +30,7 @@ Three things grow without bound, and the first is the cheapest and safest to fix
 | What | Risk | Notes |
 | --- | --- | --- |
 | ~~Idempotency markers~~ | **Done** | `IIdempotencyMarkerMaintenance`, all four providers. Nothing schedules it yet |
-| **Admin audit entries** | Low | Added by the audit work; needs a *minimum* retention floor rather than a maximum |
+| **Admin audit entries** | Low | Still open. Needs a *minimum* retention floor rather than a maximum — the risk is deleting too early, not growing too large |
 | ~~Event streams~~ | **Done** | Preview, policy and prune ship. `RequireSnapshot = false` is permitted but logs a warning naming the risk |
 
 Verified absent: no `PruneAsync`, no `EventRetentionPolicy`, no marker cleanup. The transactional
@@ -45,10 +45,17 @@ contention. Verified absent: no fault injection of any kind.
 Phase 1 (`FaultInjectingEventStore<T>` plus the seven invariants) is the valuable part and runs in
 the unit suite.
 
-### 3. Admin audit, phases 3–5
+### 3. Admin audit, phase 5 only
 
-No read side (`IAdminAuditQueryService` does not exist — verified), no Azure Storage or MongoDB
-logger, no retention floor.
+Phases 3 and 4 shipped: `IAdminAuditEntryReader` with tenant-filtered implementations for SQL Server,
+PostgreSQL, Azure Storage, MongoDB and the in-memory sink, and durable loggers for all four. The
+Azure Storage one partitions by tenant rather than filtering on it.
+
+What is left is the **retention floor**: nothing deletes an audit entry on any provider. Safe by
+default, unbounded by default. No delete path is offered deliberately — one that could be mistaken
+for sanctioned pruning is worse than none.
+
+There is **no Admin API endpoint** for reading the trail, by decision (see decision 6 below).
 
 ### 4. Smaller, already-decided follow-ups
 
@@ -64,7 +71,7 @@ logger, no retention floor.
 
 ## Decisions that block work
 
-Each design page ends with its own list. These are the ones that stop work starting:
+Every decision below is now answered. Each design page keeps its own list.
 
 | # | Decision | My recommendation |
 | --- | --- | --- |
@@ -73,7 +80,7 @@ Each design page ends with its own list. These are the ones that stop work start
 | ~~3~~ | ~~Retention: is `RequireSnapshot = false` permitted at all?~~ | **Answered: yes, with a warning logged every run** |
 | ~~4~~ | ~~Retention: **blocked by** a lagging subscription checkpoint, or warn?~~ | **Answered: blocked** |
 | ~~5~~ | ~~Resilience: does fault injection live in `SharedTestingFramework`?~~ | **Answered: yes, authored there and linked into the unit suite** |
-| 6 | Audit: is the **query endpoint** part of the Admin API, or database-only? | Open — it is a second privilege either way |
+| ~~6~~ | ~~Audit: is the **query endpoint** part of the Admin API, or database-only?~~ | **Answered: no endpoint.** `IAdminAuditEntryReader` is public and registered; who may read the record of who read what is the deployment's decision. Adding an endpoint later is additive |
 
 ## Known gaps outside the five plans
 

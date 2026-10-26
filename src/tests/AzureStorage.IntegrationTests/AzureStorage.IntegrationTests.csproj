@@ -17,6 +17,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\..\src\Admin.AzureStorage\Admin.AzureStorage.csproj" />
 		<ProjectReference Include="..\..\src\Samples\Samples.csproj" />
 	</ItemGroup>
 </Project>

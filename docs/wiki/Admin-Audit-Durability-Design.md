@@ -1,15 +1,23 @@
 # Durable Admin Audit — Design
 
-> **Status: partly implemented.**
+> **Status: phases 1–4 implemented. Phase 5 (retention) remains a proposal.**
 >
-> Phase 1 (tenant and correlation on the entry, stamped centrally) and Phase 2 (SQL Server and
-> PostgreSQL durable loggers with the failure-mode option) have shipped — see
-> [Guarantees and Limitations](Guarantees-and-Limitations.md#admin-audit). **Phases 3 to 5 remain
-> proposals**: there is still no read side, no Azure Storage or MongoDB logger, and no retention.
+> Shipped: tenant and correlation stamped centrally on every entry; durable loggers for **SQL Server,
+> PostgreSQL, Azure Table Storage and MongoDB** with the failure-mode option; and the read side,
+> `IAdminAuditEntryReader`, with a tenant-filtered implementation for each of those four plus the
+> in-memory sink. See [Guarantees and Limitations](Guarantees-and-Limitations.md#admin-audit).
 >
-> One design change against the plan below: the stamping decorator is wired through a keyed
-> registration (`AdminAuditKeys.Sink`) rather than by decorating whatever happens to be registered.
-> Decoration depended on the order an application calls the helpers in, and broke both ways.
+> Three design changes against the plan below:
+>
+> - The stamping decorator is wired through a keyed registration (`AdminAuditKeys.Sink`) rather than
+>   by decorating whatever happens to be registered. Decoration depended on the order an application
+>   calls the helpers in, and broke both ways.
+> - The read contract is `IAdminAuditEntryReader`, not `IAdminAuditQueryService`, returning an
+>   `AdminAuditPage` with `HasMore` rather than a total count. Counting an append-only table that only
+>   grows costs a scan on every page for a number that is stale before the caller reads it.
+> - **There is no Admin API endpoint for it, deliberately** — decision 3 below, answered. The seam is
+>   public so an application can expose it on terms it chooses; which principals may read the trail of
+>   who read what is a deployment decision, not a framework default.
 
 ## The problem
 
@@ -54,22 +62,49 @@ public sealed record AdminAuditEntry(
 Both additive, so existing construction sites keep compiling.
 
 ```csharp
-public interface IAdminAuditQueryService
+public interface IAdminAuditEntryReader
 {
-    Task<PagedResult<AdminAuditEntry>> QueryAsync(AdminAuditQuery query, CancellationToken cancellationToken);
+    Task<AdminAuditPage> QueryAsync(AdminAuditQuery query, CancellationToken cancellationToken);
 }
 ```
 
 Kept separate from `IAdminAuditLogger` deliberately: writing and reading an audit trail are
-different privileges, and a component that can write must not automatically be able to read.
+different privileges, a deployment can grant the two to different database principals only if they
+are different types, and it keeps `IAdminAuditLogger` implementable by a write-only sink — a log
+pipeline, an event hub — that has no read side at all.
+
+**`AdminAuditQuery` carries no tenant.** The tenant comes from `ICurrentTenant`, so a caller cannot
+widen their own scope by asking for a different one. `PageSize` is clamped to 500: an audit table is
+the one table that only grows, and an unbounded page is a way to pull the whole trail — every
+principal and target it names — in a single request.
 
 ### Implementations
 
-| Provider | Store |
-| --- | --- |
-| SQL Server, PostgreSQL | A dedicated append-only table |
-| Azure Storage | A table, partitioned by tenant and day |
-| MongoDB | A collection with a TTL index for retention |
+| Provider | Store | How the tenant is enforced |
+| --- | --- | --- |
+| SQL Server, PostgreSQL | A dedicated append-only table | `WHERE [TenantId] = @tenantId`, `OFFSET`/`FETCH` paging |
+| Azure Storage | A table partitioned by tenant | **Structural** — the tenant *is* the partition key |
+| MongoDB | A collection, indexed `(TenantId, TimestampUtc desc)` | A filter on `TenantId` |
+| In-memory | The default sink | The same rule, so a test against it exercises the real boundary |
+
+Azure Storage is the one worth calling out: structural isolation is preferred wherever the store
+allows it, because a partition a query never names cannot be returned by accident, whereas a
+predicate is something a future query can forget. Its row key is **inverted ticks**, so Table
+Storage's own ascending order *is* newest-first within a tenant and no sort is needed — plus a random
+suffix, because two entries written inside one tick would otherwise collide and `AddEntity` would
+fail the second, losing an entry under the failure mode meant to be the safest.
+
+**Every implementation fails closed.** An entry with no `TenantId` is visible only to
+`TenantScope.System` — never treated as visible to everyone. One missed stamp must look like absent
+data, not like another tenant's audit trail.
+
+### Known limitation — Azure Storage system-scope reads
+
+Table Storage orders by partition key then row key, so a cross-partition read is not globally
+newest-first and the reader sorts the fetched window in memory. Bound such a read with
+`FromUtc`, which the inverted row key turns into a server-side range. A tenant-scoped read needs none
+of this: its single partition is already in time order. The SQL and MongoDB readers order in the
+store for both scopes.
 
 Append-only is enforced by **not offering** update or delete on the contract, and by documenting the
 database grants the table expects (`INSERT`/`SELECT` only for the application principal). The
@@ -120,9 +155,9 @@ Recommendation: ship (1), design the schema so (2) can be added without a migrat
 | --- | --- |
 | 1 | `TenantId` and `CorrelationId` on `AdminAuditEntry`; populate from the request scope |
 | 2 | SQL Server + PostgreSQL durable loggers, with the failure-mode option |
-| 3 | `IAdminAuditQueryService` and an Admin API endpoint behind its own permission |
-| 4 | Azure Storage + MongoDB loggers |
-| 5 | Retention floor and cleanup |
+| 3 | **Done.** `IAdminAuditEntryReader` with tenant-filtered implementations. No Admin API endpoint, by decision |
+| 4 | **Done.** Azure Storage + MongoDB loggers *and* readers |
+| 5 | Retention floor and cleanup — **not implemented** |
 
 ## Testing
 
@@ -136,12 +171,26 @@ Recommendation: ship (1), design the schema so (2) can be added without a migrat
 - No code path updates or deletes an entry — asserted structurally, by the contract having no such
   method.
 
-## Decisions needed
+## Decisions
 
-1. Default **failure mode** for mutating features. (Recommendation: `Fail`.)
-2. Whether **hash chaining** is in scope now or reserved for later.
-3. Whether the audit query endpoint is part of the Admin API or deliberately left out, so audit can
-   only be read through the database.
-4. Whether audit entries are **tenant-scoped or system-scoped** when a super-user acts across
-   tenants — my assumption is the entry records the tenant acted *upon*, with the principal's own
-   scope in `Details`.
+1. ~~Default **failure mode** for mutating features.~~ **Answered: `Fail`, for every feature.** An
+   action nobody can prove happened is worse than an action that did not; `Continue` is available and
+   logs the gap it leaves.
+2. **Hash chaining: reserved, not shipped.** Every store reserves a `PreviousHash` column or field so
+   it can be added without rewriting what is already stored. Until it ships, tamper-evidence rests on
+   the grants a deployment issues.
+3. ~~Whether the audit query endpoint is part of the Admin API.~~ **Answered: deliberately left out.**
+   `IAdminAuditEntryReader` is public and registered, so an application can expose it; the framework
+   does not decide who may read the record of who read what. Adding an endpoint later is additive.
+4. **Still open.** Whether audit entries are tenant- or system-scoped when a super-user acts across
+   tenants. The implementation records the tenant acted *upon* — that is what the central stamping
+   does — but the principal's own scope is not separately recorded.
+
+## What is still missing
+
+- **Retention (phase 5).** Nothing deletes an audit entry, on any provider, ever. That is safe by
+  default and unbounded by default. The floor it needs is a *minimum* retention, the opposite of the
+  event-stream problem in [Retention](Retention-Design.md): the risk is deleting too early, not
+  growing too large. Until it ships, pruning the audit table is a database-administration task, and
+  the framework deliberately offers no delete path that could be mistaken for a sanctioned one.
+- **Hash chaining**, as above.

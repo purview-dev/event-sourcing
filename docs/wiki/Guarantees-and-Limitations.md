@@ -377,7 +377,8 @@ site, so an endpoint added later cannot omit them.
 | In-memory | the default | **No** - entries die with the process |
 | SQL Server | `AddPurviewEventSourcingAdminSqlServerAudit()` | Yes |
 | PostgreSQL | `AddPurviewEventSourcingAdminPostgresAudit()` | Yes |
-| Azure Storage, MongoDB | Not provided | - |
+| Azure Storage | `AddPurviewEventSourcingAdminAzureStorageAudit()` | Yes |
+| MongoDB | `AddPurviewEventSourcingAdminMongoDBAudit()` | Yes |
 
 **Audit writes default to refusing the operation when they fail** (`AdminAuditFailureMode.Fail`): an
 action nobody can prove happened is worse than an action that did not happen. Set the failure mode to
@@ -389,9 +390,29 @@ cannot grant or revoke database permissions. A deployment that needs tamper-evid
 the application principal to `INSERT` and `SELECT` on the audit table. A `PreviousHash` column is
 reserved so hash chaining can be added later without a migration.
 
-**There is no read side.** `IAdminAuditLogger` writes only, so the trail is queried through the
-database rather than the Admin API. Audit retention is also not implemented - entries accumulate
-indefinitely. See [Durable Admin Audit](Admin-Audit-Durability-Design.md).
+**The read side is `IAdminAuditEntryReader`, and it is tenant-filtered.** Each registration above
+also registers a reader over the same store; `AdminAuditQuery` narrows by time, feature, principal,
+target, success and correlation, and returns an `AdminAuditPage` with `HasMore` rather than a total
+count. `PageSize` is clamped to 500.
+
+- The tenant comes from `ICurrentTenant`, not from the query, so a caller cannot widen their own
+  scope. A tenant sees only its own entries; `TenantScope.System` sees all of them.
+- **Unowned entries fail closed**: an entry with no `TenantId` is visible only to the system scope,
+  never to every tenant. One missed stamp must look like absent data, not like another tenant's trail.
+- On Azure Storage the isolation is **structural** - the tenant is the partition key, so another
+  tenant's entries are never fetched. Its row key is inverted ticks, so a tenant-scoped read is
+  newest-first with no sort. A **system-scope** read there spans partitions, is not globally ordered
+  by the store, and is sorted in memory; bound it with `FromUtc`. SQL Server, PostgreSQL and MongoDB
+  order in the store for both scopes.
+
+**There is deliberately no Admin API endpoint for the audit trail.** Who may read the record of who
+read what is a deployment decision, not a framework default; the reader is public so an application
+can expose it on its own terms.
+
+**Audit retention is not implemented** - nothing deletes an entry, on any provider, ever. That is
+safe by default and unbounded by default; pruning the audit store is a database-administration task,
+and no delete path is offered that could be mistaken for a sanctioned one. See
+[Durable Admin Audit](Admin-Audit-Durability-Design.md).
 
 ## Admin security, metadata/payload separation, and deny-by-default
 

@@ -21,6 +21,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\..\src\Admin.MongoDB\Admin.MongoDB.csproj" />
 		<ProjectReference Include="..\..\src\Samples\Samples.csproj" />
 	</ItemGroup>
 	<ItemGroup>

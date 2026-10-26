@@ -21,7 +21,9 @@ per-registration values.
 | Durable crypto-shredding key store | In-memory only (refused outside Development) | `AddSqlServerEventCryptoShredding()` | `AddPostgresEventCryptoShredding()` | `AddAzureStorageEventCryptoShredding()` | `AddMongoDBEventCryptoShredding()` | n/a |
 | Crypto key rotation | `IRotatingEventCryptoKeyStore` | Yes | Yes | No | No | n/a |
 | Distributed tracing spans | Span names are a contract | Yes | Yes | Yes | Yes | Snapshot/query spans |
-| Durable admin audit log | Contract + in-memory default | `AddPurviewEventSourcingAdminSqlServerAudit()` | `AddPurviewEventSourcingAdminPostgresAudit()` | Not provided | Not provided | n/a |
+| Durable admin audit log | Contract + in-memory default | `AddPurviewEventSourcingAdminSqlServerAudit()` | `AddPurviewEventSourcingAdminPostgresAudit()` | `AddPurviewEventSourcingAdminAzureStorageAudit()` | `AddPurviewEventSourcingAdminMongoDBAudit()` | n/a |
+| Admin audit read side (`IAdminAuditEntryReader`) | Tenant-filtered, in-memory default | Yes | Yes | Yes (tenant **is** the partition key; system-scope reads sort in memory) | Yes | n/a |
+| Admin audit retention | Not implemented anywhere - nothing deletes an entry | No | No | No | No | n/a |
 | Event-stream retention / pruning | Preview, policy, prune orchestration | Yes | Yes | Yes | Yes (incl. blob cleanup) | n/a |
 | Idempotency marker retention | `IIdempotencyMarkerMaintenance` | Yes | Yes | Yes | Yes | n/a |
 | Provider-specific native transaction factory | No | `ISqlServerEventStoreTransactionFactory` | `IPostgresEventStoreTransactionFactory` | No | No | No |

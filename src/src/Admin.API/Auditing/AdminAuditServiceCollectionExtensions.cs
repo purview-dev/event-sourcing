@@ -41,6 +41,21 @@ public static class AdminAuditServiceCollectionExtensions
 			provider.GetService<IEventStoreCorrelationIdProvider>()
 		));
 
+		// TryAdd, and only over the in-memory sink: a durable provider registers its own reader, and
+		// this must not shadow it. Reading an in-memory sink that a durable logger has replaced would
+		// answer "nothing was audited" about a trail that is sitting in a table.
+		services.TryAddScoped<IAdminAuditEntryReader>(provider =>
+			provider.GetRequiredKeyedService<IAdminAuditLogger>(AdminAuditKeys.Sink) is InMemoryAdminAuditLogger sink
+				? new InMemoryAdminAuditEntryReader(
+					sink,
+					provider.GetService<ICurrentTenant>() ?? new SystemCurrentTenant()
+				)
+				: throw new InvalidOperationException(
+					"The registered admin audit sink is durable but no IAdminAuditEntryReader was registered for it. "
+						+ "Register the matching reader, or resolve IAdminAuditEntryReader optionally."
+				)
+		);
+
 		return services;
 	}
 }

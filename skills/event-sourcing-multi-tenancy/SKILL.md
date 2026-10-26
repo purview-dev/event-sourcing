@@ -99,6 +99,26 @@ header:
 A super user who names no tenant is **refused, not given the system scope**. The resolver returns a
 tenant identifier and nothing else, so crossing tenants is unreachable from a signed-in session.
 
+## The audit trail is tenant-scoped too
+
+`IAdminAuditEntryReader` reads the durable audit trail back. It filters on `ICurrentTenant`, not on
+anything in `AdminAuditQuery` — **the query carries no tenant**, so a caller cannot widen their own
+scope by asking for someone else's.
+
+```csharp
+// Scoped to whatever ICurrentTenant resolves. There is no overload that takes a tenant.
+var page = await reader.QueryAsync(new AdminAuditQuery { PageSize = 100 }, cancellationToken);
+```
+
+- An entry with no `TenantId` is visible **only** to `TenantScope.System`. Do not "fix" a missing
+  stamp by making unowned entries visible to everyone; that converts one forgotten stamp into silent
+  cross-tenant disclosure.
+- On Azure Storage the tenant is the **partition key**, not a predicate. Prefer that wherever a store
+  allows it: a partition a query never names cannot be returned by accident.
+- A leaking audit trail discloses the principals, targets and timings of another tenant's
+  administration. That is worse than disclosing its data, and invisible to any test that only checks
+  the right entries come back.
+
 ## Testing it - the part that is easy to get wrong
 
 Every item below was a real defect found while the tenancy tests were passing.

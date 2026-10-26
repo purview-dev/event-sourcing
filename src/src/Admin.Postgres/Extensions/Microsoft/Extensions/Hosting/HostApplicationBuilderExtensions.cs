@@ -49,6 +49,10 @@ public static class HostApplicationBuilderExtensions
 		{
 			builder.Services.AddKeyedSingleton<IAdminAuditLogger, PostgresAdminAuditLogger>(AdminAuditKeys.Sink);
 
+			// The reader is registered with the writer, because a trail nothing can read back is not
+			// an audit trail. Scoped: it filters on ICurrentTenant, which is resolved per request.
+			builder.Services.AddScoped<IAdminAuditEntryReader, PostgresAdminAuditEntryReader>();
+
 			builder
 				.Services.AddOptions<PostgresAdminAuditLoggerOptions>()
 				.Configure<IConfiguration>(
