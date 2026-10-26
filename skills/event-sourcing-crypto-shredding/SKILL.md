@@ -52,7 +52,8 @@ configured.
 | PostgreSQL | `AddPostgresEventCryptoShredding()` | Yes |
 | Azure Storage | `AddAzureStorageEventCryptoShredding()` | Yes |
 | MongoDB | `AddMongoDBEventCryptoShredding()` | Yes |
-| Key Vault | not provided yet | - |
+| Azure Key Vault, secret per subject | `AddAzureKeyVaultEventCryptoShredding()` | Yes |
+| Azure Key Vault, envelope | `AddAzureKeyVaultEnvelopeEventCryptoShredding<TInner>()` | Yes |
 
 **The host refuses to start with a non-durable key store outside Development.** Keys that die with
 the process make every protected payload unreadable - the same outcome as erasing every subject at
@@ -62,6 +63,19 @@ if you are reaching for that to make a start-up failure go away, register a dura
 Writing your own store? Implement `INonDurableEventCryptoKeyStore` on any test double so the guard
 recognises it, and scope keys by the current tenant - the same subject id in two tenants is two
 different people.
+
+### Choosing between the two Key Vault stores
+
+| | Secret per subject | Envelope |
+| -- | -- | -- |
+| Erasure is | a vault operation, in the vault's audit trail | a row deleted from a durable store |
+| Scales to | a few thousand subjects | any number |
+| Vault holds | one secret per subject | one wrapping key |
+| Needs a durable store | no | yes - pass it as `TInner` |
+
+Pick secret-per-subject when erasure itself must be vault-audited; pick envelope when the subject
+population makes that impractical. The envelope store never writes a usable key to the durable
+store, so a stolen database is unreadable without the vault.
 
 **Erasure is only as irreversible as the least-irreversible copy of the key.** This is the thing
 that fails an audit:

@@ -26,7 +26,7 @@ namespace Purview.EventSourcing.Postgres.Cryptography;
 /// when the last backup containing the key ages out.
 /// </para>
 /// </remarks>
-public sealed partial class PostgresEventCryptoKeyStore : IEventCryptoKeyStore, IDisposable
+public sealed partial class PostgresEventCryptoKeyStore : ISuppliedKeyEventCryptoKeyStore, IDisposable
 {
 	[GeneratedRegex("^[\\w\\-.]+$", RegexOptions.Compiled)]
 	private static partial Regex ValidIdentifier();
@@ -60,10 +60,18 @@ public sealed partial class PostgresEventCryptoKeyStore : IEventCryptoKeyStore, 
 	}
 
 	/// <inheritdoc/>
-	public async Task<byte[]> GetOrCreateAsync(string dataSubjectId, CancellationToken cancellationToken)
+	public Task<byte[]> GetOrCreateAsync(string dataSubjectId, CancellationToken cancellationToken) =>
+		GetOrAddAsync(dataSubjectId, AesGcmEventPayloadProtector.CreateKey(), cancellationToken);
+
+	/// <inheritdoc/>
+	public async Task<byte[]> GetOrAddAsync(
+		string dataSubjectId,
+		byte[] candidateKey,
+		CancellationToken cancellationToken
+	)
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(dataSubjectId);
-
+		ArgumentNullException.ThrowIfNull(candidateKey);
 		await EnsureSchemaAsync(cancellationToken);
 
 		await using NpgsqlConnection connection = new(_connectionString);
@@ -87,7 +95,7 @@ public sealed partial class PostgresEventCryptoKeyStore : IEventCryptoKeyStore, 
 			connection
 		);
 		AddKeyParameters(command, dataSubjectId);
-		command.Parameters.AddWithValue("@key", AesGcmEventPayloadProtector.CreateKey());
+		command.Parameters.AddWithValue("@key", candidateKey);
 		command.Parameters.AddWithValue("@now", DateTimeOffset.UtcNow);
 
 		var result = await command.ExecuteScalarAsync(cancellationToken);

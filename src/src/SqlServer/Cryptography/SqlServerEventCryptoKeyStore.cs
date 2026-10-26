@@ -26,7 +26,7 @@ namespace Purview.EventSourcing.SqlServer.Cryptography;
 /// when the last backup containing the key ages out.
 /// </para>
 /// </remarks>
-public sealed partial class SqlServerEventCryptoKeyStore : IEventCryptoKeyStore, IDisposable
+public sealed partial class SqlServerEventCryptoKeyStore : ISuppliedKeyEventCryptoKeyStore, IDisposable
 {
 	[GeneratedRegex("^[\\w\\-.]+$", RegexOptions.Compiled)]
 	private static partial Regex ValidIdentifier();
@@ -60,15 +60,22 @@ public sealed partial class SqlServerEventCryptoKeyStore : IEventCryptoKeyStore,
 	}
 
 	/// <inheritdoc/>
-	public async Task<byte[]> GetOrCreateAsync(string dataSubjectId, CancellationToken cancellationToken)
+	public Task<byte[]> GetOrCreateAsync(string dataSubjectId, CancellationToken cancellationToken) =>
+		GetOrAddAsync(dataSubjectId, AesGcmEventPayloadProtector.CreateKey(), cancellationToken);
+
+	/// <inheritdoc/>
+	public async Task<byte[]> GetOrAddAsync(
+		string dataSubjectId,
+		byte[] candidateKey,
+		CancellationToken cancellationToken
+	)
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(dataSubjectId);
+		ArgumentNullException.ThrowIfNull(candidateKey);
 
 		var existing = await TryGetAsync(dataSubjectId, cancellationToken);
 		if (existing is not null)
 			return existing;
-
-		var key = AesGcmEventPayloadProtector.CreateKey();
 
 		await using SqlConnection connection = new(_connectionString);
 		await connection.OpenAsync(cancellationToken);
@@ -93,7 +100,7 @@ public sealed partial class SqlServerEventCryptoKeyStore : IEventCryptoKeyStore,
 			connection
 		);
 		AddKeyParameters(command, dataSubjectId);
-		command.Parameters.AddWithValue("@key", key);
+		command.Parameters.AddWithValue("@key", candidateKey);
 		command.Parameters.AddWithValue("@now", DateTimeOffset.UtcNow);
 
 		await command.ExecuteNonQueryAsync(cancellationToken);

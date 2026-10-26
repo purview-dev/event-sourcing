@@ -23,7 +23,7 @@ namespace Purview.EventSourcing.AzureStorage.Cryptography;
 /// expires. Disable those on the key table, or accept the delay.
 /// </para>
 /// </remarks>
-public sealed class AzureStorageEventCryptoKeyStore : IEventCryptoKeyStore, IDisposable
+public sealed class AzureStorageEventCryptoKeyStore : ISuppliedKeyEventCryptoKeyStore, IDisposable
 {
 	readonly TableClient _tableClient;
 	readonly ICurrentTenant _currentTenant;
@@ -55,10 +55,18 @@ public sealed class AzureStorageEventCryptoKeyStore : IEventCryptoKeyStore, IDis
 	}
 
 	/// <inheritdoc/>
-	public async Task<byte[]> GetOrCreateAsync(string dataSubjectId, CancellationToken cancellationToken)
+	public Task<byte[]> GetOrCreateAsync(string dataSubjectId, CancellationToken cancellationToken) =>
+		GetOrAddAsync(dataSubjectId, AesGcmEventPayloadProtector.CreateKey(), cancellationToken);
+
+	/// <inheritdoc/>
+	public async Task<byte[]> GetOrAddAsync(
+		string dataSubjectId,
+		byte[] candidateKey,
+		CancellationToken cancellationToken
+	)
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(dataSubjectId);
-
+		ArgumentNullException.ThrowIfNull(candidateKey);
 		await EnsureTableAsync(cancellationToken);
 
 		var existing = await TryGetAsync(dataSubjectId, cancellationToken);
@@ -69,7 +77,7 @@ public sealed class AzureStorageEventCryptoKeyStore : IEventCryptoKeyStore, IDis
 		{
 			PartitionKey = PartitionKeyFor(),
 			RowKey = RowKeyFor(dataSubjectId),
-			KeyMaterial = AesGcmEventPayloadProtector.CreateKey(),
+			KeyMaterial = candidateKey,
 			CreatedUtc = DateTimeOffset.UtcNow,
 		};
 

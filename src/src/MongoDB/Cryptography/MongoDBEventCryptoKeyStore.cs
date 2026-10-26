@@ -22,7 +22,7 @@ namespace Purview.EventSourcing.MongoDB.Cryptography;
 /// brings shredded keys back.
 /// </para>
 /// </remarks>
-public sealed class MongoDBEventCryptoKeyStore : IEventCryptoKeyStore, IDisposable
+public sealed class MongoDBEventCryptoKeyStore : ISuppliedKeyEventCryptoKeyStore, IDisposable
 {
 	const string KeyMaterialField = "k";
 	const string CreatedUtcField = "c";
@@ -65,16 +65,24 @@ public sealed class MongoDBEventCryptoKeyStore : IEventCryptoKeyStore, IDisposab
 	}
 
 	/// <inheritdoc/>
-	public async Task<byte[]> GetOrCreateAsync(string dataSubjectId, CancellationToken cancellationToken)
+	public Task<byte[]> GetOrCreateAsync(string dataSubjectId, CancellationToken cancellationToken) =>
+		GetOrAddAsync(dataSubjectId, AesGcmEventPayloadProtector.CreateKey(), cancellationToken);
+
+	/// <inheritdoc/>
+	public async Task<byte[]> GetOrAddAsync(
+		string dataSubjectId,
+		byte[] candidateKey,
+		CancellationToken cancellationToken
+	)
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(dataSubjectId);
-
+		ArgumentNullException.ThrowIfNull(candidateKey);
 		// $setOnInsert with an upsert is atomic get-or-create: concurrent callers converge on one
 		// key rather than each generating their own, which would make payloads written by the loser
 		// unreadable. ReturnDocument.After yields the stored key whether it was just created or
 		// already there.
 		var update = Builders<BsonDocument>
-			.Update.SetOnInsert(KeyMaterialField, AesGcmEventPayloadProtector.CreateKey())
+			.Update.SetOnInsert(KeyMaterialField, candidateKey)
 			.SetOnInsert(CreatedUtcField, DateTimeOffset.UtcNow.UtcDateTime);
 
 		var document = await _collection.FindOneAndUpdateAsync(

@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using Azure.Core;
 using Azure.Identity;
+using Azure.Security.KeyVault.Keys;
+using Azure.Security.KeyVault.Keys.Cryptography;
 using Azure.Security.KeyVault.Secrets;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -55,6 +57,59 @@ public static class ServiceCollectionExtensions
 			services.TryAddSingleton<IKeyVaultSecretOperations, SecretClientOperations>();
 
 			services.AddEventCryptoShredding<AzureKeyVaultEventCryptoKeyStore>();
+
+			return services;
+		}
+
+		/// <summary>
+		/// Registers crypto-shredding with per-subject keys wrapped by a Key Vault key and held in a
+		/// durable store.
+		/// </summary>
+		/// <typeparam name = "TInnerStore">The durable store holding wrapped keys.</typeparam>
+		/// <param name = "configure">Optional <see cref = "AzureKeyVaultEventCryptoKeyStoreOptions"/> configuration.</param>
+		/// <param name = "credential">The credential used to reach the vault; defaults to <see cref = "DefaultAzureCredential"/>.</param>
+		/// <returns>The <paramref name = "services"/> for chaining.</returns>
+		/// <remarks>
+		/// <para>
+		/// The vault holds one wrapping key rather than one secret per subject, so this scales to any
+		/// subject population, and a stolen copy of the durable store is unreadable without the vault.
+		/// </para>
+		/// <para>
+		/// Erasure deletes the wrapped key from the durable store, so it does **not** appear in the
+		/// vault's audit trail. Use <c>AddAzureKeyVaultEventCryptoShredding</c> when erasure itself must
+		/// be vault-audited.
+		/// </para>
+		/// </remarks>
+		public IServiceCollection AddAzureKeyVaultEnvelopeEventCryptoShredding<TInnerStore>(
+			Action<AzureKeyVaultEventCryptoKeyStoreOptions>? configure = null,
+			TokenCredential? credential = null
+		)
+			where TInnerStore : class, ISuppliedKeyEventCryptoKeyStore
+		{
+			services.AddAzureKeyVaultCryptoOptions(configure);
+
+			services.TryAddSingleton<ISuppliedKeyEventCryptoKeyStore, TInnerStore>();
+
+			services.TryAddSingleton<IKeyVaultKeyWrapping>(provider =>
+			{
+				var options = provider.GetRequiredService<IOptions<AzureKeyVaultEventCryptoKeyStoreOptions>>().Value;
+				if (string.IsNullOrWhiteSpace(options.WrappingKeyName))
+				{
+					throw new InvalidOperationException(
+						$"Envelope crypto-shredding requires a wrapping key. Configure '{AzureKeyVaultEventCryptoKeyStoreOptions.AzureKeyVaultCryptography}:"
+							+ $"{nameof(AzureKeyVaultEventCryptoKeyStoreOptions.WrappingKeyName)}'."
+					);
+				}
+
+				KeyClient keyClient = new(new Uri(options.VaultUri), credential ?? new DefaultAzureCredential());
+				var key = keyClient.GetKey(options.WrappingKeyName);
+
+				return new CryptographyClientKeyWrapping(
+					new CryptographyClient(key.Value.Id, credential ?? new DefaultAzureCredential())
+				);
+			});
+
+			services.AddEventCryptoShredding<AzureKeyVaultEnvelopeEventCryptoKeyStore>();
 
 			return services;
 		}

@@ -107,7 +107,8 @@ they get two different keys, and neither tenant can read or erase the other's.
 | PostgreSQL | `AddPostgresEventCryptoShredding()` | Yes |
 | Azure Storage | `AddAzureStorageEventCryptoShredding()` | Yes |
 | MongoDB | `AddMongoDBEventCryptoShredding()` | Yes |
-| Key Vault | Not provided yet | - |
+| Azure Key Vault (secret per subject) | `AddAzureKeyVaultEventCryptoShredding()` | Yes |
+| Azure Key Vault (envelope) | `AddAzureKeyVaultEnvelopeEventCryptoShredding<TInner>()` | Yes |
 
 **The host refuses to start with a non-durable key store outside Development.** Losing the keys is
 indistinguishable from erasing every data subject at once, and nothing reports that it happened, so the
