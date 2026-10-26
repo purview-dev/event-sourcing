@@ -94,12 +94,23 @@ services.AddSqlServerSubscriptionCheckpoints();   // or AddPostgresSubscriptionC
 services.AddEventSubscription<Order, OrderProjection>();
 ```
 
-Only SQL Server and PostgreSQL ship one. On Azure Storage or MongoDB you must supply an
-`ISubscriptionCheckpointStore` yourself, or accept a full replay on every restart.
+Every provider with an event stream ships one - `AddSqlServerSubscriptionCheckpoints`,
+`AddPostgresSubscriptionCheckpoints`, `AddAzureStorageSubscriptionCheckpoints`,
+`AddMongoDBSubscriptionCheckpoints`. Cosmos DB has no event stream, so there is nothing to
+checkpoint.
 
-If you write one, encode the scope with `SubscriptionCheckpointTenantColumn` rather than inventing
-your own, and do not use a nullable tenant column: PostgreSQL treats NULLs as distinct in a unique
-index, so the system scope would silently get duplicate rows.
+If you write your own, encode the scope with `SubscriptionCheckpointTenantColumn` rather than
+inventing your own scheme, and note two traps the shipped stores had to handle:
+
+- **Do not use a nullable tenant column.** PostgreSQL treats NULLs as distinct in a unique index, so
+  the system scope would silently accumulate duplicate rows.
+- **Do not build the key by concatenating with a delimiter** unless you encode the segments. A
+  subscription name, tenant or aggregate id containing the delimiter makes two different keys
+  identical. The Azure store Base64Url-encodes each segment; the Mongo store uses a compound `_id`
+  document, which is unambiguous by construction.
+
+The position must never move backwards: a cycle that re-read an earlier range would otherwise rewind
+a position that is already further on and redeliver everything in between.
 
 ## Failure stalls the stream, on purpose
 

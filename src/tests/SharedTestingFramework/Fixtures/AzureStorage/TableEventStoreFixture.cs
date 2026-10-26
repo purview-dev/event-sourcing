@@ -23,6 +23,9 @@ public sealed class TableEventStoreFixture : IAsyncInitializer, IAsyncDisposable
 		EventStoreOperationContext.RequiresValidPrincipalIdentifierDefault = false;
 	}
 
+	/// <summary>The emulator connection string, for tests that build their own storage client.</summary>
+	public string ConnectionString => _azuriteContainer.GetEmulatorConnectionString();
+
 	public IDistributedCacheMock Cache { get; private set; } = default!;
 
 	public ITableEventStoreTelemetryMock Telemetry { get; private set; } = default!;

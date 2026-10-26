@@ -22,6 +22,9 @@ public sealed class MongoDBEventStoreFixture : IAsyncInitializer, IAsyncDisposab
 		_mongoDBContainer = ContainerHelper.CreateMongoDB();
 	}
 
+	/// <summary>The container connection string, for tests that build their own Mongo client.</summary>
+	public string ConnectionString => _mongoDBContainer.GetConnectionString();
+
 	public IDistributedCacheMock Cache { get; private set; } = default!;
 
 	public IMongoDBEventStoreTelemetryMock Telemetry { get; private set; } = default!;

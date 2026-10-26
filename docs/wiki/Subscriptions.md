@@ -108,15 +108,24 @@ services.AddSqlServerSubscriptionCheckpoints();   // or AddPostgresSubscriptionC
 services.AddEventSubscription<Order, OrderProjection>();
 ```
 
-| Provider | Durable checkpoints |
-| --- | --- |
-| SQL Server | `AddSqlServerSubscriptionCheckpoints()` |
-| PostgreSQL | `AddPostgresSubscriptionCheckpoints()` |
-| Azure Storage, MongoDB, Cosmos DB | Not provided — supply an `ISubscriptionCheckpointStore` |
+| Provider | Durable checkpoints | Section |
+| --- | --- | --- |
+| SQL Server | `AddSqlServerSubscriptionCheckpoints()` | `EventStore:SqlServer:Subscriptions` |
+| PostgreSQL | `AddPostgresSubscriptionCheckpoints()` | `EventStore:Postgres:Subscriptions` |
+| Azure Storage | `AddAzureStorageSubscriptionCheckpoints()` | `EventStore:AzureStorage:Subscriptions` |
+| MongoDB | `AddMongoDBSubscriptionCheckpoints()` | `EventStore:MongoDB:Subscriptions` |
+| Cosmos DB | n/a — it has no event stream to subscribe to | |
 
-Both SQL stores create their table on first use (`AutoCreateTable`, on by default) and are
-configured from `EventStore:SqlServer:Subscriptions` / `EventStore:Postgres:Subscriptions`. They
-fall back to the event-store connection string when none is given.
+Each creates its table or collection on first use and falls back to the event-store connection
+string when none is given.
+
+The guarantee that a position never moves backwards is expressed differently per store, because the
+engines differ: SQL Server uses a guarded `UPDATE` then a conditional `INSERT`; PostgreSQL uses
+`ON CONFLICT ... DO UPDATE ... WHERE`; MongoDB uses a filtered upsert and treats the resulting
+duplicate-key error as "already further on"; Azure Table Storage has no conditional-on-value write
+at all, so it reads and then writes conditionally on the ETag, retrying on contention
+(`MaxWriteAttempts`, default 5). If Azure exhausts its retries it leaves the position behind, which
+redelivers — safe, because delivery is at-least-once regardless.
 
 The scope is stored in a single non-null `TenantId` column, with the system scope encoded as the
 empty string by `SubscriptionCheckpointTenantColumn`. That is shared rather than per-provider
@@ -144,8 +153,7 @@ services.AddEventSubscription<Order, OrderProjection>(options => options.PollInt
 
 - **No global ordering**, and no ordered live tail. Both are discussed in
   [the design page](Subscriptions-And-Retention-Design.md).
-- **Durable checkpoints ship for SQL Server and PostgreSQL only.** Azure Storage, MongoDB and an
-  InMemory deployment replay every stream after a restart unless you supply a store.
+- **Durable checkpoints ship for every provider with an event stream** — SQL Server, PostgreSQL, Azure Storage and MongoDB. An InMemory deployment still replays every stream after a restart.
 - **Cosmos DB cannot be subscribed to at all** — it persists no event stream, and `RunCycleAsync`
   throws `NotSupportedException`.
 - **A permanently failing event stalls its stream.** There is no dead-letter path.

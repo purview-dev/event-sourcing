@@ -169,9 +169,7 @@ Not guaranteed, and not configurable:
 - **No dead-letter path.** A subscriber that throws stops that stream at the failing event and retries it
   every cycle, indefinitely. This is fail-closed by choice: skipping would lose data silently. An
   unresolvable event type is not a failure - it is delivered with `IsUnresolved` set and skipped past.
-- **Durable checkpoints ship for SQL Server and PostgreSQL only** (`AddSqlServerSubscriptionCheckpoints`,
-  `AddPostgresSubscriptionCheckpoints`). Elsewhere the default is in-memory and replays every stream after
-  a restart.
+- **Durable checkpoints ship for every provider with an event stream** — SQL Server, PostgreSQL, Azure Storage and MongoDB, each via `Add<Provider>SubscriptionCheckpoints()`. Without one the default is in-memory and replays every stream after a restart.
 - **Cosmos DB cannot be subscribed to** — it persists no event stream. Every other provider works, because
   stream discovery reads `IEventStoreCore<T>.GetAggregateIdsAsync`, which every store implements and
   tenant-filters.
