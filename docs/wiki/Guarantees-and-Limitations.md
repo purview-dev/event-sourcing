@@ -122,6 +122,17 @@ of the key table brings shredded keys back. A deployment that must erase on requ
 key table from long-retention backups, or accept that erasure completes only when the last backup
 containing the key ages out. This is an operational control, not something the framework can enforce.
 
+Keys are **cached in process memory** by default (`EventStore:Cryptography:CacheKeys`), because an
+uncached store makes every protect and unprotect a round trip - impractical against a throttled vault.
+`ShredAsync` evicts before deleting and again afterwards, so a reader racing the delete cannot leave a
+stale entry behind.
+
+**The cache is per process**, so `KeyCacheDuration` (default 5 minutes) is the upper bound on how long
+an erasure takes to take effect across a cluster: another instance holding the key keeps serving it
+until its own entry expires. Treat that duration as a compliance parameter rather than a tuning one, or
+turn caching off where an erasure must be immediate everywhere. Key material is never written to a
+distributed cache.
+
 Key rotation is **not** implemented: `ProtectedPayload` records no key identifier, so there is no way to
 tell which key a payload used. See [Crypto Key Management](Crypto-Key-Management-Design.md).
 

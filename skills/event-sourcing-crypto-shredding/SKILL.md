@@ -77,6 +77,20 @@ Pick secret-per-subject when erasure itself must be vault-audited; pick envelope
 population makes that impractical. The envelope store never writes a usable key to the durable
 store, so a stolen database is unreadable without the vault.
 
+### Caching bounds how fast an erasure takes effect
+
+Keys are cached in process by default - an uncached store makes every protect and unprotect a round
+trip, which a throttled vault will not tolerate. `ShredAsync` evicts before deleting *and again
+afterwards*, because a reader racing the delete can repopulate the entry in between.
+
+**The cache is per process**, so `KeyCacheDuration` (default 5 minutes) is the upper bound on how
+long a shredded subject stays readable on another instance. That makes it a compliance parameter,
+not a tuning one. Set `CacheKeys = false` where an erasure must be immediate everywhere.
+
+If you write a decorator around a key store, implement `IEventCryptoKeyStoreDecorator` - the
+start-up guard unwraps decorators to find the real store, and a decorator that hides it silently
+stops the guard working.
+
 **Erasure is only as irreversible as the least-irreversible copy of the key.** This is the thing
 that fails an audit:
 

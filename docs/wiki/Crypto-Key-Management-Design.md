@@ -4,9 +4,8 @@
 >
 > Phase 1 (the start-up guard), Phase 2 (SQL Server, PostgreSQL, Azure Storage and MongoDB key
 > stores) and Phase 4 (both Key Vault models) have shipped — see
-> [Guarantees and Limitations](Guarantees-and-Limitations.md#key-stores). **Caching (Phase 3) and
-> rotation (Phase 5) remain proposals**, and caching is the one that matters before Key Vault is
-> used at volume: every protect and unprotect is currently a vault round trip.
+> [Guarantees and Limitations](Guarantees-and-Limitations.md#key-stores). **Rotation (Phase 5) remains a proposal.** Caching
+> (Phase 3) has shipped, including the evict-before-delete rule.
 
 ## The problem
 

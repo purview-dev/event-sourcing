@@ -24,14 +24,19 @@ public sealed class NonDurableKeyStoreStartupCheck(
 	/// <inheritdoc/>
 	public Task StartAsync(CancellationToken cancellationToken)
 	{
-		if (keyStore is not INonDurableEventCryptoKeyStore)
+		// Unwrap decorators - the cache wraps the real store - so the check is made against whatever
+		// actually holds the keys rather than the outermost object.
+		var store = keyStore;
+		while (store is IEventCryptoKeyStoreDecorator decorator)
+			store = decorator.Inner;
+		if (store is not INonDurableEventCryptoKeyStore)
 			return Task.CompletedTask;
 
 		if (environment.IsDevelopment() || options.Value.AllowNonDurableKeyStore)
 			return Task.CompletedTask;
 
 		throw new InvalidOperationException(
-			$"Crypto-shredding is configured with '{keyStore.GetType().Name}', which does not persist keys across a restart, "
+			$"Crypto-shredding is configured with '{store.GetType().Name}', which does not persist keys across a restart, "
 				+ $"in the '{environment.EnvironmentName}' environment. Every protected event would become permanently "
 				+ "unreadable when this process restarts, which is indistinguishable from erasing every data subject. "
 				+ "Register a durable key store, or set "

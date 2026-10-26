@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.Aggregates.Events.Upcasting;
@@ -111,9 +112,26 @@ public static class ServiceCollectionExtensions
 			where TKeyStore : class, IEventCryptoKeyStore
 		{
 			services.TryAddSingleton<TKeyStore>();
-			services.TryAddSingleton<IEventCryptoKeyStore>(static provider => provider.GetRequiredService<TKeyStore>());
-			services.TryAddSingleton<IEventPayloadProtector, AesGcmEventPayloadProtector>();
 			services.AddOptions<EventCryptoOptions>().Configure(options => configure?.Invoke(options));
+
+			// The cache wraps the real store, so IEventCryptoKeyStore resolves to whichever the
+			// options asked for. The start-up check resolves the same registration, so it still sees
+			// through to a non-durable store underneath.
+			services.TryAddSingleton<IEventCryptoKeyStore>(static provider =>
+			{
+				var keyStore = provider.GetRequiredService<TKeyStore>();
+				var options = provider.GetRequiredService<IOptions<EventCryptoOptions>>();
+				if (!options.Value.CacheKeys)
+					return keyStore;
+
+				return new CachingEventCryptoKeyStore(
+					keyStore,
+					options,
+					provider.GetService<Purview.EventSourcing.Tenancy.ICurrentTenant>()
+				);
+			});
+
+			services.TryAddSingleton<IEventPayloadProtector, AesGcmEventPayloadProtector>();
 			services.AddHostedService<NonDurableKeyStoreStartupCheck>();
 
 			return services;
