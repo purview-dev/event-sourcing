@@ -15,7 +15,7 @@ what is waiting on a decision. The five design pages hold the *reasoning*; this 
 | [Observability Parity](Observability-Parity-Design.md) | **Done, one gap** | No test asserts spans are emitted |
 | [Durable Admin Audit](Admin-Audit-Durability-Design.md) | **Partly done** | Phases 3–5: read side, Azure/Mongo loggers, retention |
 | [Retention](Retention-Design.md) | **Done** | No way to retire a subscription, which blocks retention indefinitely |
-| [Resilience Testing](Resilience-Testing-Design.md) | **Not started** | All five phases |
+| [Resilience Testing](Resilience-Testing-Design.md) | **Phase 1 done** | Phases 2–5: transport faults, Admin coverage, upgrade suite, load/soak |
 
 Also delivered outside those five: the result/failure model, multi-tenancy, crypto-shredding,
 metrics, principal capture, tenant isolation as a provider contract, the BDTest acceptance suite, and
@@ -72,7 +72,7 @@ Each design page ends with its own list. These are the ones that stop work start
 | ~~2~~ | ~~Retention: does a **dry run ship before** the destructive path?~~ | **Answered: the preview shipped first** |
 | ~~3~~ | ~~Retention: is `RequireSnapshot = false` permitted at all?~~ | **Answered: yes, with a warning logged every run** |
 | ~~4~~ | ~~Retention: **blocked by** a lagging subscription checkpoint, or warn?~~ | **Answered: blocked** |
-| 5 | Resilience: does fault injection live in `SharedTestingFramework`? | Yes, so provider suites can reuse it |
+| ~~5~~ | ~~Resilience: does fault injection live in `SharedTestingFramework`?~~ | **Answered: yes, authored there and linked into the unit suite** |
 | 6 | Audit: is the **query endpoint** part of the Admin API, or database-only? | Open — it is a second privilege either way |
 
 ## Known gaps outside the five plans

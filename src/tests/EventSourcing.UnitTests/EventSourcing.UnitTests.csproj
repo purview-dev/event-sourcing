@@ -1,4 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
+	<!--
+		The fault-injection helpers are authored in SharedTestingFramework so the provider integration
+		suites can reuse them, and linked here rather than referenced: that project pulls in every
+		provider and the container packages, which would make the unit suite slow and
+		infrastructure-dependent for the sake of two files.
+	-->
+	<ItemGroup>
+		<Compile Include="..\SharedTestingFramework\Faults\*.cs" Link="Faults\%(Filename)%(Extension)" />
+	</ItemGroup>
+
 	<ItemGroup>
 		<ProjectReference Include="..\..\src\InMemory\InMemory.csproj" />
 		<!-- The EF snapshot mapping is shared by the SQL Server, Postgres and Cosmos DB providers; the

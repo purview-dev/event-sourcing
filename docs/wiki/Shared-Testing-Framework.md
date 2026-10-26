@@ -152,6 +152,36 @@ category `Acceptance`, so PR validation's `[Category=Unit]` filter excludes it. 
 3. The test runs automatically for every provider whose integration project links the contract
    sources and derives from the relevant base class.
 
+## Fault injection
+
+`FaultInjectingEventStore<T>` wraps any `IEventStoreCore<T>` and fails chosen calls, so the paths
+that only run when storage misbehaves can be tested at all. `FaultPlan` says which call fails and
+how:
+
+```csharp
+FaultPlan.None.FailAfter(FaultOperation.Save);   // the write lands; the caller is told it did not
+FaultPlan.None.FailBefore(FaultOperation.Get, onCall: 2);
+```
+
+**`FailAfter` is the one that matters.** It models a lost response - a timeout after commit, a
+connection dropped mid-acknowledgement - where storage changed and the caller believes it did not.
+That is the fault that produces duplicates, because the caller's natural reaction is to retry an
+operation that already happened. `FailBefore` only proves nothing was written.
+
+Faults are scheduled explicitly by call number rather than randomly: a test that fails the third
+save reproduces, where one that fails a random save turns a real defect into an intermittent
+annoyance nobody trusts. Each fault fires once, so a retry after a fault can succeed.
+
+The sources live here so provider suites can reuse them, and are **linked** into
+`EventSourcing.UnitTests` rather than referenced - this project pulls in every provider and the
+container packages, which would make the unit suite slow and infrastructure-dependent for the sake
+of two files.
+
+`EventStoreFailureInvariantTests` uses them against the in-memory store, so the invariants run on
+every pull request with no infrastructure: events survive a lost response, a retry does not
+double-apply, a failed save leaves nothing behind, versions stay contiguous across a failure, and
+every one of those holds inside a tenant scope.
+
 ## Environment notes
 
 - Integration suites start their containers through [Purview.Containers](https://www.nuget.org/packages/Purview.Containers),

@@ -1,6 +1,12 @@
 # Resilience Testing — Design
 
-> **Status: proposal. Nothing on this page is implemented.**
+> **Status: phase 1 implemented.**
+>
+> `FaultPlan` and `FaultInjectingEventStore<T>` ship in `SharedTestingFramework`, with the failure
+> invariants as unit tests running on every pull request — see
+> [Shared Testing Framework](Shared-Testing-Framework.md#fault-injection). **Phases 2 to 5 remain
+> proposals**: transport-level faults, the Admin coverage work, the upgrade suite and the load/soak
+> harness do not exist.
 
 ## The problem
 

@@ -1,4 +1,4 @@
-﻿using Purview.EventSourcing.Aggregates;
+using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Internal;
 
 namespace Purview.EventSourcing.InMemory.Events;
@@ -13,7 +13,10 @@ namespace Purview.EventSourcing.InMemory.Events;
 /// single-process scenarios; data is not shared between instances or persisted across restarts.
 /// </remarks>
 /// <seealso cref="IInMemorySnapshotStore{T}"/>
-public interface IInMemoryEventStore<T> : INonQueryableEventStore<T>, IAggregateEventHistoryStoreCore<T>
+public interface IInMemoryEventStore<T>
+	: INonQueryableEventStore<T>,
+		IAggregateEventHistoryStoreCore<T>,
+		Retention.IEventStreamPruning<T>
 	where T : class, IAggregate, new()
 {
 	/// <summary>
