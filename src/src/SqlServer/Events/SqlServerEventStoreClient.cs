@@ -446,6 +446,22 @@ sealed partial class SqlServerEventStoreClient
 			.ExecuteDeleteAsync(cancellationToken);
 	}
 
+	public async Task<int> DeleteIdempotencyMarkersOlderThanAsync(
+		int idempotencyMarkerType,
+		DateTimeOffset cutoff,
+		CancellationToken cancellationToken = default
+	)
+	{
+		await EnsureConfiguredAsync(cancellationToken);
+		await using var context = CreateContext();
+
+		// The context carries the tenant query filter, so this deletes only what the current scope
+		// can see - a tenant clears its own markers, the system scope clears every tenant's.
+		return await context
+			.EventStoreEntities.Where(x => x.EntityType == idempotencyMarkerType && x.Timestamp < cutoff)
+			.ExecuteDeleteAsync(cancellationToken);
+	}
+
 	public async Task<RowData?> GetByIdAsync(string id, CancellationToken cancellationToken = default)
 	{
 		await EnsureConfiguredAsync(cancellationToken);

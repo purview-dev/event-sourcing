@@ -283,6 +283,25 @@ partial class MongoDBClient
 		await collection.DeleteOneAsync(Scoped<T>(predicate), cancellationToken);
 	}
 
+	/// <summary>
+	/// Deletes every matching document, returning how many were removed.
+	/// </summary>
+	/// <remarks>
+	/// Scoped like every other read and write, so a tenant removes only its own documents and the
+	/// system scope removes them all.
+	/// </remarks>
+	public async Task<int> DeleteManyAsync<T>(
+		FilterDefinition<T> predicate,
+		CancellationToken cancellationToken = default
+	)
+		where T : class
+	{
+		var collection = GetCollection<T>();
+		var result = await collection.DeleteManyAsync(Scoped<T>(predicate), cancellationToken);
+
+		return (int)result.DeletedCount;
+	}
+
 	public async Task DeleteAsync<T>(FilterDefinition<T> predicate, CancellationToken cancellationToken = default)
 		where T : class
 	{
@@ -298,7 +317,11 @@ partial class MongoDBClient
 		where T : class
 	{
 		var collection = GetCollection<T>();
-		await collection.DeleteManyAsync(predicate, cancellationToken);
+
+		// Scoped, like every other operation on this client. It was not, which made it a delete that
+		// crossed tenants - unused so far, but sitting next to a scoped overload of the same name is
+		// exactly how the wrong one gets picked.
+		await collection.DeleteManyAsync(Scoped<T>(predicate), cancellationToken);
 	}
 
 	public async Task DeleteDatabaseAsync(CancellationToken cancellationToken = default) =>

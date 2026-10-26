@@ -236,6 +236,24 @@ Subscriptions are deliberately absent from `EventStoreCapabilities`: whether one
 registered discovery implementation, which is dependency-injection state rather than a property of the
 store, so a capability flag could not report it truthfully.
 
+### Idempotency marker retention
+
+`IIdempotencyMarkerMaintenance.CleanupIdempotencyMarkersAsync` removes markers older than a window,
+on SQL Server, PostgreSQL, Azure Storage and MongoDB. Markers are **opt-in** in the first place
+(`EventStoreOperationContext.UseIdempotencyMarker`), so a deployment that never enables them has
+nothing to clean.
+
+Deleting an expired marker is safe, which is what makes this separable from event-stream retention:
+the worst case is that a save retried after the window elapsed is applied twice, and optimistic
+concurrency already rejects that. A zero or negative retention is refused, because it would delete
+markers for saves still in flight.
+
+Cleanup honours the current tenant - a tenant clears its own markers, `TenantScope.System` clears
+them all. That matters more than a read filter would: a bulk delete that forgot the tenant would
+destroy another tenant's data rather than expose it.
+
+**Nothing invokes it.** There is no scheduled cleanup; call it from a maintenance job.
+
 Event-stream **retention** is not implemented. Streams grow without bound; nothing removes an event.
 
 ## Tracing

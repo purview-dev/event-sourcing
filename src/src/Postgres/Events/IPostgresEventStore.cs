@@ -7,7 +7,10 @@ namespace Purview.EventSourcing.Postgres.Events;
 /// The PostgreSQL event-store contract for <typeparamref name="T"/> aggregates.
 /// </summary>
 /// <typeparam name="T">An <see cref="IAggregate"/> implementation.</typeparam>
-public interface IPostgresEventStore<T> : INonQueryableEventStore<T>, IAggregateEventHistoryStoreCore<T>
+public interface IPostgresEventStore<T>
+	: INonQueryableEventStore<T>,
+		IAggregateEventHistoryStoreCore<T>,
+		IIdempotencyMarkerMaintenance
 	where T : class, IAggregate, new()
 {
 	//

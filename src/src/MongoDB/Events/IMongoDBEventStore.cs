@@ -13,7 +13,10 @@ namespace Purview.EventSourcing.MongoDB.Events;
 /// but does not maintain a queryable snapshot model.
 /// </remarks>
 /// <seealso cref="MongoDBEventStore{T}"/>
-public interface IMongoDBEventStore<T> : INonQueryableEventStore<T>, IAggregateEventHistoryStoreCore<T>
+public interface IMongoDBEventStore<T>
+	: INonQueryableEventStore<T>,
+		IAggregateEventHistoryStoreCore<T>,
+		IIdempotencyMarkerMaintenance
 	where T : class, IAggregate, new()
 {
 	//
