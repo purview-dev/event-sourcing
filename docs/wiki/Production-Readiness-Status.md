@@ -87,9 +87,6 @@ surprises.
   which is weaker than it sounds.
 - **`.agents/skills/` is tracked** — 59 files, duplicated into `.claude/skills/` — although
   `AGENTS.md` documents it as gitignored.
-- **No Changeset tooling exists.** `AGENTS.md` and the release flow refer to Changesets; there is no
-  `.changeset` folder, so the version comes from `package.json` alone. The 2.0 breaking changes have
-  no changeset describing them.
 - **Cosmos DB is never validated against the real service.** The vnext emulator cannot run the suite.
 - **No upgrade test.** Nothing proves data written by 1.x reads under 2.0, on a branch whose headline
   change is breaking.

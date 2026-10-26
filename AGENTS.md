@@ -41,7 +41,7 @@ This repository contains the `Purview.EventSourcing` framework, its incremental 
 | `Directory.Packages.props` | Centrally managed NuGet versions |
 | `src/Directory.Build.props` / `src/Directory.Build.targets` | Solution-wide SDK, package, analyzer, and build behavior |
 | `global.json` | Required .NET SDK and Microsoft.Testing.Platform selection |
-| `package.json` | Authoritative repository/package version and Changesets package identity |
+| `package.json` | Authoritative repository/package version and package identity |
 | `Justfile` | Supported local workflow commands |
 
 Do not introduce a second version source, dependency-version location, or parallel build entrypoint without an explicit repository-wide migration.
@@ -262,11 +262,10 @@ dotnet csharpier check .
 - Pack when package assets, public package dependencies, analyzers, build targets, or packaging metadata change.
 - Build the canonical solution when shared contracts, project configuration, central packages, or generator/package wiring change.
 
-## Versioning, changesets, and releases
+## Versioning and releases
 
 - `package.json` is the authoritative release/package version. `UsePackageJsonVersion` is strict; do not manually diverge project versions.
-- User-facing package changes normally require a Changeset when release preparation is in scope. Changeset text must describe actual consumer-visible behavior.
-- Version application updates `package.json`, `CHANGELOG.md`, and consumes the relevant `.changeset` files. Do not hand-edit only one part of that result.
+- The version is bumped directly in `package.json`. There is no changelog file and no version-preparation tooling: the GitHub release generates its notes from the commits and pull requests it contains, which is why commit messages carry the consumer-visible detail.
 - Release is automatic on push to `main`: the `Release` workflow runs the shared `Purview.Build` pipeline with `Release:Mode=NuGet`, publishing packages and creating the `v<version>` GitHub release only when that tag does not already exist. NuGet publishing uses the `NUGET__APIKEY` organization secret.
 - Never create release tags or publish packages manually unless the user explicitly requests a documented recovery procedure. See `docs/wiki/Release-Flow.md`.
 

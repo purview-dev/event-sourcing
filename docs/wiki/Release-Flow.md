@@ -36,8 +36,7 @@ The PR workflow does not tag, release, or publish packages.
 bun -p "require('./package.json').version"
 ```
 
-This flow assumes version prep already happened before release (for example with `@changesets/cli` versioning and
-changelog updates merged to `main`). The release pipeline does not invent or auto-bump versions.
+This flow assumes the version was bumped before release - `package.json` is edited directly and merged to `main`. The release pipeline does not invent or auto-bump versions.
 
 ## Release on push to main
 
@@ -53,8 +52,7 @@ The shared workflow:
 4. Pushes every `.nupkg` to nuget.org (`--skip-duplicate`).
 5. Creates the `v<version>` GitHub release with generated release notes and attaches the package artifacts.
 
-A release is therefore produced simply by bumping `package.json` (via changesets) and merging to `main`. Do not create
-release tags manually.
+A release is therefore produced simply by bumping `package.json` and merging to `main`. Do not create release tags manually.
 
 ## Release gates for 2.0.0
 

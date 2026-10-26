@@ -219,8 +219,8 @@ Additional notes:
 
 Releases are fully automated from `main`:
 
-1. Update the package version with the repository release process (changesets).
-2. Review the generated `CHANGELOG.md` and package version changes.
+1. Bump `version` in `package.json`.
+2. Review the change; the GitHub release generates its notes from the commits and pull requests it contains.
 3. Merge to `main`; the `Release` workflow validates, builds, packs, and publishes through the shared `Purview.Build` pipeline.
 4. The pipeline creates the `v<version>` tag and GitHub release, and pushes NuGet packages to nuget.org.
 
