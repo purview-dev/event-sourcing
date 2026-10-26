@@ -1,8 +1,15 @@
 # Durable Admin Audit — Design
 
-> **Status: proposal. Nothing on this page is implemented.**
+> **Status: partly implemented.**
 >
-> `InMemoryAdminAuditLogger` is the only `IAdminAuditLogger` that ships.
+> Phase 1 (tenant and correlation on the entry, stamped centrally) and Phase 2 (SQL Server and
+> PostgreSQL durable loggers with the failure-mode option) have shipped — see
+> [Guarantees and Limitations](Guarantees-and-Limitations.md#admin-audit). **Phases 3 to 5 remain
+> proposals**: there is still no read side, no Azure Storage or MongoDB logger, and no retention.
+>
+> One design change against the plan below: the stamping decorator is wired through a keyed
+> registration (`AdminAuditKeys.Sink`) rather than by decorating whatever happens to be registered.
+> Decoration depended on the order an application calls the helpers in, and broke both ways.
 
 ## The problem
 

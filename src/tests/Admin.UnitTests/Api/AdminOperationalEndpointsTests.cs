@@ -133,8 +133,10 @@ public sealed class AdminOperationalEndpointsTests
 		await client.GetAsync("/admin/api/capabilities", cancellationToken);
 		await client.GetAsync("/admin/api/health", cancellationToken);
 
-		var auditLogger = host.App.Services.GetRequiredService<IAdminAuditLogger>();
-		var audit = (InMemoryAdminAuditLogger)auditLogger;
+		// The unkeyed registration is the context-stamping decorator; the recording logger sits
+		// behind the sink key.
+		var audit = (InMemoryAdminAuditLogger)
+			host.App.Services.GetRequiredKeyedService<IAdminAuditLogger>(AdminAuditKeys.Sink);
 		await Assert.That(audit.Entries.Count).IsEqualTo(2);
 		await Assert.That(audit.Entries.All(static entry => entry.Feature == AdminFeature.ViewCapabilities)).IsTrue();
 		await Assert.That(audit.Entries.All(static entry => entry.Succeeded)).IsTrue();

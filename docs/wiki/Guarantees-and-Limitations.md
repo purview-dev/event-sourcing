@@ -317,6 +317,33 @@ preserved metadata, query support, idempotency, concurrency, and operational lim
 registered stores. The [Provider Feature Matrix](Provider-Feature-Matrix.md) summarizes the same
 facts for package selection.
 
+## Admin audit
+
+Every privileged Admin operation is recorded as an `AdminAuditEntry`. Entries carry the tenant the
+operation **acted on** and a correlation identifier, both stamped centrally rather than at each call
+site, so an endpoint added later cannot omit them.
+
+| Store | Registration | Durable |
+| --- | --- | --- |
+| In-memory | the default | **No** - entries die with the process |
+| SQL Server | `AddPurviewEventSourcingAdminSqlServerAudit()` | Yes |
+| PostgreSQL | `AddPurviewEventSourcingAdminPostgresAudit()` | Yes |
+| Azure Storage, MongoDB | Not provided | - |
+
+**Audit writes default to refusing the operation when they fail** (`AdminAuditFailureMode.Fail`): an
+action nobody can prove happened is worse than an action that did not happen. Set the failure mode to
+`Continue` where availability matters more; the failure is then logged and the operation proceeds
+unaudited.
+
+The durable tables are append-only by contract - there is no update or delete path - but the framework
+cannot grant or revoke database permissions. A deployment that needs tamper-evidence should also limit
+the application principal to `INSERT` and `SELECT` on the audit table. A `PreviousHash` column is
+reserved so hash chaining can be added later without a migration.
+
+**There is no read side.** `IAdminAuditLogger` writes only, so the trail is queried through the
+database rather than the Admin API. Audit retention is also not implemented - entries accumulate
+indefinitely. See [Durable Admin Audit](Admin-Audit-Durability-Design.md).
+
 ## Admin security, metadata/payload separation, and deny-by-default
 
 - Admin endpoints are denied by default and authorized per feature

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
+using Purview.EventSourcing.Admin.API.Auditing;
 using Purview.EventSourcing.Admin.API.Contracts;
 using ZodSharp.AspNetCore;
 
@@ -35,6 +36,11 @@ public static class HostApplicationBuilderExtensions
 			// Register the ZodSharp schema factory and auto-discover the generated validators for the Admin API
 			// request contracts and options so endpoint filters and option validation can resolve them by type.
 			builder.Services.AddZodSharp(options => options.ScanAssemblies.Add(typeof(EventRangeRequest).Assembly));
+
+			// Stamps the tenant and correlation identifier onto every audit entry. Added here, after
+			// the application has registered whichever logger it wants, so a durable provider logger
+			// is decorated just as the in-memory default is.
+			builder.Services.AddAdminAuditContextStamping();
 
 			return builder;
 		}
