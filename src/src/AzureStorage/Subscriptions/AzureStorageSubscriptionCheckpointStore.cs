@@ -1,4 +1,3 @@
-using System.Text;
 using Azure;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Options;
@@ -135,16 +134,10 @@ public sealed class AzureStorageSubscriptionCheckpointStore : ISubscriptionCheck
 		}
 	}
 
-	// Azure table keys cannot contain '/', '\', '#' or '?', and a delimited key would be ambiguous if
-	// any segment contained the delimiter. Base64Url uses only characters that are legal in a key and
-	// never produces the '|' separator, so the composed key is both legal and unambiguous.
 	static string PartitionKeyFor(SubscriptionCheckpointKey key) =>
-		$"{Encode(key.SubscriptionName)}|{Encode(TenantColumn.Encode(key.Scope))}";
+		$"{AzureTableKeyEncoding.Encode(key.SubscriptionName)}{AzureTableKeyEncoding.SegmentSeparator}{AzureTableKeyEncoding.Encode(TenantColumn.Encode(key.Scope))}";
 
-	static string RowKeyFor(SubscriptionCheckpointKey key) => Encode(key.AggregateId);
-
-	static string Encode(string value) =>
-		Convert.ToBase64String(Encoding.UTF8.GetBytes(value)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+	static string RowKeyFor(SubscriptionCheckpointKey key) => AzureTableKeyEncoding.Encode(key.AggregateId);
 
 	/// <inheritdoc/>
 	public void Dispose() => _tableLock.Dispose();

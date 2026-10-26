@@ -6,7 +6,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
+using Purview.EventSourcing.Cryptography;
 using Purview.EventSourcing.Internal;
+using Purview.EventSourcing.MongoDB.Cryptography;
 using Purview.EventSourcing.MongoDB.Events;
 using Purview.EventSourcing.MongoDB.Snapshots;
 using Purview.EventSourcing.MongoDB.Subscriptions;
@@ -249,6 +251,37 @@ public static class ServiceCollectionExtensions
 				ServiceDescriptor.Singleton<
 					IValidateOptions<MongoDBSubscriptionCheckpointStoreOptions>,
 					MongoDBSubscriptionCheckpointStoreOptionsValidator
+				>()
+			);
+
+			return services;
+		}
+
+		/// <summary>
+		/// Registers crypto-shredding backed by a durable MongoDB key store.
+		/// </summary>
+		/// <param name="configure">Optional <see cref="EventCryptoOptions"/> configuration.</param>
+		/// <returns>The <paramref name="services"/> for chaining.</returns>
+		/// <remarks>
+		/// Keys are scoped to the current tenant and survive a restart, so this is what makes
+		/// crypto-shredding usable in a deployed application. Note that restoring the key store from a
+		/// backup brings shredded keys back; see <c>docs/wiki/Crypto-Key-Management-Design.md</c>.
+		/// </remarks>
+		public IServiceCollection AddMongoDBEventCryptoShredding(Action<EventCryptoOptions>? configure = null)
+		{
+			services.AddEventCryptoShredding<MongoDBEventCryptoKeyStore>(configure);
+
+			services
+				.AddOptions<MongoDBEventCryptoKeyStoreOptions>()
+				.Configure<IConfiguration>(
+					(options, configuration) =>
+						configuration.GetSection(MongoDBEventCryptoKeyStoreOptions.MongoDBCryptography).Bind(options)
+				);
+
+			services.TryAddEnumerable(
+				ServiceDescriptor.Singleton<
+					IValidateOptions<MongoDBEventCryptoKeyStoreOptions>,
+					MongoDBEventCryptoKeyStoreOptionsValidator
 				>()
 			);
 

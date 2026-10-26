@@ -105,7 +105,9 @@ they get two different keys, and neither tenant can read or erase the other's.
 | In-memory | `AddInMemoryEventCryptoShredding()` | **No** - keys are lost on restart |
 | SQL Server | `AddSqlServerEventCryptoShredding()` | Yes |
 | PostgreSQL | `AddPostgresEventCryptoShredding()` | Yes |
-| Azure Storage, MongoDB, Key Vault | Not provided yet | - |
+| Azure Storage | `AddAzureStorageEventCryptoShredding()` | Yes |
+| MongoDB | `AddMongoDBEventCryptoShredding()` | Yes |
+| Key Vault | Not provided yet | - |
 
 **The host refuses to start with a non-durable key store outside Development.** Losing the keys is
 indistinguishable from erasing every data subject at once, and nothing reports that it happened, so the

@@ -50,7 +50,9 @@ configured.
 | In-memory | `AddInMemoryEventCryptoShredding()` | **No** |
 | SQL Server | `AddSqlServerEventCryptoShredding()` | Yes |
 | PostgreSQL | `AddPostgresEventCryptoShredding()` | Yes |
-| Azure Storage, MongoDB, Key Vault | not provided yet | - |
+| Azure Storage | `AddAzureStorageEventCryptoShredding()` | Yes |
+| MongoDB | `AddMongoDBEventCryptoShredding()` | Yes |
+| Key Vault | not provided yet | - |
 
 **The host refuses to start with a non-durable key store outside Development.** Keys that die with
 the process make every protected payload unreadable - the same outcome as erasing every subject at
@@ -68,6 +70,8 @@ that fails an audit:
   long-retention backups, or accept that erasure completes only when the last backup ages out.
 - **Key Vault purge protection** keeps a deleted secret recoverable for the retention window, so a
   "shredded" subject is not actually erased until it expires.
+- **Azure Storage soft delete / point-in-time restore**, and a **MongoDB replica that has not yet
+  applied the delete**, both do the same thing.
 
 Neither is something the framework can enforce; both belong in the deployment's runbook.
 
