@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup Label="NuGet Package Values">
 		<IsPackable>true</IsPackable>
 		<Title>Purview Event Store for MongoDB</Title>
@@ -14,8 +14,6 @@
 	<ItemGroup>
 		<PackageReference Include="LinqKit" />
 		<PackageReference Include="MongoDB.Driver" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
-		<PackageReference Include="Microsoft.Extensions.Options" />
 	</ItemGroup>
 </Project>

@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Npgsql;
@@ -15,6 +17,11 @@ namespace Purview.EventSourcing.Postgres.Outbox;
 public sealed class PostgresOutboxIntegrationTests(PostgresEventStoreFixture fixture)
 {
 	[Test]
+	[SuppressMessage(
+		"Maintainability",
+		"CA1506:Avoid excessive class coupling",
+		Justification = "Test wiring: the store, its infrastructure and the result model are all named here."
+	)]
 	public async Task CommitAsync_GivenEnlistedOutboxAndAggregate_CommitsBothAtomically(
 		CancellationToken cancellationToken
 	)
@@ -37,7 +44,8 @@ public sealed class PostgresOutboxIntegrationTests(PostgresEventStoreFixture fix
 		);
 
 		var result = await transaction.CommitAsync(cancellationToken);
-		var savedAggregate = await eventStore.GetAsync(aggregateId, null, cancellationToken);
+		var savedAggregateResult = await eventStore.GetAsync(aggregateId, null, cancellationToken);
+		var savedAggregate = savedAggregateResult.IsSuccess ? savedAggregateResult.Value : null;
 		var row = await ReadOutboxRowAsync(tableName, envelope.Id, cancellationToken);
 
 		await Assert.That(result.Success).IsTrue();
@@ -69,7 +77,8 @@ public sealed class PostgresOutboxIntegrationTests(PostgresEventStoreFixture fix
 		transaction.Enlist((_, _, _) => Task.FromException(new InvalidOperationException("enlisted operation failed")));
 
 		var result = await transaction.CommitAsync(cancellationToken);
-		var savedAggregate = await eventStore.GetAsync(aggregateId, null, cancellationToken);
+		var savedAggregateResult = await eventStore.GetAsync(aggregateId, null, cancellationToken);
+		var savedAggregate = savedAggregateResult.IsSuccess ? savedAggregateResult.Value : null;
 		var row = await ReadOutboxRowAsync(tableName, envelope.Id, cancellationToken);
 
 		await Assert.That(result.Success).IsFalse();
@@ -255,7 +264,7 @@ public sealed class PostgresOutboxIntegrationTests(PostgresEventStoreFixture fix
 
 	sealed class SlowRecordingHandler : IOutboxHandler
 	{
-		public List<string> HandledIds { get; } = [];
+		public ConcurrentBag<string> HandledIds { get; } = [];
 
 		public async Task HandleAsync(OutboxEnvelope message, CancellationToken cancellationToken)
 		{

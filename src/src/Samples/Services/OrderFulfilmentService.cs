@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
+using Purview.EventSourcing.Failures;
 using Purview.EventSourcing.Samples.Domain;
 
 namespace Purview.EventSourcing.Samples.Services;
@@ -19,15 +20,19 @@ public sealed class OrderFulfilmentService(IEventStoreTransactionFactory transac
 		CancellationToken cancellationToken = default
 	)
 	{
-		var customer = await store.GetAsync<CustomerAggregate>(customerId, cancellationToken);
-		if (customer is null || customer.Details.IsDeleted)
+		var customerResult = await store.GetAsync<CustomerAggregate>(customerId, cancellationToken);
+		if (customerResult.IsFailure)
 			return FulfilmentResult.Fail("Customer not found.");
+
+		var customer = customerResult.Value;
 		if (!customer.IsActive)
 			return FulfilmentResult.Fail($"Customer '{customer.Name}' is not active.");
 
-		var inventory = await store.GetAsync<InventoryAggregate>(inventoryId, cancellationToken);
-		if (inventory is null || inventory.Details.IsDeleted)
+		var inventoryResult = await store.GetAsync<InventoryAggregate>(inventoryId, cancellationToken);
+		if (inventoryResult.IsFailure)
 			return FulfilmentResult.Fail("Inventory item not found.");
+
+		var inventory = inventoryResult.Value;
 		if (inventory.AvailableQuantity < quantity)
 			return FulfilmentResult.Fail(
 				$"Insufficient stock for '{inventory.ProductName}'. Available: {inventory.AvailableQuantity}, requested: {quantity}."
@@ -50,9 +55,18 @@ public sealed class OrderFulfilmentService(IEventStoreTransactionFactory transac
 		transaction.Enlist(inventory, store);
 
 		var transactionResult = await transaction.CommitAsync(cancellationToken);
-		return transactionResult.Success
-			? FulfilmentResult.Success(order, inventory)
-			: FulfilmentResult.Fail("Failed to place order. Nothing was saved.");
+		if (transactionResult.Success)
+			return FulfilmentResult.Success(order, inventory);
+
+		// A lost concurrency check is reported, not thrown, so the caller can tell a retryable race
+		// apart from a genuine failure.
+		var conflicted = transactionResult.Results.Any(result => result.Failure is ConcurrencyConflict);
+
+		return FulfilmentResult.Fail(
+			conflicted
+				? "Another user modified the inventory concurrently. Nothing was saved - please try again."
+				: "Failed to place order. Nothing was saved."
+		);
 	}
 
 	static decimal GetUnitPrice(string productId)

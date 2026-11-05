@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text.Json.Serialization;
 using MongoDB.Bson.Serialization.Attributes;
 using Purview.EventSourcing.MongoDB.StorageClient;
@@ -40,6 +40,11 @@ public sealed class SnapshotEntity : IEntity
 	/// The discriminator identifying the entity as a snapshot.
 	/// </summary>
 	public int EntityType { get; set; } = EntityTypes.SnapshotType;
+
+	/// <summary>
+	/// The tenant that owns the document; null in a single-tenant deployment.
+	/// </summary>
+	public string? TenantId { get; set; }
 
 	/// <summary>
 	/// The short name of the aggregate type the snapshot belongs to.

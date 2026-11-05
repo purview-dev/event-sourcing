@@ -1,4 +1,5 @@
-﻿using Purview.EventSourcing.AzureStorage.Exceptions;
+using Purview.EventSourcing.Failures;
+using Purview.Results;
 
 namespace Purview.EventSourcing.AzureStorage;
 
@@ -7,7 +8,12 @@ partial class TableEventStore<T>
 {
 	static ArgumentNullException NullAggregate(T? aggregate) => new(nameof(aggregate));
 
-	static AggregateIsDeletedException AggregateIsDeletedException(string aggregateId) => new(aggregateId);
+	Result<T, AggregateReadFailure> NotFound(string aggregateId) =>
+		AggregateReadFailure.Failure<T>(new AggregateNotFound(_aggregateTypeShortName, aggregateId));
 
-	static AggregateNotDeletedException AggregateNotDeletedException(string aggregateId) => new(aggregateId);
+	Result<T, AggregateReadFailure> Deleted(string aggregateId) =>
+		AggregateReadFailure.Failure<T>(new AggregateDeleted(_aggregateTypeShortName, aggregateId));
+
+	Result<T, AggregateReadFailure> NotDeleted(string aggregateId) =>
+		AggregateReadFailure.Failure<T>(new AggregateNotDeleted(_aggregateTypeShortName, aggregateId));
 }

@@ -2,6 +2,14 @@ using Purview.EventSourcing.Services;
 
 namespace Purview.EventSourcing.AzureStorage;
 
+// The store is a provider facade over Table Storage, Blob Storage, caching, telemetry and the change
+// feed, so its coupling is inherent to the role; adopting the result model added the two failure-model
+// namespaces and tipped it two types past the limit.
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+	"Maintainability",
+	"CA1506:Avoid excessive class coupling",
+	Justification = "Provider facade; the coupling is the sum of the storage, caching and telemetry surfaces it owns."
+)]
 partial class TableEventStore<T>
 {
 	///<inheritdoc/>

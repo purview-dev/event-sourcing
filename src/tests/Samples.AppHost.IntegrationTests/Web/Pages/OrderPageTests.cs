@@ -125,7 +125,7 @@ public sealed class OrderPageTests(AppHostFixture fixture)
 		);
 
 		var saveResult = await store.SaveAsync(inventory, cancellationToken);
-		return (saveResult.Aggregate.Id(), destinationLocationId);
+		return (saveResult.Value.Aggregate.Id(), destinationLocationId);
 	}
 
 	async Task<string> GetAntiForgeryTokenAsync(HttpClient client, string url, CancellationToken cancellationToken)
@@ -138,7 +138,7 @@ public sealed class OrderPageTests(AppHostFixture fixture)
 			return string.Empty;
 
 		var valueStart = html.IndexOf("value=\"", start, StringComparison.Ordinal) + 7;
-		var valueEnd = html.IndexOf('"', valueStart);
+		var valueEnd = html.IndexOf('"', valueStart, StringComparison.Ordinal);
 
 		return html[valueStart..valueEnd];
 	}
@@ -149,7 +149,7 @@ public sealed class OrderPageTests(AppHostFixture fixture)
 		var customer = await store.CreateAsync<CustomerAggregate>(cancellationToken: cancellationToken);
 		customer.RegisterCustomer($"paging-orders-{Guid.NewGuid():N}", $"paging-orders-{Guid.NewGuid():N}@example.com");
 		var customerResult = await store.SaveAsync(customer, cancellationToken);
-		var customerId = customerResult.Aggregate.Id();
+		var customerId = customerResult.Value.Aggregate.Id();
 
 		for (var i = 0; i < orderCount; i++)
 		{

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Purview.EventSourcing.Aggregates.Persistence;
 using Purview.EventSourcing.Fixtures.SqlServer;
 using Purview.EventSourcing.Samples.Domain;
@@ -54,6 +55,11 @@ public sealed class SqlServerSnapshotQueryTranslationBoundaryTests(SqlServerSnap
 	}
 
 	[Test]
+	[SuppressMessage(
+		"Maintainability",
+		"CA1506:Avoid excessive class coupling",
+		Justification = "Test wiring: the store, its infrastructure and the result model are all named here."
+	)]
 	public async Task QueryAsync_GivenDirectlyMappedComplexNestedMembers_Translates(CancellationToken cancellationToken)
 	{
 		var store = fixture.CreateSnapshotStore<PersistenceAggregate>();

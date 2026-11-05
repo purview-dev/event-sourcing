@@ -1,7 +1,13 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
+using Purview.EventSourcing.AzureStorage.Cryptography;
+using Purview.EventSourcing.AzureStorage.Subscriptions;
+using Purview.EventSourcing.Cryptography;
 using Purview.EventSourcing.Internal;
+using Purview.EventSourcing.Subscriptions;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -77,6 +83,72 @@ public static class ServiceCollectionExtensions
 					$"{nameof(AzureStorageEventStoreOptions)} is invalid."
 				)
 				.ValidateOnStart();
+
+			return services;
+		}
+
+		/// <summary>
+		/// Registers the Azure Table Storage subscription checkpoint store, so subscription positions
+		/// survive a restart.
+		/// </summary>
+		/// <returns>The <paramref name="services"/> for chaining.</returns>
+		/// <remarks>
+		/// Call this before <c>AddEventSubscription</c>. Without a durable checkpoint store the default
+		/// in-memory one is used, and every subscription replays every stream from the beginning after a
+		/// restart.
+		/// </remarks>
+		public IServiceCollection AddAzureStorageSubscriptionCheckpoints()
+		{
+			services.TryAddSingleton<ISubscriptionCheckpointStore, AzureStorageSubscriptionCheckpointStore>();
+
+			services
+				.AddOptions<AzureStorageSubscriptionCheckpointStoreOptions>()
+				.Configure<IConfiguration>(
+					(options, configuration) =>
+						configuration
+							.GetSection(AzureStorageSubscriptionCheckpointStoreOptions.AzureStorageSubscriptions)
+							.Bind(options)
+				);
+
+			services.TryAddEnumerable(
+				ServiceDescriptor.Singleton<
+					IValidateOptions<AzureStorageSubscriptionCheckpointStoreOptions>,
+					AzureStorageSubscriptionCheckpointStoreOptionsValidator
+				>()
+			);
+
+			return services;
+		}
+
+		/// <summary>
+		/// Registers crypto-shredding backed by a durable Azure Table Storage key store.
+		/// </summary>
+		/// <param name="configure">Optional <see cref="EventCryptoOptions"/> configuration.</param>
+		/// <returns>The <paramref name="services"/> for chaining.</returns>
+		/// <remarks>
+		/// Keys are scoped to the current tenant and survive a restart, so this is what makes
+		/// crypto-shredding usable in a deployed application. Note that restoring the key store from a
+		/// backup brings shredded keys back; see <c>docs/wiki/Crypto-Key-Management-Design.md</c>.
+		/// </remarks>
+		public IServiceCollection AddAzureStorageEventCryptoShredding(Action<EventCryptoOptions>? configure = null)
+		{
+			services.AddEventCryptoShredding<AzureStorageEventCryptoKeyStore>(configure);
+
+			services
+				.AddOptions<AzureStorageEventCryptoKeyStoreOptions>()
+				.Configure<IConfiguration>(
+					(options, configuration) =>
+						configuration
+							.GetSection(AzureStorageEventCryptoKeyStoreOptions.AzureStorageCryptography)
+							.Bind(options)
+				);
+
+			services.TryAddEnumerable(
+				ServiceDescriptor.Singleton<
+					IValidateOptions<AzureStorageEventCryptoKeyStoreOptions>,
+					AzureStorageEventCryptoKeyStoreOptionsValidator
+				>()
+			);
 
 			return services;
 		}

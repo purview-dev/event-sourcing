@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 	<!--
 		The shared provider-agnostic event-store contract suite is linked from SharedTestingFramework into this
 		compilation rather than consumed cross-assembly through [InheritsTests]. TUnit's TestMetadataGenerator
@@ -14,9 +14,14 @@
 			Include="..\SharedTestingFramework\Contracts\EventStore*.cs"
 			Link="Contracts\%(Filename)%(Extension)"
 		/>
+		<Compile
+			Include="..\SharedTestingFramework\Contracts\SubscriptionCheckpoint*.cs"
+			Link="Contracts\%(Filename)%(Extension)"
+		/>
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\..\src\Admin.AzureStorage\Admin.AzureStorage.csproj" />
 		<ProjectReference Include="..\..\src\Samples\Samples.csproj" />
 	</ItemGroup>
 </Project>

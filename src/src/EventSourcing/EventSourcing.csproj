@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup Label="NuGet Package Values">
 		<IsPackable>true</IsPackable>
 		<Title>Purview Event Sourcing</Title>
@@ -7,6 +7,13 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<ProjectReference
+			Include="..\MirrorGenerator\MirrorGenerator.csproj"
+			PrivateAssets="all"
+			Pack="false"
+			OutputItemType="Analyzer"
+			ReferenceOutputAssembly="false"
+		/>
 		<ProjectReference
 			Include="..\SourceGenerator\SourceGenerator.csproj"
 			PrivateAssets="all"
@@ -21,12 +28,18 @@
 		/>
 	</ItemGroup>
 
+	<PropertyGroup>
+		<!-- RSG1006: the failure unions deliberately share leaf cases - one vocabulary across read, save,
+		     delete and restore - so each shared case gets its AsFailure helper generated for one union only.
+		     The documented authoring rule is the union-receiver factory (Union.Failure(...)), and using the
+		     wrong helper is a compile error rather than a silent mis-binding. See
+		     docs/wiki/Result-And-Failure-Model.md. -->
+		<NoWarn>$(NoWarn);RSG1006</NoWarn>
+	</PropertyGroup>
+
 	<ItemGroup>
-		<PackageReference Include="Microsoft.Extensions.Caching.Abstractions" />
-		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
-		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
-		<PackageReference Include="Microsoft.Extensions.Options" />
+		<PackageReference Include="Microsoft.Extensions.Caching.Memory" />
+		<PackageReference Include="Purview.Results" />
 		<PackageReference Include="Purview.ValueObjects" />
 	</ItemGroup>
 

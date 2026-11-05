@@ -1,5 +1,7 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Azure.Data.Tables;
+using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Persistence;
 using Purview.EventSourcing.Aggregates.Persistence.Events;
 using Purview.EventSourcing.AzureStorage.Entities;
@@ -52,7 +54,7 @@ public sealed class AzureTableEventStoreGuardTests(TableEventStoreFixture fixtur
 		var tableClient = ctx.TableClient;
 
 		// Act
-		bool result = await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
+		var result = await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
 		var streamVersionVersion = await GetStreamVersionNumberAndAssertNotNull(
 			tableClient,
@@ -61,10 +63,16 @@ public sealed class AzureTableEventStoreGuardTests(TableEventStoreFixture fixtur
 		);
 
 		// Assert
-		await Assert.That(result).IsTrue();
+		await Assert.That(result.IsSuccess).IsTrue();
 		await Assert.That(aggregate.IsNew()).IsFalse();
 
-		var aggregateFromEventStore = await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		var aggregateFromEventStoreResult = await eventStore.GetAsync(
+			aggregateId,
+			cancellationToken: cancellationToken
+		);
+		var aggregateFromEventStore = aggregateFromEventStoreResult.IsSuccess
+			? aggregateFromEventStoreResult.Value
+			: null;
 
 		await AssertRecreatedMatchesSource(aggregateFromEventStore, aggregate);
 
@@ -90,16 +98,22 @@ public sealed class AzureTableEventStoreGuardTests(TableEventStoreFixture fixtur
 		var tableClient = ctx.TableClient;
 
 		// Act
-		bool result = await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
+		var result = await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
 		// Get and update stream version to remove the Version property.
 		var streamVersionVersion = await ReadAndRemoveStreamVersion(tableClient, aggregateId, cancellationToken);
 
 		// Assert
-		await Assert.That(result).IsTrue();
+		await Assert.That(result.IsSuccess).IsTrue();
 		await Assert.That(aggregate.IsNew()).IsFalse();
 
-		var aggregateFromEventStore = await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		var aggregateFromEventStoreResult = await eventStore.GetAsync(
+			aggregateId,
+			cancellationToken: cancellationToken
+		);
+		var aggregateFromEventStore = aggregateFromEventStoreResult.IsSuccess
+			? aggregateFromEventStoreResult.Value
+			: null;
 
 		await AssertRecreatedMatchesSource(aggregateFromEventStore, aggregate);
 
@@ -124,15 +138,13 @@ public sealed class AzureTableEventStoreGuardTests(TableEventStoreFixture fixtur
 
 		await eventStore.SaveAsync(aggregate, cancellationToken);
 
-		var aggregateResult =
-			await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken)
-			?? throw new NullReferenceException();
+		var aggregateResult = (await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken)).Value;
 
 		// Act
 		var result = await eventStore.DeleteAsync(aggregateResult, cancellationToken: cancellationToken);
 
 		// Assert
-		await Assert.That(result).IsTrue();
+		await Assert.That(result.IsSuccess).IsTrue();
 
 		cache.RemoveAsync(cacheKey, Any<CancellationToken>()).WasCalled(Times.Once);
 	}
@@ -153,7 +165,8 @@ public sealed class AzureTableEventStoreGuardTests(TableEventStoreFixture fixtur
 
 		await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
-		aggregate = await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		var aggregateResult = await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		aggregate = aggregateResult.IsSuccess ? aggregateResult.Value : null;
 		await Assert.That(aggregate).IsNotNull();
 
 		// Act
@@ -164,7 +177,7 @@ public sealed class AzureTableEventStoreGuardTests(TableEventStoreFixture fixtur
 		);
 
 		// Assert
-		await Assert.That(result).IsTrue();
+		await Assert.That(result.IsSuccess).IsTrue();
 		await Assert.That(aggregate.Details.IsDeleted).IsTrue();
 		await Assert.That(aggregate.Details.Locked).IsTrue();
 
@@ -200,7 +213,8 @@ public sealed class AzureTableEventStoreGuardTests(TableEventStoreFixture fixtur
 
 		await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
-		aggregate = await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		var aggregateResult = await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		aggregate = aggregateResult.IsSuccess ? aggregateResult.Value : null;
 		await Assert.That(aggregate).IsNotNull();
 
 		// Act
@@ -211,7 +225,7 @@ public sealed class AzureTableEventStoreGuardTests(TableEventStoreFixture fixtur
 		);
 
 		// Assert
-		await Assert.That(result).IsTrue();
+		await Assert.That(result.IsSuccess).IsTrue();
 		await Assert.That(aggregate.Details.IsDeleted).IsTrue();
 		await Assert.That(aggregate.Details.Locked).IsTrue();
 
@@ -232,16 +246,22 @@ public sealed class AzureTableEventStoreGuardTests(TableEventStoreFixture fixtur
 		var telemetry = ctx.Telemetry;
 
 		// Act
-		bool result = await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
+		var result = await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
 		// Assert
-		await Assert.That(result).IsFalse();
+		await Assert.That(result.IsSuccess).IsTrue();
+		await Assert.That(result.Value.Kind).IsEqualTo(SaveOutcomeKind.NoChanges);
 
 		telemetry.SaveContainedNoChanges(aggregateId, Any<string>(), Any<string>()).WasCalled(Times.Once);
 	}
 
 	[Test]
 	[MethodDataSource(nameof(OldEventCountTestData))]
+	[SuppressMessage(
+		"Maintainability",
+		"CA1506",
+		Justification = "Guard scenario intentionally touches the full event-store surface."
+	)]
 	public async Task GetAsync_GivenAnAggregateWithNonRegisteredEventType_TelemetryLogsCannotApplyEvent(
 		int eventsToCreate,
 		int numberOfOldEventsToCreate,
@@ -261,11 +281,12 @@ public sealed class AzureTableEventStoreGuardTests(TableEventStoreFixture fixtur
 		// Act
 		await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
-		var result = await eventStore.GetAsync(
+		var resultResult = await eventStore.GetAsync(
 			aggregateId,
 			new EventStoreOperationContext { SkipSnapshot = true },
 			cancellationToken: cancellationToken
 		);
+		var result = resultResult.IsSuccess ? resultResult.Value : null;
 
 		// Assert
 		telemetry
@@ -275,7 +296,7 @@ public sealed class AzureTableEventStoreGuardTests(TableEventStoreFixture fixtur
 				Any<string>(),
 				Any<string>(),
 				Is<string>(eventType => eventType!.Contains(nameof(OldEvent), StringComparison.Ordinal)),
-				Any<int>()
+				Any<long>()
 			)
 			.WasCalled(Times.Exactly(numberOfOldEventsToCreate));
 
@@ -318,15 +339,16 @@ public sealed class AzureTableEventStoreGuardTests(TableEventStoreFixture fixtur
 			cancellationToken
 		);
 
-		var result = await eventStore.GetAsync(
+		var resultResult = await eventStore.GetAsync(
 			aggregateId,
 			new EventStoreOperationContext { SkipSnapshot = true },
 			cancellationToken: cancellationToken
 		);
+		var result = resultResult.IsSuccess ? resultResult.Value : null;
 
 		// Assert
 		telemetry
-			.SkippedUnknownEvent(aggregateId, Any<string>(), Any<string>(), unknownEventType, Any<int>())
+			.SkippedUnknownEvent(aggregateId, Any<string>(), Any<string>(), unknownEventType, Any<long>())
 			.WasCalled(Times.Exactly(numberOfOldEventsToCreate));
 
 		await Assert.That(result).IsNotNull();
@@ -400,7 +422,7 @@ public sealed class AzureTableEventStoreGuardTests(TableEventStoreFixture fixtur
 		await tableClient.SubmitBatchAsync(batch, cancellationToken);
 	}
 
-	static async Task<int?> ReadAndRemoveStreamVersion(
+	static async Task<long?> ReadAndRemoveStreamVersion(
 		AzureTableClient tableClient,
 		string aggregateId,
 		CancellationToken cancellationToken
@@ -413,7 +435,8 @@ public sealed class AzureTableEventStoreGuardTests(TableEventStoreFixture fixtur
 				TableEventStoreConstants.StreamVersionRowKey,
 				cancellationToken: cancellationToken
 			) ?? throw new NullReferenceException();
-		var streamVersionVersion = streamVersion[nameof(StreamVersionEntity.Version)] as int?;
+		// Stored as Edm.Int64 since the stream version widened; reading it as int? would silently yield null.
+		var streamVersionVersion = streamVersion[nameof(StreamVersionEntity.Version)] as long?;
 
 		streamVersion.Remove(nameof(StreamVersionEntity.Version));
 
@@ -426,7 +449,7 @@ public sealed class AzureTableEventStoreGuardTests(TableEventStoreFixture fixtur
 		return streamVersionVersion;
 	}
 
-	static async Task<int?> GetStreamVersionNumberAndAssertNotNull(
+	static async Task<long?> GetStreamVersionNumberAndAssertNotNull(
 		AzureTableClient tableClient,
 		string aggregateId,
 		CancellationToken cancellationToken
@@ -441,7 +464,8 @@ public sealed class AzureTableEventStoreGuardTests(TableEventStoreFixture fixtur
 
 		await Assert.That(streamVersion).IsNotNull();
 
-		return streamVersion![nameof(StreamVersionEntity.Version)] as int?;
+		// Stored as Edm.Int64 since the stream version widened; reading it as int? would silently yield null.
+		return streamVersion![nameof(StreamVersionEntity.Version)] as long?;
 	}
 
 	static async Task AssertRecreatedMatchesSource(PersistenceAggregate? result, PersistenceAggregate aggregate)

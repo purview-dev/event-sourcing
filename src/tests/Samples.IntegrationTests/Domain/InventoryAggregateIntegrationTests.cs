@@ -29,7 +29,8 @@ public sealed class InventoryAggregateIntegrationTests(SqlServerSnapshotEventSto
 		var store = fixture.CreateEventStore<InventoryAggregate>();
 		await store.SaveAsync(inv, cancellationToken);
 
-		var loaded = await store.GetAsync(inv.Id(), cancellationToken);
+		var loadedResult = await store.GetAsync(inv.Id(), cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.ProductId).IsEqualTo("prod-1");
@@ -50,7 +51,8 @@ public sealed class InventoryAggregateIntegrationTests(SqlServerSnapshotEventSto
 		var store = fixture.CreateEventStore<InventoryAggregate>();
 		await store.SaveAsync(inv, cancellationToken);
 
-		var loaded = await store.GetAsync(inv.Id(), cancellationToken);
+		var loadedResult = await store.GetAsync(inv.Id(), cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.QuantityOnHand).IsEqualTo(100);
@@ -71,7 +73,8 @@ public sealed class InventoryAggregateIntegrationTests(SqlServerSnapshotEventSto
 		var store = fixture.CreateEventStore<InventoryAggregate>();
 		await store.SaveAsync(inv, cancellationToken);
 
-		var loaded = await store.GetAsync(inv.Id(), cancellationToken);
+		var loadedResult = await store.GetAsync(inv.Id(), cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.QuantityOnHand).IsEqualTo(140);
@@ -91,7 +94,8 @@ public sealed class InventoryAggregateIntegrationTests(SqlServerSnapshotEventSto
 		var store = fixture.CreateEventStore<InventoryAggregate>();
 		await store.SaveAsync(inv, cancellationToken);
 
-		var loaded = await store.GetAsync(inv.Id(), cancellationToken);
+		var loadedResult = await store.GetAsync(inv.Id(), cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.QuantityOnHand).IsEqualTo(20);
@@ -111,7 +115,8 @@ public sealed class InventoryAggregateIntegrationTests(SqlServerSnapshotEventSto
 		var store = fixture.CreateEventStore<InventoryAggregate>();
 		await store.SaveAsync(inv, cancellationToken);
 
-		var loaded = await store.GetAsync(inv.Id(), cancellationToken);
+		var loadedResult = await store.GetAsync(inv.Id(), cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.ReservedQuantity).IsEqualTo(0);
@@ -132,7 +137,8 @@ public sealed class InventoryAggregateIntegrationTests(SqlServerSnapshotEventSto
 		var store = fixture.CreateEventStore<InventoryAggregate>();
 		await store.SaveAsync(inv, cancellationToken);
 
-		var loaded = await store.GetAsync(inv.Id(), cancellationToken);
+		var loadedResult = await store.GetAsync(inv.Id(), cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.Details.SavedVersion).IsEqualTo(3);
@@ -155,7 +161,8 @@ public sealed class InventoryAggregateIntegrationTests(SqlServerSnapshotEventSto
 		var store = fixture.CreateEventStore<InventoryAggregate>();
 		await store.SaveAsync(inv, cancellationToken);
 
-		var atV1 = await store.GetAtAsync(id, 1, cancellationToken);
+		var atV1Result = await store.GetAtAsync(id, 1, cancellationToken);
+		var atV1 = atV1Result.IsSuccess ? atV1Result.Value : null;
 
 		await Assert.That(atV1).IsNotNull();
 		await Assert.That(atV1!.QuantityOnHand).IsEqualTo(100);
@@ -179,7 +186,8 @@ public sealed class InventoryAggregateIntegrationTests(SqlServerSnapshotEventSto
 		var store = fixture.CreateSnapshotStore(snapshotStrategy: new AlwaysSnapshotStrategy<InventoryAggregate>());
 		await store.SaveAsync(inv, cancellationToken);
 
-		var loaded = await store.GetAsync(inv.Id(), cancellationToken);
+		var loadedResult = await store.GetAsync(inv.Id(), cancellationToken);
+		var loaded = loadedResult.IsSuccess ? loadedResult.Value : null;
 
 		await Assert.That(loaded).IsNotNull();
 		await Assert.That(loaded!.QuantityOnHand).IsEqualTo(250);

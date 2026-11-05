@@ -1,13 +1,15 @@
 using System.Diagnostics;
+using Purview.EventSourcing.Failures;
+using Purview.Results;
 
 namespace Purview.EventSourcing.AzureStorage;
 
 partial class TableEventStore<T>
 {
 	///<inheritdoc/>
-	public async Task<T?> GetAtAsync(
+	public async Task<Result<T, AggregateReadFailure>> GetAtAsync(
 		string aggregateId,
-		int version,
+		long version,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
 	)
@@ -16,16 +18,17 @@ partial class TableEventStore<T>
 
 		operationContext ??= EventStoreOperationContext.DefaultContext();
 
+		using var activity = _eventStoreTelemetry.GetAggregateAtVersion(aggregateId, version, _aggregateTypeFullName);
 		_eventStoreTelemetry.GetAggregateAtSpecificVersionStart(aggregateId, version, _aggregateTypeFullName);
 		var getStopwatch = Stopwatch.StartNew();
 		try
 		{
 			var streamVersion = await GetStreamVersionAsync(aggregateId, true, cancellationToken);
 			if (streamVersion == null)
-				return null;
+				return NotFound(aggregateId);
 
-			if (!ReturnAggregate(streamVersion.IsDeleted, aggregateId, operationContext))
-				return null;
+			if (!ReturnAggregate(streamVersion.IsDeleted, operationContext))
+				return Deleted(aggregateId);
 
 			T aggregate = new() { Details = { Id = aggregateId } };
 

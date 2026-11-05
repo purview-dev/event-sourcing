@@ -65,9 +65,12 @@ public sealed class MultiAggregateIntegrationTests(SqlServerEventStoreFixture fi
 		await orderStore.SaveAsync(order, cancellationToken);
 
 		// Act: Reload all three aggregates from their respective stores
-		var loadedCustomer = await customerStore.GetAsync(customer.Id(), cancellationToken);
-		var loadedInventory = await inventoryStore.GetAsync(inventory.Id(), cancellationToken);
-		var loadedOrder = await orderStore.GetAsync(order.Id(), cancellationToken);
+		var loadedCustomerResult = await customerStore.GetAsync(customer.Id(), cancellationToken);
+		var loadedCustomer = loadedCustomerResult.IsSuccess ? loadedCustomerResult.Value : null;
+		var loadedInventoryResult = await inventoryStore.GetAsync(inventory.Id(), cancellationToken);
+		var loadedInventory = loadedInventoryResult.IsSuccess ? loadedInventoryResult.Value : null;
+		var loadedOrderResult = await orderStore.GetAsync(order.Id(), cancellationToken);
+		var loadedOrder = loadedOrderResult.IsSuccess ? loadedOrderResult.Value : null;
 
 		// Assert: Customer
 		await Assert.That(loadedCustomer).IsNotNull();
@@ -122,8 +125,10 @@ public sealed class MultiAggregateIntegrationTests(SqlServerEventStoreFixture fi
 		await inventoryStore.SaveAsync(inventory, cancellationToken);
 
 		// Act: Reload
-		var loadedOrder = await orderStore.GetAsync(order.Id(), cancellationToken);
-		var loadedInventory = await inventoryStore.GetAsync(inventory.Id(), cancellationToken);
+		var loadedOrderResult = await orderStore.GetAsync(order.Id(), cancellationToken);
+		var loadedOrder = loadedOrderResult.IsSuccess ? loadedOrderResult.Value : null;
+		var loadedInventoryResult = await inventoryStore.GetAsync(inventory.Id(), cancellationToken);
+		var loadedInventory = loadedInventoryResult.IsSuccess ? loadedInventoryResult.Value : null;
 
 		// Assert
 		await Assert.That(loadedOrder).IsNotNull();
@@ -161,8 +166,10 @@ public sealed class MultiAggregateIntegrationTests(SqlServerEventStoreFixture fi
 		await customerStore.SaveAsync(customer, cancellationToken);
 
 		// Reload both
-		var loadedCustomer = await customerStore.GetAsync(customer.Id(), cancellationToken);
-		var loadedOrder = await orderStore.GetAsync(order.Id(), cancellationToken);
+		var loadedCustomerResult = await customerStore.GetAsync(customer.Id(), cancellationToken);
+		var loadedCustomer = loadedCustomerResult.IsSuccess ? loadedCustomerResult.Value : null;
+		var loadedOrderResult = await orderStore.GetAsync(order.Id(), cancellationToken);
+		var loadedOrder = loadedOrderResult.IsSuccess ? loadedOrderResult.Value : null;
 
 		await Assert.That(loadedCustomer).IsNotNull();
 		await Assert.That(loadedCustomer!.IsActive).IsFalse();

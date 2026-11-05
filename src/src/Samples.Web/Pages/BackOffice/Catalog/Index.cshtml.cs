@@ -77,7 +77,8 @@ sealed class IndexModel(IQueryableEventStore store) : PageModel
 
 	public async Task<IActionResult> OnPostArchiveAsync(string id)
 	{
-		var item = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		var itemResult = await store.GetAsync<InventoryAggregate>(id, HttpContext.RequestAborted);
+		var item = itemResult.IsSuccess ? itemResult.Value : null;
 		if (item != null)
 		{
 			await store.DeleteAsync(item, HttpContext.RequestAborted);

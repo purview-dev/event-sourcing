@@ -1,9 +1,12 @@
-﻿namespace Purview.EventSourcing.SqlServer.Events;
+using Purview.EventSourcing.Failures;
+using Purview.Results;
+
+namespace Purview.EventSourcing.SqlServer.Events;
 
 partial class SqlServerEventStore<T>
 {
 	///<inheritdoc/>
-	public async Task<T?> GetOrCreateAsync(
+	public async Task<Result<T, AggregateReadFailure>> GetOrCreateAsync(
 		string? aggregateId,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -11,8 +14,8 @@ partial class SqlServerEventStore<T>
 	{
 		if (!string.IsNullOrWhiteSpace(aggregateId))
 		{
-			var exists = await ExistsAsync(aggregateId, cancellationToken);
-			if (exists)
+			var existence = await ExistsAsync(aggregateId, cancellationToken);
+			if (existence.DoesExist)
 				return await GetAsync(aggregateId, operationContext, cancellationToken);
 		}
 

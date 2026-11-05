@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Purview.Telemetry;
 
 namespace Purview.EventSourcing.MongoDB.Events;
@@ -10,9 +11,94 @@ namespace Purview.EventSourcing.MongoDB.Events;
 /// cache operations, as well as to report failures such as deserialization errors, storage commit failures
 /// and missing event types.
 /// </remarks>
+[ActivitySource]
 [Logger]
+[Meter]
 public interface IMongoDBEventStoreTelemetry
 {
+	// Activities (distributed tracing)
+	//
+	// Names and parameters match the SQL Server and PostgreSQL contracts deliberately: a dashboard or
+	// trace query built against one provider has to keep working when the same service moves to
+	// another, so span names are a compatibility contract in the same way instrument names are.
+
+	/// <summary>
+	/// Starts an activity representing a get-aggregate operation.
+	/// </summary>
+	/// <param name="aggregateId">The id of the aggregate being retrieved.</param>
+	/// <param name="aggregateTypeFullName">The full name of the aggregate type.</param>
+	/// <returns>The activity, or <see langword="null"/> when tracing is not enabled.</returns>
+	[Activity]
+	Activity? GetAggregate(string aggregateId, [Baggage] string aggregateTypeFullName);
+
+	/// <summary>
+	/// Starts an activity representing a get-aggregate-at-version operation.
+	/// </summary>
+	/// <param name="aggregateId">The id of the aggregate being retrieved.</param>
+	/// <param name="version">The version of the aggregate being retrieved.</param>
+	/// <param name="aggregateTypeFullName">The full name of the aggregate type.</param>
+	/// <returns>The activity, or <see langword="null"/> when tracing is not enabled.</returns>
+	[Activity]
+	Activity? GetAggregateAtVersion(string aggregateId, long version, [Baggage] string aggregateTypeFullName);
+
+	/// <summary>
+	/// Starts an activity representing a save-aggregate operation.
+	/// </summary>
+	/// <param name="aggregateId">The id of the aggregate being saved.</param>
+	/// <param name="aggregateTypeFullName">The full name of the aggregate type.</param>
+	/// <returns>The activity, or <see langword="null"/> when tracing is not enabled.</returns>
+	[Activity]
+	Activity? SaveAggregate(string aggregateId, [Baggage] string aggregateTypeFullName);
+
+	/// <summary>
+	/// Starts an activity representing a delete-aggregate operation.
+	/// </summary>
+	/// <param name="aggregateId">The id of the aggregate being deleted.</param>
+	/// <param name="aggregateTypeFullName">The full name of the aggregate type.</param>
+	/// <returns>The activity, or <see langword="null"/> when tracing is not enabled.</returns>
+	[Activity]
+	Activity? DeleteAggregate(string aggregateId, [Baggage] string aggregateTypeFullName);
+
+	/// <summary>
+	/// Records the number of events reconstituted when loading an aggregate.
+	/// </summary>
+	/// <param name="activity">The activity to attach the event to.</param>
+	/// <param name="eventCount">The number of events applied.</param>
+	/// <param name="version">The resulting aggregate version.</param>
+	[Event]
+	void EventsReconstituted(Activity? activity, int eventCount, long version);
+
+	/// <summary>
+	/// Records the completion of a save operation.
+	/// </summary>
+	/// <param name="activity">The activity to attach the event to.</param>
+	/// <param name="eventCount">The number of events saved.</param>
+	[Event]
+	void SaveCompleted(Activity? activity, int eventCount);
+
+	// Metrics (counters)
+
+	/// <summary>
+	/// Increments the counter tracking loaded aggregates.
+	/// </summary>
+	/// <param name="aggregateType">The short name of the aggregate type.</param>
+	[AutoCounter]
+	void AggregateLoaded(string aggregateType);
+
+	/// <summary>
+	/// Increments the counter tracking saved aggregates.
+	/// </summary>
+	/// <param name="aggregateType">The short name of the aggregate type.</param>
+	[AutoCounter]
+	void AggregateSaved(string aggregateType);
+
+	/// <summary>
+	/// Increments the counter tracking deleted aggregates.
+	/// </summary>
+	/// <param name="aggregateType">The short name of the aggregate type.</param>
+	[AutoCounter]
+	void AggregateDeletedCounter(string aggregateType);
+
 	/// <summary>
 	/// Logs that an aggregate was retrieved from the distributed cache.
 	/// </summary>
@@ -40,7 +126,7 @@ public interface IMongoDBEventStoreTelemetry
 	void GetAggregateAtSpecificVersionFailed(
 		string aggregateId,
 		string aggregateTypeFullName,
-		int specificVersion,
+		long specificVersion,
 		Exception exception
 	);
 
@@ -68,7 +154,7 @@ public interface IMongoDBEventStoreTelemetry
 	/// <param name="specificVersion">The version the aggregate is requested at.</param>
 	/// <param name="aggregateTypeFullName">The full name of the aggregate type.</param>
 	[Debug]
-	void GetAggregateAtSpecificVersionStart(string aggregateId, int specificVersion, string aggregateTypeFullName);
+	void GetAggregateAtSpecificVersionStart(string aggregateId, long specificVersion, string aggregateTypeFullName);
 
 	/// <summary>
 	/// Logs that a save operation contained no changes to persist.
@@ -93,7 +179,7 @@ public interface IMongoDBEventStoreTelemetry
 		string aggregateTypeFullName,
 		string aggregateType,
 		string eventType,
-		int aggregateVersion
+		long aggregateVersion
 	);
 
 	/// <summary>
@@ -112,7 +198,7 @@ public interface IMongoDBEventStoreTelemetry
 		string aggregateType,
 		string eventType,
 		string eventTypeFullName,
-		int aggregateVersion
+		long aggregateVersion
 	);
 
 	/// <summary>
@@ -233,7 +319,7 @@ public interface IMongoDBEventStoreTelemetry
 	void GetAggregateAtSpecificVersionComplete(
 		string aggregateId,
 		string aggregateTypeFullName,
-		int specificVersion,
+		long specificVersion,
 		long elapsedMilliseconds
 	);
 
@@ -327,7 +413,7 @@ public interface IMongoDBEventStoreTelemetry
 	/// <param name="aggregateType">The short name of the aggregate type.</param>
 	/// <param name="isDeleted">Whether the aggregate is soft-deleted.</param>
 	[Debug]
-	void StreamVersionFound(string aggregateId, int streamVersion, string aggregateType, bool isDeleted);
+	void StreamVersionFound(string aggregateId, long streamVersion, string aggregateType, bool isDeleted);
 
 	/// <summary>
 	/// Logs that reading the stream version record failed.

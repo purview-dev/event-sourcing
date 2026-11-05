@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
 using Purview.EventSourcing.Aggregates;
+using Purview.EventSourcing.Failures;
+using Purview.Results;
 
 namespace Purview.EventSourcing.Contracts;
 
@@ -114,14 +116,14 @@ public static class EventStoreTestSeed
 		where TAggregate : class, IAggregateTest, new()
 	{
 		// Act
-		async Task<SaveResult<TAggregate>?> Func() =>
+		async Task<Result<SaveOutcome<TAggregate>, AggregateSaveFailure>> Func() =>
 			await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
 		// Assert
 		await Assert.That(Func).Throws<ArgumentOutOfRangeException>();
 	}
 
-	public static async Task AssertGetAsyncThrowsDeletedException<TAggregate>(
+	public static async Task AssertGetAsyncReportsDeleted<TAggregate>(
 		IEventStoreCore<TAggregate> eventStore,
 		string aggregateId,
 		CancellationToken cancellationToken
@@ -129,17 +131,10 @@ public static class EventStoreTestSeed
 		where TAggregate : class, IAggregateTest, new()
 	{
 		// Act
-		Task<TAggregate?> Func() =>
-			eventStore.GetAsync(
-				aggregateId,
-				new EventStoreOperationContext { DeleteMode = DeleteHandlingMode.ThrowsException },
-				cancellationToken: cancellationToken
-			);
+		var result = await eventStore.GetAsync(aggregateId, null, cancellationToken: cancellationToken);
 
 		// Assert
-		// Each provider surfaces its own AggregateIsDeletedException type (they do not share a base type),
-		// so assert on the exception type name as the shared observable.
-		var exception = await Assert.That(Func).Throws<Exception>();
-		await Assert.That(exception!.GetType().Name).IsEqualTo("AggregateIsDeletedException");
+		await Assert.That(result.IsFailure).IsTrue();
+		await Assert.That(result.Error is AggregateDeleted).IsTrue();
 	}
 }

@@ -8,7 +8,7 @@ namespace Purview.EventSourcing.Admin.Site.Pages;
 /// Page model for the admin portal point-in-time projection page.
 /// </summary>
 /// <param name="adminApiClient">The generated Admin API client used to build projections.</param>
-public class ProjectionModel(AdminApiClient adminApiClient) : PageModel
+sealed class ProjectionModel(AdminApiClient adminApiClient) : PageModel
 {
 	readonly AdminApiClient _adminAPIClient = adminApiClient ?? throw new ArgumentNullException(nameof(adminApiClient));
 

@@ -96,7 +96,7 @@ static partial class SourceGenLibrary
 
 		return context
 			.AdditionalTextsProvider.Combine(fileName)
-			.Where(static pair => IsBaselineFile(pair.Left?.Path ?? string.Empty, pair.Right))
+			.Where(pair => IsBaselineFile(pair.Left?.Path ?? string.Empty, pair.Right))
 			.Collect()
 			.Select(
 				static (pairs, ct) =>
@@ -105,9 +105,9 @@ static partial class SourceGenLibrary
 					if (pairs.IsEmpty)
 						return new BaselineState(null, null);
 
-					var (Left, Right) = pairs[0];
-					var content = Left.GetText(ct)?.ToString() ?? string.Empty;
-					return EventContractManifestLibrary.Parse(content, Right);
+					var (left, right) = pairs[0];
+					var content = left.GetText(ct)?.ToString() ?? string.Empty;
+					return EventContractManifestLibrary.Parse(content, right);
 				}
 			)
 			.WithTrackingName("EventContractBaseline");

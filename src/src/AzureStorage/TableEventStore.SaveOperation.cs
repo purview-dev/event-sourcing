@@ -1,9 +1,9 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
-using System.Security.Claims;
 using System.Text;
 using Azure;
+using Azure.Data.Tables;
 using Microsoft.Extensions.Options;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
@@ -12,10 +12,12 @@ using Purview.EventSourcing.AzureStorage.Entities;
 using Purview.EventSourcing.AzureStorage.Events;
 using Purview.EventSourcing.AzureStorage.StorageClients.Blob;
 using Purview.EventSourcing.AzureStorage.StorageClients.Table;
+using Purview.EventSourcing.Cryptography;
+using Purview.EventSourcing.Failures;
 using Purview.EventSourcing.Serialization;
 using Purview.EventSourcing.Services;
-using Purview.EventSourcing.Storage;
 using Purview.EventSourcing.Validation;
+using Purview.Results;
 
 namespace Purview.EventSourcing.AzureStorage;
 
@@ -30,7 +32,10 @@ sealed class TableSaveOperation<T>(
 	ITableEventStoreTelemetry eventStoreTelemetry,
 	string aggregateTypeFullName,
 	ISnapshotStrategy<T> snapshotStrategy,
-	ISnapshotStrategySelector? snapshotStrategySelector
+	ISnapshotStrategySelector? snapshotStrategySelector,
+	IEventStorePrincipalAccessor principalAccessor,
+	IEventStoreMetrics metrics,
+	IEventPayloadProtector? payloadProtector
 )
 	where T : class, IAggregate, new()
 {
@@ -38,36 +43,50 @@ sealed class TableSaveOperation<T>(
 	const int MaxEventSize = 32000;
 
 	[DebuggerStepThrough]
-	public Task<SaveResult<T>> SaveAsync(
+	public Task<Result<SaveOutcome<T>, AggregateSaveFailure>> SaveAsync(
 		[NotNull] T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
 	) => SaveCoreAsync(aggregate, operationContext, cancellationToken);
 
-	internal async Task<SaveResult<T>> SaveCoreAsync(
+	internal async Task<Result<SaveOutcome<T>, AggregateSaveFailure>> SaveCoreAsync(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken,
 		params EventRecord[] additionalEvents
 	)
 	{
-		var (Terminal, Aggregate, OperationContext, IdempotencyId, ChangeEvents, IsNew, Marker) =
+		using var activity = store.EventStoreTelemetry.SaveAggregate(aggregate.Id(), store.AggregateTypeFullName);
+		var saveStopwatch = System.Diagnostics.Stopwatch.StartNew();
+		var (saveResult, preparedAggregate, preparedOperationContext, idempotencyId, changeEvents, isNew, marker) =
 			await PrepareSaveAsync(aggregate, operationContext, additionalEvents, cancellationToken);
 
-		return Terminal
+		var result =
+			saveResult
 			?? await PersistAndNotifyAsync(
-				Aggregate,
-				OperationContext,
-				IdempotencyId,
-				ChangeEvents,
-				IsNew,
-				Marker!,
+				preparedAggregate,
+				preparedOperationContext,
+				idempotencyId,
+				changeEvents,
+				isNew,
+				marker!,
 				cancellationToken
 			);
+
+		saveStopwatch.Stop();
+		metrics.RecordSave(saveStopwatch.Elapsed.TotalMilliseconds, store.AggregateTypeShortName, result);
+
+		// Only a write actually appended events; a no-op or an idempotent replay appended none.
+		if (result.IsSuccess && result.Value.Kind is SaveOutcomeKind.Written)
+			metrics.EventsAppended(changeEvents.Length, store.AggregateTypeShortName);
+		store.EventStoreTelemetry.SaveCompleted(activity, changeEvents.Length);
+		store.EventStoreTelemetry.AggregateSaved(preparedAggregate.AggregateType);
+
+		return result;
 	}
 
 	async Task<(
-		SaveResult<T>? Terminal,
+		Result<SaveOutcome<T>, AggregateSaveFailure>? Terminal,
 		T Aggregate,
 		EventStoreOperationContext OperationContext,
 		string IdempotencyId,
@@ -90,7 +109,7 @@ sealed class TableSaveOperation<T>(
 
 		if (!validationResult.IsValid)
 			return (
-				SaveResultBuilder.Create(aggregate, false, false, validationResult),
+				AggregateSaveFailure.Failure<SaveOutcome<T>>(new AggregateInvalid(validationResult)),
 				aggregate,
 				operationContext,
 				idempotencyId,
@@ -101,17 +120,17 @@ sealed class TableSaveOperation<T>(
 
 		if (aggregate.Details.Locked)
 		{
-			return operationContext.LockMode is LockHandlingMode.ThrowsException
-				? throw new Exceptions.AggregateLockedException(idempotencyId)
-				: (
-					SaveResultBuilder.Create(aggregate, false, false),
-					aggregate,
-					operationContext,
-					idempotencyId,
-					[],
-					false,
-					null
-				);
+			return (
+				AggregateSaveFailure.Failure<SaveOutcome<T>>(
+					new AggregateLocked(aggregate.AggregateType, aggregate.Id())
+				),
+				aggregate,
+				operationContext,
+				idempotencyId,
+				[],
+				false,
+				null
+			);
 		}
 
 		if (string.IsNullOrWhiteSpace(aggregate.Details.Id))
@@ -123,7 +142,7 @@ sealed class TableSaveOperation<T>(
 			eventStoreTelemetry.SaveContainedNoChanges(aggregate.Id(), aggregateTypeFullName, aggregate.AggregateType);
 
 			return (
-				SaveResultBuilder.Create(aggregate, false, true),
+				new SaveOutcome<T>(aggregate, SaveOutcomeKind.NoChanges),
 				aggregate,
 				operationContext,
 				idempotencyId,
@@ -153,7 +172,7 @@ sealed class TableSaveOperation<T>(
 			{
 				eventStoreTelemetry.EventsAlreadyApplied(aggregate.Id(), idempotencyId);
 				return (
-					SaveResultBuilder.Create(aggregate, true, true),
+					new SaveOutcome<T>(aggregate, SaveOutcomeKind.AlreadyApplied),
 					aggregate,
 					operationContext,
 					idempotencyId,
@@ -172,7 +191,7 @@ sealed class TableSaveOperation<T>(
 		"CA1502:Avoid excessive complexity",
 		Justification = "Save orchestration handles many interleaved states; keep the flow readable."
 	)]
-	async Task<SaveResult<T>> PersistAndNotifyAsync(
+	async Task<Result<SaveOutcome<T>, AggregateSaveFailure>> PersistAndNotifyAsync(
 		T aggregate,
 		EventStoreOperationContext operationContext,
 		string idempotencyId,
@@ -192,11 +211,11 @@ sealed class TableSaveOperation<T>(
 
 		var streamEntity = await store.GetStreamVersionAsync(aggregate.Id(), !isNew, cancellationToken);
 		var hasStreamEntity = streamEntity != null;
-		if (streamEntity?.IsDeleted == true)
+		if (streamEntity?.IsDeleted == true && !changeEvents.Any(record => record.Event is Restored))
 		{
-			var throwIfDeleted = !changeEvents.Any(record => record.Event is Restored);
-			if (throwIfDeleted)
-				throw new Exceptions.AggregateDeletedException(aggregate.Id(), idempotencyId);
+			return AggregateSaveFailure.Failure<SaveOutcome<T>>(
+				new AggregateDeleted(aggregate.AggregateType, aggregate.Id())
+			);
 		}
 
 		try
@@ -219,7 +238,7 @@ sealed class TableSaveOperation<T>(
 			else
 				batchOperation.Update(streamEntity, merge: false);
 
-			var userId = ClaimsPrincipal.Current?.FindFirst(operationContext.ClaimIdentifier)?.Value;
+			var userId = principalAccessor.GetPrincipal()?.FindFirst(operationContext.ClaimIdentifier)?.Value;
 			if (operationContext.RequiresValidPrincipalIdentifier && string.IsNullOrWhiteSpace(userId))
 				throw new NullReferenceException(
 					$"Missing ClaimsPrincipal identifier '{operationContext.ClaimIdentifier}'. Unable to save aggregate."
@@ -238,13 +257,14 @@ sealed class TableSaveOperation<T>(
 					CorrelationId = changeEvents[i].Metadata.CorrelationId ?? operationContext.CorrelationId,
 				};
 
-				AppendEventToBatch(
+				await AppendEventToBatchAsync(
 					changeEvent,
 					metadata,
 					aggregate,
 					idempotencyMarkerOperation,
 					batchOperation,
-					largeChangeEvents
+					largeChangeEvents,
+					cancellationToken
 				);
 			}
 
@@ -314,22 +334,39 @@ sealed class TableSaveOperation<T>(
 				await aggregateChangeNotifier.FailureAsync(aggregate, deleteRequested, ex, cancellationToken);
 			}
 
+			if (ex is Exceptions.ConcurrencyException conflict)
+			{
+				return AggregateSaveFailure.Failure<SaveOutcome<T>>(
+					new ConcurrencyConflict(
+						aggregate.AggregateType,
+						aggregate.Id(),
+						conflict.VersionAttempted,
+						conflict.Version
+					)
+				);
+			}
+
 			throw;
 		}
 
-		return SaveResultBuilder.Create(aggregate, true, false);
+		return new SaveOutcome<T>(aggregate, SaveOutcomeKind.Written);
 	}
 
-	void AppendEventToBatch(
+	async Task AppendEventToBatchAsync(
 		object changeEvent,
 		EventMetadata metadata,
 		T aggregate,
 		IdempotencyMarkerEntity idempotencyMarkerOperation,
 		BatchOperation batchOperation,
-		Dictionary<string, object> largeChangeEvents
+		Dictionary<string, object> largeChangeEvents,
+		CancellationToken cancellationToken
 	)
 	{
-		var serializedEvent = TableEventStore<T>.SerializeEvent(changeEvent);
+		var serializedEvent = await ProtectIfRequiredAsync(
+			changeEvent,
+			TableEventStore<T>.SerializeEvent(changeEvent),
+			cancellationToken
+		);
 		var eventEntity = CreateSerializedEvent(
 			aggregate.Id(),
 			changeEvent,
@@ -388,6 +425,10 @@ sealed class TableSaveOperation<T>(
 		{
 			eventStoreTelemetry.SaveFailedAtStorage(aggregate.Id(), aggregateTypeFullName, ex.Status, ex);
 
+			// Only a transaction failure identifies which action collided, and the classification
+			// below is meaningless without it.
+			batchOperation.RecordFailedAction((ex as TableTransactionFailedException)?.FailedTransactionActionIndex);
+
 			var statusCode = (HttpStatusCode)ex.Status;
 
 			store.ClearCacheFireAndForget(aggregate);
@@ -414,19 +455,17 @@ sealed class TableSaveOperation<T>(
 						// Idempotency marker already exists, that means transaction with this idempotencyId already succeeded, so we don't care anymore
 						return;
 
-					if (
-						errorEntity.RowKey.Equals(
-							TableEventStoreConstants.StreamVersionRowKey,
-							StringComparison.Ordinal
-						)
-					)
-						// Stream version Etag check or initial insert has failed, so somebody modified aggregate before us and whole transaction has to be retried.
-						throw new Exceptions.ConcurrencyException(
-							aggregate.Id(),
-							idempotencyId,
-							aggregate.Details.CurrentVersion,
-							aggregate.Details.SavedVersion
-						);
+					// Either the stream-version row lost its ETag check, or an event row already
+					// exists for this version. Event rows are keyed by aggregate version, so a
+					// collision means another writer already persisted it - both are the same
+					// concurrency conflict, and reporting the second as a commit failure would
+					// present a retryable race as an infrastructure fault.
+					throw new Exceptions.ConcurrencyException(
+						aggregate.Id(),
+						idempotencyId,
+						aggregate.Details.CurrentVersion,
+						aggregate.Details.SavedVersion
+					);
 				}
 			}
 
@@ -499,7 +538,11 @@ sealed class TableSaveOperation<T>(
 		{
 			var largeEvent = largeChangeEvents[i];
 			var blobName = store.GenerateEventBlobName(aggregateId, largeEvent.Key);
-			var largeEventContent = TableEventStore<T>.SerializeEvent(largeEvent.Value);
+			var largeEventContent = await ProtectIfRequiredAsync(
+				largeEvent.Value,
+				TableEventStore<T>.SerializeEvent(largeEvent.Value),
+				cancellationToken
+			);
 			using MemoryStream stream = new();
 			using (StreamWriter writer = new(stream, Encoding.UTF8, SerializationBufferSize, true))
 				await writer.WriteAsync(largeEventContent);
@@ -562,6 +605,13 @@ sealed class TableSaveOperation<T>(
 
 	bool ShouldSnapShot(T aggregate, EventRecord[] events, EventStoreOperationContext? operationContext)
 	{
+		// A snapshot serializes aggregate state, which holds the same personal data as the protected
+		// events in clear - and one snapshot can span many subjects, so no single key can protect it.
+		// With protection enabled the store does not snapshot at all: a snapshot surviving key erasure
+		// would make crypto-shredding untrue. Replay from events stays correct, only slower.
+		if (payloadProtector is not null)
+			return false;
+
 		if (aggregate.Details.IsDeleted || events.Any(record => record.Event is Restored))
 			return true;
 
@@ -584,4 +634,16 @@ sealed class TableSaveOperation<T>(
 			? await DefaultAggregateValidator<T>.Instance.ValidateAsync(aggregate, cancellationToken)
 			: await validator.ValidateAsync(aggregate, cancellationToken);
 	}
+
+	/// <summary>
+	/// Encrypts a serialized payload when its event names a data subject.
+	/// </summary>
+	/// <remarks>
+	/// Applied to both the table payload and the blob used for oversized events, so routing an event to
+	/// blob storage does not quietly store it in clear.
+	/// </remarks>
+	Task<string> ProtectIfRequiredAsync(object changeEvent, string serialized, CancellationToken cancellationToken) =>
+		payloadProtector is not null && changeEvent is IEventDataSubject dataSubject
+			? payloadProtector.ProtectAsync(serialized, dataSubject.DataSubjectId, cancellationToken)
+			: Task.FromResult(serialized);
 }

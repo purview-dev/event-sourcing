@@ -4,8 +4,8 @@ namespace Purview.EventSourcing.Fixtures.MongoDB;
 
 public class MongoDBSnapshotEventStoreFixture : IAsyncInitializer, IAsyncDisposable
 {
-	readonly Testcontainers.Azurite.AzuriteContainer _azuriteContainer;
-	readonly Testcontainers.MongoDb.MongoDbContainer _mongoDBContainer;
+	readonly Containers.Azurite.AzuriteContainer _azuriteContainer;
+	readonly MongoDBTestContainer _mongoDBContainer;
 
 	public MongoDBSnapshotEventStoreFixture()
 	{
@@ -18,7 +18,7 @@ public class MongoDBSnapshotEventStoreFixture : IAsyncInitializer, IAsyncDisposa
 	public MongoDBSnapshotTestContext CreateContext(int correlationIdsToGenerate = 1, string? collectionName = null) =>
 		new(
 			_mongoDBContainer.GetConnectionString(),
-			_azuriteContainer.GetConnectionString(),
+			_azuriteContainer.GetEmulatorConnectionString(),
 			correlationIdsToGenerate,
 			collectionName
 		);

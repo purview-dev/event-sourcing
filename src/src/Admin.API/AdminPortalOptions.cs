@@ -45,6 +45,26 @@ public sealed class AdminPortalOptions
 	/// </summary>
 	[Required]
 	public AdminProjectionOptions Projections { get; set; } = new();
+
+	/// <summary>
+	/// Gets or sets whether every admin request must resolve to a single tenant.
+	/// </summary>
+	/// <remarks>
+	/// Off by default, so a single-tenant deployment is unaffected. When on, an
+	/// <see cref="Services.IAdminTenantResolver"/> decides the tenant from the caller's entitlements and
+	/// the tenant named on the request; a request that resolves to none is refused rather than served
+	/// across every tenant.
+	/// </remarks>
+	public bool EnforceTenantScope { get; set; }
+
+	/// <summary>
+	/// Gets or sets the request header naming the tenant to act for.
+	/// </summary>
+	/// <remarks>
+	/// Only meaningful to a caller entitled to more than one tenant; naming a tenant the caller does not
+	/// hold is refused.
+	/// </remarks>
+	public string TenantHeaderName { get; set; } = "Purview-Tenant";
 }
 
 /// <summary>

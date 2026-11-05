@@ -1,12 +1,14 @@
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
+using Purview.EventSourcing.Failures;
+using Purview.Results;
 
 namespace Purview.EventSourcing.MongoDB;
 
 partial class MongoDBEventStore<T>
 {
 	///<inheritdoc/>
-	public async Task<bool> RestoreAsync(
+	public async Task<Result<SaveOutcome<T>, AggregateRestoreFailure>> RestoreAsync(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -16,7 +18,11 @@ partial class MongoDBEventStore<T>
 			throw NullAggregate(aggregate);
 
 		if (!aggregate.Details.IsDeleted)
-			throw AggregateNotDeletedException(aggregate.Id());
+		{
+			return AggregateRestoreFailure.Failure<SaveOutcome<T>>(
+				new AggregateNotDeleted(aggregate.AggregateType, aggregate.Id())
+			);
+		}
 
 		operationContext ??= EventStoreOperationContext.DefaultContext();
 
@@ -33,7 +39,11 @@ partial class MongoDBEventStore<T>
 		aggregate.ApplyEvent(restoreAggregateEvent, metadata);
 
 		if (aggregate.IsNew())
-			return false;
+		{
+			return AggregateRestoreFailure.Failure<SaveOutcome<T>>(
+				new AggregateNotFound(aggregate.AggregateType, aggregate.Id())
+			);
+		}
 
 		var result = await SaveCoreAsync(
 			aggregate,
@@ -41,6 +51,6 @@ partial class MongoDBEventStore<T>
 			cancellationToken,
 			new EventRecord(restoreAggregateEvent, metadata)
 		);
-		return result.Saved;
+		return result.IsFailure ? result.Error.ToRestoreFailure<T>() : result.Value;
 	}
 }

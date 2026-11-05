@@ -6,13 +6,14 @@ using Purview.EventSourcing.AzureStorage.StorageClients.Blob;
 using Purview.EventSourcing.AzureStorage.StorageClients.Table;
 using Purview.EventSourcing.ChangeFeed;
 using Purview.EventSourcing.Services;
+using Purview.EventSourcing.Tenancy;
 using TUnit.Core.Interfaces;
 
 namespace Purview.EventSourcing.Fixtures.AzureStorage;
 
 public sealed class TableEventStoreFixture : IAsyncInitializer, IAsyncDisposable
 {
-	readonly Testcontainers.Azurite.AzuriteContainer _azuriteContainer = ContainerHelper.CreateAzurite();
+	readonly Containers.Azurite.AzuriteContainer _azuriteContainer = ContainerHelper.CreateAzurite();
 
 	IAggregateEventNameMapper _eventNameMapper = default!;
 	IDisposable? _eventStoreAsDisposable;
@@ -21,6 +22,9 @@ public sealed class TableEventStoreFixture : IAsyncInitializer, IAsyncDisposable
 	{
 		EventStoreOperationContext.RequiresValidPrincipalIdentifierDefault = false;
 	}
+
+	/// <summary>The emulator connection string, for tests that build their own storage client.</summary>
+	public string ConnectionString => _azuriteContainer.GetEmulatorConnectionString();
 
 	public IDistributedCacheMock Cache { get; private set; } = default!;
 
@@ -33,13 +37,17 @@ public sealed class TableEventStoreFixture : IAsyncInitializer, IAsyncDisposable
 	public TableEventStore<TAggregate> CreateEventStore<TAggregate>(
 		IAggregateChangeFeedNotifier<TAggregate>? aggregateChangeNotifier = null,
 		bool removeFromCacheOnDelete = false,
-		int snapshotRecalculationInterval = 1
+		int snapshotRecalculationInterval = 1,
+		ICurrentTenant? currentTenant = null,
+		Guid? runId = null
 	)
 		where TAggregate : class, IAggregate, new() =>
 		CreateEventStoreContext(
 			aggregateChangeNotifier,
 			removeFromCacheOnDelete,
-			snapshotRecalculationInterval
+			snapshotRecalculationInterval,
+			currentTenant,
+			runId
 		).EventStore;
 
 	internal (
@@ -51,11 +59,13 @@ public sealed class TableEventStoreFixture : IAsyncInitializer, IAsyncDisposable
 	) CreateEventStoreContext<TAggregate>(
 		IAggregateChangeFeedNotifier<TAggregate>? aggregateChangeNotifier = null,
 		bool removeFromCacheOnDelete = false,
-		int snapshotRecalculationInterval = 1
+		int snapshotRecalculationInterval = 1,
+		ICurrentTenant? currentTenant = null,
+		Guid? runId = null
 	)
 		where TAggregate : class, IAggregate, new()
 	{
-		var runId = Guid.NewGuid();
+		runId ??= Guid.NewGuid();
 
 		var tableName = TestHelpers.GenAzureTableName(runId);
 		var containerName = TestHelpers.GenAzureBlobContainerName(runId);
@@ -71,7 +81,7 @@ public sealed class TableEventStoreFixture : IAsyncInitializer, IAsyncDisposable
 		var aggregateRequirementsManager = IAggregateRequirementsManager.Mock();
 		AzureStorageEventStoreOptions azureStorageOptions = new()
 		{
-			ConnectionString = _azuriteContainer.GetConnectionString(),
+			ConnectionString = _azuriteContainer.GetEmulatorConnectionString(),
 			Table = tableName,
 			Container = containerName,
 			TimeoutInSeconds = 10,
@@ -85,10 +95,11 @@ public sealed class TableEventStoreFixture : IAsyncInitializer, IAsyncDisposable
 			aggregateChangeNotifier: aggregateChangeNotifier ?? IAggregateChangeFeedNotifier<TAggregate>.Mock(),
 			eventStoreTelemetry: telemetry,
 			aggregateRequirementsManager: aggregateRequirementsManager,
-			snapshotStrategy: new IntervalSnapshotStrategy<TAggregate>(snapshotRecalculationInterval)
+			snapshotStrategy: new IntervalSnapshotStrategy<TAggregate>(snapshotRecalculationInterval),
+			currentTenant: currentTenant
 		);
 
-		AzureTableClient tableClient = new(azureStorageOptions, eventStore.TableName);
+		AzureTableClient tableClient = new(azureStorageOptions, eventStore.TableName, currentTenant);
 		TableClient = tableClient;
 
 		AzureBlobClient blobClient = new(azureStorageOptions, eventStore.ContainerName);

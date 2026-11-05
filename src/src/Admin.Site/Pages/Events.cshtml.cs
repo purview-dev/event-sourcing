@@ -8,7 +8,7 @@ namespace Purview.EventSourcing.Admin.Site.Pages;
 /// Page model for the admin portal event history page.
 /// </summary>
 /// <param name="adminApiClient">The generated Admin API client used to load event ranges.</param>
-public class EventsModel(AdminApiClient adminApiClient) : PageModel
+sealed class EventsModel(AdminApiClient adminApiClient) : PageModel
 {
 	readonly AdminApiClient _adminAPIClient = adminApiClient ?? throw new ArgumentNullException(nameof(adminApiClient));
 

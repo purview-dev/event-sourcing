@@ -79,7 +79,7 @@ sealed class AggregateChangeFeedNotifier<T>(
 
 	public async Task AfterSaveAsync(
 		T aggregate,
-		int previousSavedVersion,
+		long previousSavedVersion,
 		bool isNew,
 		EventRecord[] events,
 		CancellationToken cancellationToken = default

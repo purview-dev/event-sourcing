@@ -6,7 +6,7 @@ partial class OrderAggregate
 {
 	partial void OnShippingAddressChanging(ref string? shippingAddress)
 	{
-		shippingAddress = shippingAddress.OrNull();
+		shippingAddress = shippingAddress.OrDefault();
 
 		if (Status.Value is not OrderStatusCode.Draft)
 			throw new InvalidOperationException("Shipping address can only be set while order is in draft status.");

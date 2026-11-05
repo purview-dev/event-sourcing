@@ -1,5 +1,7 @@
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.ChangeFeed;
+using Purview.EventSourcing.Failures;
+using Purview.EventSourcing.Tenancy;
 
 namespace Purview.EventSourcing.Contracts;
 
@@ -25,6 +27,26 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 	);
 
 	/// <summary>
+	/// Creates a store bound to a tenant scope, sharing storage with every other store created for the
+	/// same <paramref name="runId"/>.
+	/// </summary>
+	/// <param name="scope">The tenant the store runs under.</param>
+	/// <param name="runId">Identifies the storage the stores share.</param>
+	/// <remarks>
+	/// <para>
+	/// Abstract rather than virtual, so a provider cannot be added without stating how it is scoped. The
+	/// tenancy tests below are the reason: they were previously per-provider copies, and a provider that
+	/// simply never had one looked just as green as a provider that passed.
+	/// </para>
+	/// <para>
+	/// **Sharing storage is the whole point.** Two stores built with different run identifiers use
+	/// different tables, databases or containers, so "the other tenant cannot see it" passes while
+	/// proving nothing.
+	/// </para>
+	/// </remarks>
+	protected abstract IEventStoreCore<TAggregate> CreateTenantScopedEventStore(TenantScope scope, Guid runId);
+
+	/// <summary>
 	/// Rewrites the stored event-type names for a range of events so they can no longer be resolved.
 	/// Used by the unknown-event-type test to simulate schema/type evolution. Providers that cannot
 	/// rewrite stored event types should move that test to their own guard suite.
@@ -39,6 +61,124 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 	) => throw new NotSupportedException($"{GetType().Name} does not support marking stored event types as unknown.");
 #pragma warning restore CA1506
 
+	async Task<string> SeedForTenantAsync(Guid runId, string tenantId, CancellationToken cancellationToken)
+	{
+		var aggregateId = $"{Guid.NewGuid()}";
+		var store = CreateTenantScopedEventStore(TenantScope.For(tenantId), runId);
+
+		var aggregate = TestHelpers.Aggregate<TAggregate>(aggregateId: aggregateId);
+		aggregate.IncrementInt32Value();
+
+		var saved = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
+
+		await Assert.That(saved.IsSuccess).IsTrue();
+
+		return aggregateId;
+	}
+
+	[Test]
+	public async Task GetAsync_GivenAnotherTenantsAggregate_DoesNotReturnIt(CancellationToken cancellationToken)
+	{
+		var runId = Guid.NewGuid();
+		var aggregateId = await SeedForTenantAsync(runId, "acme", cancellationToken);
+
+		var owner = CreateTenantScopedEventStore(TenantScope.For("acme"), runId);
+		var other = CreateTenantScopedEventStore(TenantScope.For("globex"), runId);
+
+		await Assert.That((await owner.GetAsync(aggregateId, cancellationToken: cancellationToken)).IsSuccess).IsTrue();
+		await Assert.That((await other.GetAsync(aggregateId, cancellationToken: cancellationToken)).IsFailure).IsTrue();
+	}
+
+	[Test]
+	public async Task GetAsync_GivenSystemScope_ReadsAcrossTenants(CancellationToken cancellationToken)
+	{
+		var runId = Guid.NewGuid();
+		var aggregateId = await SeedForTenantAsync(runId, "acme", cancellationToken);
+
+		var system = CreateTenantScopedEventStore(TenantScope.System, runId);
+
+		await Assert
+			.That((await system.GetAsync(aggregateId, cancellationToken: cancellationToken)).IsSuccess)
+			.IsTrue();
+	}
+
+	// The distributed cache is read before the tenant-filtered storage lookup, so an unqualified cache
+	// key serves one tenant's aggregate to another ahead of every storage filter. Reading twice as the
+	// owner guarantees the entry is cached before the other tenant asks for it.
+	[Test]
+	public async Task GetAsync_GivenACachedAggregate_DoesNotServeItToAnotherTenant(CancellationToken cancellationToken)
+	{
+		var runId = Guid.NewGuid();
+		var aggregateId = await SeedForTenantAsync(runId, "acme", cancellationToken);
+
+		var owner = CreateTenantScopedEventStore(TenantScope.For("acme"), runId);
+		await owner.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		await Assert.That((await owner.GetAsync(aggregateId, cancellationToken: cancellationToken)).IsSuccess).IsTrue();
+
+		var other = CreateTenantScopedEventStore(TenantScope.For("globex"), runId);
+
+		await Assert.That((await other.GetAsync(aggregateId, cancellationToken: cancellationToken)).IsFailure).IsTrue();
+	}
+
+	// An unowned row - written tenant-less, or by a write path that missed the stamp - must not become
+	// visible to every tenant. Failing closed turns a stamping bug into absent data, not a leak.
+	[Test]
+	public async Task GetAsync_GivenAnUnownedAggregate_IsNotVisibleToATenant(CancellationToken cancellationToken)
+	{
+		var runId = Guid.NewGuid();
+		var aggregateId = $"{Guid.NewGuid()}";
+
+		var system = CreateTenantScopedEventStore(TenantScope.System, runId);
+		var aggregate = TestHelpers.Aggregate<TAggregate>(aggregateId: aggregateId);
+		aggregate.IncrementInt32Value();
+		await system.SaveAsync(aggregate, cancellationToken: cancellationToken);
+
+		var tenant = CreateTenantScopedEventStore(TenantScope.For("acme"), runId);
+
+		await Assert
+			.That((await tenant.GetAsync(aggregateId, cancellationToken: cancellationToken)).IsFailure)
+			.IsTrue();
+		await Assert
+			.That((await system.GetAsync(aggregateId, cancellationToken: cancellationToken)).IsSuccess)
+			.IsTrue();
+	}
+
+	[Test]
+	public async Task SaveAsync_GivenAggregateLoadedBeforeAnotherWriterSaved_ReturnsConcurrencyConflict(
+		CancellationToken cancellationToken
+	)
+	{
+		// Arrange
+		var aggregateId = $"{Guid.NewGuid()}";
+		var aggregate = TestHelpers.Aggregate<TAggregate>(aggregateId: aggregateId);
+		aggregate.IncrementInt32Value();
+
+		var eventStore = CreateEventStore();
+		await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
+
+		var firstResult = await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		var secondResult = await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken);
+
+		await Assert.That(firstResult.IsSuccess).IsTrue();
+		await Assert.That(secondResult.IsSuccess).IsTrue();
+
+		var first = firstResult.Value;
+		var second = secondResult.Value;
+
+		first.IncrementInt32Value();
+		second.IncrementInt32Value();
+
+		// Act
+		var firstSave = await eventStore.SaveAsync(first, cancellationToken: cancellationToken);
+		var secondSave = await eventStore.SaveAsync(second, cancellationToken: cancellationToken);
+
+		// Assert - the second writer read the same version, so its write loses. It must lose as the
+		// shared ConcurrencyConflict case: a caller handles it without referencing a provider assembly.
+		await Assert.That(firstSave.IsSuccess).IsTrue();
+		await Assert.That(secondSave.IsFailure).IsTrue();
+		await Assert.That(secondSave.Error is ConcurrencyConflict).IsTrue();
+	}
+
 	[Test]
 	public async Task SaveAsync_GivenNewAggregateWithChanges_SavesAggregate(CancellationToken cancellationToken)
 	{
@@ -50,13 +190,19 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		var eventStore = CreateEventStore();
 
 		// Act
-		bool result = await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
+		var result = await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
 		// Assert
-		await Assert.That(result).IsTrue();
+		await Assert.That(result.IsSuccess).IsTrue();
 		await Assert.That(aggregate.IsNew()).IsFalse();
 
-		var aggregateFromEventStore = await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		var aggregateFromEventStoreResult = await eventStore.GetAsync(
+			aggregateId,
+			cancellationToken: cancellationToken
+		);
+		var aggregateFromEventStore = aggregateFromEventStoreResult.IsSuccess
+			? aggregateFromEventStoreResult.Value
+			: null;
 
 		await Assert.That(aggregateFromEventStore).IsNotNull();
 		await Assert.That(aggregateFromEventStore!.Id()).IsEqualTo(aggregate.Id());
@@ -77,10 +223,11 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		var eventStore = CreateEventStore();
 
 		// Act
-		bool result = await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
+		var result = await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
 		// Assert
-		await Assert.That(result).IsFalse();
+		await Assert.That(result.IsSuccess).IsTrue();
+		await Assert.That(result.Value.Kind).IsEqualTo(SaveOutcomeKind.NoChanges);
 	}
 
 	[Test]
@@ -99,7 +246,7 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 
 		// Assert
 		aggregateChangeNotifier
-			.AfterSaveAsync(aggregate, Any<int>(), true, Any<EventRecord[]>(), Any<CancellationToken>())
+			.AfterSaveAsync(aggregate, Any<long>(), true, Any<EventRecord[]>(), Any<CancellationToken>())
 			.WasNeverCalled();
 	}
 
@@ -138,7 +285,7 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 			.Callback(() => afterWasCalled = true);
 
 		// Act
-		bool result = await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
+		var result = await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
 		// Assert
 		await Assert.That(beforeWasCalled).IsTrue();
@@ -149,7 +296,7 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		aggregateChangeNotifier
 			.AfterSaveAsync(
 				aggregate,
-				Any<int>(),
+				Any<long>(),
 				true,
 				Is<EventRecord[]>(events => events!.Length == eventsToCreate),
 				Any<CancellationToken>()
@@ -172,12 +319,14 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		var result = await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
 		// Assert
-		await Assert.That(result.Saved).IsFalse();
-		await Assert.That(result.IsValid).IsFalse();
-		await Assert.That((bool)result).IsFalse();
-		await Assert.That(result.ValidationResult.Failures).HasSingleItem();
+		await Assert.That(result.IsFailure).IsTrue();
+		await Assert.That(result.Error is AggregateInvalid).IsTrue();
+
+		var invalid = result.Error is AggregateInvalid value ? value : default;
+
+		await Assert.That(invalid.ValidationResult.Failures).HasSingleItem();
 		await Assert
-			.That(result.ValidationResult.Failures.Single().PropertyName)
+			.That(invalid.ValidationResult.Failures.Single().PropertyName)
 			.IsEqualTo(nameof(IAggregateTest.IncrementInt32));
 	}
 
@@ -194,10 +343,11 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 
 		var eventStore = CreateEventStore();
 		var result = await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
-		await Assert.That(result.Saved).IsTrue();
+		await Assert.That(result.IsSuccess && result.Value.Written).IsTrue();
 
 		// Act
-		var aggregateGetResult = await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		var aggregateGetResultResult = await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		var aggregateGetResult = aggregateGetResultResult.IsSuccess ? aggregateGetResultResult.Value : null;
 
 		// Assert
 		await EventStoreTestSeed.AssertComplexPropertyMatches(aggregate, aggregateGetResult);
@@ -218,13 +368,19 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		var eventStore = CreateEventStore();
 
 		// Act
-		bool result = await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
+		var result = await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
 		// Assert
-		await Assert.That(result).IsTrue();
+		await Assert.That(result.IsSuccess).IsTrue();
 		await Assert.That(aggregate.IsNew()).IsFalse();
 
-		var aggregateFromEventStore = await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		var aggregateFromEventStoreResult = await eventStore.GetAsync(
+			aggregateId,
+			cancellationToken: cancellationToken
+		);
+		var aggregateFromEventStore = aggregateFromEventStoreResult.IsSuccess
+			? aggregateFromEventStoreResult.Value
+			: null;
 
 		await Assert
 			.That((aggregateFromEventStore?.StringProperty ?? string.Empty).Length)
@@ -248,18 +404,21 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		var eventStore = CreateEventStore();
 
 		// Act
-		bool result = await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
+		var result = await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
 		// Assert
-		await Assert.That(result).IsTrue();
+		await Assert.That(result.IsSuccess).IsTrue();
 		await Assert.That(aggregate.IsNew()).IsFalse();
 
 		// Re-read the aggregate straight from the event records, bypassing the snapshot.
-		var aggregateFromEventStore = await eventStore.GetAsync(
+		var aggregateFromEventStoreResult = await eventStore.GetAsync(
 			aggregateId,
 			new EventStoreOperationContext { SkipSnapshot = true },
 			cancellationToken: cancellationToken
 		);
+		var aggregateFromEventStore = aggregateFromEventStoreResult.IsSuccess
+			? aggregateFromEventStoreResult.Value
+			: null;
 
 		await Assert
 			.That((aggregateFromEventStore?.StringProperty ?? string.Empty).Length)
@@ -303,11 +462,12 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
 		// Act
-		var result = await eventStore.GetAsync(
+		var resultResult = await eventStore.GetAsync(
 			aggregateId,
 			new EventStoreOperationContext { SkipSnapshot = true },
 			cancellationToken: cancellationToken
 		);
+		var result = resultResult.IsSuccess ? resultResult.Value : null;
 
 		// Assert
 		await Assert.That(result).IsNotNull();
@@ -349,7 +509,8 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
 		// Act
-		var result = await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		var resultResult = await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		var result = resultResult.IsSuccess ? resultResult.Value : null;
 
 		// Assert
 		await Assert.That(result).IsNotNull();
@@ -389,11 +550,12 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
 		// Get without using the snapshot, just from the event records.
-		var result = await eventStore.GetAsync(
+		var resultResult = await eventStore.GetAsync(
 			aggregateId,
 			new EventStoreOperationContext { SkipSnapshot = true },
 			cancellationToken: cancellationToken
 		);
+		var result = resultResult.IsSuccess ? resultResult.Value : null;
 
 		// Assert
 		await EventStoreTestSeed.AssertRecreatedWithTotals(result, aggregate, totalEvents);
@@ -442,20 +604,19 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		);
 
 		// Get without using the snapshot, just from the event records.
-		var result = await eventStore.GetAsync(
+		var resultResult = await eventStore.GetAsync(
 			aggregateId,
 			new EventStoreOperationContext { SkipSnapshot = true },
 			cancellationToken: cancellationToken
 		);
+		var result = resultResult.IsSuccess ? resultResult.Value : null;
 
 		// Assert
 		await EventStoreTestSeed.AssertRecreatedWithTotals(result, aggregate, totalEvents);
 	}
 
 	[Test]
-	public async Task GetAsync_GivenAggregateIsDeletedAndDeletedModeIsSetToThrow_ThrowsEventStoreAggregateDeletedException(
-		CancellationToken cancellationToken
-	)
+	public async Task GetAsync_GivenAggregateIsDeleted_ReportsAggregateDeleted(CancellationToken cancellationToken)
 	{
 		// Arrange
 		var aggregateId = $"{Guid.NewGuid()}";
@@ -468,7 +629,7 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		await eventStore.DeleteAsync(aggregate, cancellationToken: cancellationToken);
 
 		// Act / Assert
-		await EventStoreTestSeed.AssertGetAsyncThrowsDeletedException(eventStore, aggregateId, cancellationToken);
+		await EventStoreTestSeed.AssertGetAsyncReportsDeleted(eventStore, aggregateId, cancellationToken);
 	}
 
 	[Test]
@@ -495,11 +656,12 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		await Assert.That(aggregate.IncrementInt32).IsEqualTo(previousEventsToCreate + 1);
 
 		// Act
-		var result = await eventStore.GetAtAsync(
+		var resultResult = await eventStore.GetAtAsync(
 			aggregateId,
 			version: previousEventsToCreate,
 			cancellationToken: cancellationToken
 		);
+		var result = resultResult.IsSuccess ? resultResult.Value : null;
 
 		// Assert
 		await Assert.That(result).IsNotNull();
@@ -519,11 +681,12 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		var eventStore = CreateEventStore();
 
 		// Act
-		var result = await eventStore.GetOrCreateAsync(
+		var resultResult = await eventStore.GetOrCreateAsync(
 			aggregateId,
 			operationContext: null,
 			cancellationToken: cancellationToken
 		);
+		var result = resultResult.IsSuccess ? resultResult.Value : null;
 
 		// Assert
 		await Assert.That(result).IsNotNull();
@@ -548,7 +711,7 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 
 		// Assert
 		await Assert.That(result.DoesExist).IsTrue();
-		await Assert.That(result.Status).IsEqualTo(ExistsStatus.Exists);
+		await Assert.That(result.Status).IsEqualTo(ExistenceStatus.Exists);
 	}
 
 	[Test]
@@ -565,7 +728,8 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		await eventStore.DeleteAsync(aggregate, cancellationToken: cancellationToken);
 
 		// Act
-		var aggregateResult = await eventStore.GetDeletedAsync(aggregateId, cancellationToken: cancellationToken);
+		var aggregateResultResult = await eventStore.GetDeletedAsync(aggregateId, cancellationToken: cancellationToken);
+		var aggregateResult = aggregateResultResult.IsSuccess ? aggregateResultResult.Value : null;
 
 		// Assert
 		await Assert.That(aggregateResult).IsNotNull();
@@ -574,7 +738,7 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 	}
 
 	[Test]
-	public async Task IsDeletedAsync_GivenDeletedAggregates_ReturnsTrue(CancellationToken cancellationToken)
+	public async Task ExistsAsync_GivenDeletedAggregate_ReportsExistsInDeletedState(CancellationToken cancellationToken)
 	{
 		// Arrange
 		var aggregateId = $"{Guid.NewGuid()}";
@@ -587,14 +751,14 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		await eventStore.DeleteAsync(aggregate, cancellationToken: cancellationToken);
 
 		// Act
-		var result = await eventStore.IsDeletedAsync(aggregateId, cancellationToken: cancellationToken);
+		var result = await eventStore.ExistsAsync(aggregateId, cancellationToken: cancellationToken);
 
 		// Assert
-		await Assert.That(result).IsTrue();
+		await Assert.That(result.Status).IsEqualTo(ExistenceStatus.ExistsInDeletedState);
 	}
 
 	[Test]
-	public async Task IsDeletedAsync_GivenNonDeletedAggregates_ReturnsFalse(CancellationToken cancellationToken)
+	public async Task ExistsAsync_GivenLiveAggregate_ReportsExists(CancellationToken cancellationToken)
 	{
 		// Arrange
 		var aggregateId = $"{Guid.NewGuid()}";
@@ -606,10 +770,10 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
 		// Act
-		var result = await eventStore.IsDeletedAsync(aggregateId, cancellationToken: cancellationToken);
+		var result = await eventStore.ExistsAsync(aggregateId, cancellationToken: cancellationToken);
 
 		// Assert
-		await Assert.That(result).IsFalse();
+		await Assert.That(result.Status).IsEqualTo(ExistenceStatus.Exists);
 	}
 
 	[Test]
@@ -627,14 +791,15 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 		await eventStore.DeleteAsync(aggregate, cancellationToken: cancellationToken);
 
-		aggregate = await eventStore.GetDeletedAsync(aggregateId, cancellationToken);
+		var aggregateResult = await eventStore.GetDeletedAsync(aggregateId, cancellationToken);
+		aggregate = aggregateResult.IsSuccess ? aggregateResult.Value : null;
 		await Assert.That(aggregate).IsNotNull();
 
 		// Act
 		var result = await eventStore.RestoreAsync(aggregate!, cancellationToken: cancellationToken);
 
 		// Assert
-		await Assert.That(result).IsTrue();
+		await Assert.That(result.IsSuccess).IsTrue();
 		await Assert.That(aggregate.Details.IsDeleted).IsFalse();
 		await Assert.That(aggregate.Details.SavedVersion).IsEqualTo(3);
 	}
@@ -651,15 +816,13 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 
 		await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
-		var aggregateResult =
-			await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken)
-			?? throw new NullReferenceException();
+		var aggregateResult = (await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken)).Value;
 
 		// Act
 		var result = await eventStore.DeleteAsync(aggregateResult, cancellationToken: cancellationToken);
 
 		// Assert
-		await Assert.That(result).IsTrue();
+		await Assert.That(result.IsSuccess).IsTrue();
 		await Assert.That(aggregateResult.Details.IsDeleted).IsTrue();
 		await Assert.That(aggregateResult.Details.SavedVersion).IsEqualTo(2);
 	}
@@ -711,7 +874,8 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 
 		await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
-		aggregate = await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		var aggregateResult = await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		aggregate = aggregateResult.IsSuccess ? aggregateResult.Value : null;
 		await Assert.That(aggregate).IsNotNull();
 
 		// Act
@@ -722,10 +886,12 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		);
 
 		// Assert
-		await Assert.That(result).IsTrue();
+		await Assert.That(result.IsSuccess).IsTrue();
 
 		// The aggregate and all of its data are gone.
-		await Assert.That(await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken)).IsNull();
+		await Assert
+			.That((await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken)).IsFailure)
+			.IsTrue();
 	}
 
 	[Test]
@@ -744,7 +910,8 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 
 		await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
-		aggregate = await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		var aggregateResult = await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		aggregate = aggregateResult.IsSuccess ? aggregateResult.Value : null;
 		await Assert.That(aggregate).IsNotNull();
 
 		// Act
@@ -755,10 +922,12 @@ public abstract class EventStoreContractTestsBase<TAggregate>
 		);
 
 		// Assert
-		await Assert.That(result).IsTrue();
+		await Assert.That(result.IsSuccess).IsTrue();
 
 		// The aggregate and all of its data are gone.
-		await Assert.That(await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken)).IsNull();
+		await Assert
+			.That((await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken)).IsFailure)
+			.IsTrue();
 	}
 
 	[Test]

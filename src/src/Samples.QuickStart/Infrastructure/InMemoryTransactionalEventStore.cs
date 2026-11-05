@@ -7,8 +7,9 @@ using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Purview.EventSourcing.Aggregates;
+using Purview.EventSourcing.Failures;
 using Purview.EventSourcing.Internal;
-using Purview.EventSourcing.Validation;
+using Purview.Results;
 
 namespace Purview.EventSourcing.Samples.QuickStart.Infrastructure;
 
@@ -19,6 +20,9 @@ sealed class InMemoryTransactionalEventStore<T>(InMemoryFailurePlan failurePlan)
 	where T : class, IAggregate, new()
 {
 	static readonly ConcurrentDictionary<string, string> Persisted = new(StringComparer.OrdinalIgnoreCase);
+
+	static Result<T, AggregateReadFailure> NotFound(string aggregateId) =>
+		AggregateReadFailure.Failure<T>(new AggregateNotFound(typeof(T).Name, aggregateId));
 
 	public string TransactionBoundaryKey => "quickstart-inmemory";
 
@@ -34,7 +38,7 @@ sealed class InMemoryTransactionalEventStore<T>(InMemoryFailurePlan failurePlan)
 		return Task.FromResult(aggregate);
 	}
 
-	public async Task<T?> GetOrCreateAsync(
+	public async Task<Result<T, AggregateReadFailure>> GetOrCreateAsync(
 		string? aggregateId,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -43,31 +47,35 @@ sealed class InMemoryTransactionalEventStore<T>(InMemoryFailurePlan failurePlan)
 		if (!string.IsNullOrWhiteSpace(aggregateId))
 		{
 			var existing = await GetAsync(aggregateId, operationContext, cancellationToken);
-			if (existing is not null)
+			if (existing.IsSuccess)
 				return existing;
 		}
 
 		return await CreateAsync(aggregateId, cancellationToken);
 	}
 
-	public Task<T?> GetAsync(
+	public Task<Result<T, AggregateReadFailure>> GetAsync(
 		string aggregateId,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
-	) => Task.FromResult(Persisted.TryGetValue(aggregateId, out var json) ? Deserialize(json) : default);
+	) =>
+		Task.FromResult<Result<T, AggregateReadFailure>>(
+			Persisted.TryGetValue(aggregateId, out var json) ? Deserialize(json) : NotFound(aggregateId)
+		);
 
-	public async Task<T?> GetAtAsync(
+	public async Task<Result<T, AggregateReadFailure>> GetAtAsync(
 		string aggregateId,
-		int version,
+		long version,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
 	)
 	{
-		var aggregate = await GetAsync(aggregateId, operationContext, cancellationToken);
-		return aggregate?.Details.CurrentVersion == version ? aggregate : null;
+		var result = await GetAsync(aggregateId, operationContext, cancellationToken);
+
+		return result.IsSuccess && result.Value.Details.CurrentVersion == version ? result : NotFound(aggregateId);
 	}
 
-	public Task<SaveResult<T>> SaveAsync(
+	public Task<Result<SaveOutcome<T>, AggregateSaveFailure>> SaveAsync(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -84,19 +92,18 @@ sealed class InMemoryTransactionalEventStore<T>(InMemoryFailurePlan failurePlan)
 		return Task.FromResult(CreateSavedResult(aggregate));
 	}
 
-	public Task<bool> IsDeletedAsync(string aggregateId, CancellationToken cancellationToken = default) =>
-		Task.FromResult(false);
+	public Task<Result<T, AggregateReadFailure>> GetDeletedAsync(
+		string aggregateId,
+		CancellationToken cancellationToken = default
+	) => Task.FromResult(NotFound(aggregateId));
 
-	public Task<T?> GetDeletedAsync(string aggregateId, CancellationToken cancellationToken = default) =>
-		Task.FromResult<T?>(default);
-
-	public Task<bool> DeleteAsync(
+	public Task<Result<SaveOutcome<T>, AggregateDeleteFailure>> DeleteAsync(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
 	) => throw new NotSupportedException("The quick start store only demonstrates create, load, query, and save.");
 
-	public Task<bool> RestoreAsync(
+	public Task<Result<SaveOutcome<T>, AggregateRestoreFailure>> RestoreAsync(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -113,19 +120,19 @@ sealed class InMemoryTransactionalEventStore<T>(InMemoryFailurePlan failurePlan)
 		await Task.CompletedTask;
 	}
 
-	public Task<ExistsState> ExistsAsync(string aggregateId, CancellationToken cancellationToken = default)
+	public Task<AggregateExistence> ExistsAsync(string aggregateId, CancellationToken cancellationToken = default)
 	{
 		return !Persisted.TryGetValue(aggregateId, out var json)
-			? Task.FromResult(ExistsState.DoesNotExist)
-			: Task.FromResult(new ExistsState(ExistsStatus.Exists, Deserialize(json).Details.CurrentVersion));
+			? Task.FromResult(AggregateExistence.DoesNotExist)
+			: Task.FromResult(new AggregateExistence(ExistenceStatus.Exists, Deserialize(json).Details.CurrentVersion));
 	}
 
 	public T FulfilRequirements(T aggregate) => aggregate;
 
 	public IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync(
 		string aggregateId,
-		int versionFrom,
-		int? versionTo,
+		long versionFrom,
+		long? versionTo,
 		CancellationToken cancellationToken
 	) => throw new NotSupportedException("The quick start store only demonstrates create, load, query, and save.");
 
@@ -264,11 +271,11 @@ sealed class InMemoryTransactionalEventStore<T>(InMemoryFailurePlan failurePlan)
 		return aggregate;
 	}
 
-	static SaveResult<T> CreateSavedResult(T aggregate) =>
-		new(aggregate, new ValidationResult(), saved: true, skipped: false);
+	static Result<SaveOutcome<T>, AggregateSaveFailure> CreateSavedResult(T aggregate) =>
+		new SaveOutcome<T>(aggregate, SaveOutcomeKind.Written);
 
-	static SaveResult<T> CreateSkippedResult(T aggregate) =>
-		new(aggregate, new ValidationResult(), saved: false, skipped: true);
+	static Result<SaveOutcome<T>, AggregateSaveFailure> CreateSkippedResult(T aggregate) =>
+		new SaveOutcome<T>(aggregate, SaveOutcomeKind.NoChanges);
 
 	static void MarkAsSaved(T aggregate)
 	{

@@ -1,4 +1,4 @@
-namespace Purview.EventSourcing.Admin.Abstractions.Models;
+namespace Purview.EventSourcing.Admin.Models;
 
 /// <summary>
 /// Represents a permission granted to a user for an admin portal feature.

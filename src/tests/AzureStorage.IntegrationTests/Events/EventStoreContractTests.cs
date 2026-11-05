@@ -5,6 +5,7 @@ using Purview.EventSourcing.AzureStorage.StorageClients.Table;
 using Purview.EventSourcing.ChangeFeed;
 using Purview.EventSourcing.Contracts;
 using Purview.EventSourcing.Fixtures.AzureStorage;
+using Purview.EventSourcing.Tenancy;
 
 namespace Purview.EventSourcing.AzureStorage.Events;
 
@@ -71,4 +72,7 @@ public sealed class EventStoreContractTests<TAggregate>(TableEventStoreFixture f
 
 		await tableClient.SubmitBatchAsync(batch, cancellationToken);
 	}
+
+	protected override IEventStoreCore<TAggregate> CreateTenantScopedEventStore(TenantScope scope, Guid runId) =>
+		fixture.CreateEventStore<TAggregate>(currentTenant: new EventStoreTenantScopeStub(scope), runId: runId);
 }

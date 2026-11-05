@@ -1,4 +1,6 @@
 using Purview.EventSourcing.Aggregates;
+using Purview.EventSourcing.Failures;
+using Purview.Results;
 
 namespace Purview.EventSourcing;
 
@@ -34,9 +36,9 @@ public interface IEventStore
 	/// <param name="aggregateId">Optional, the id of the aggregate to get, or used as the id of the aggregate to create.</param>
 	/// <param name="operationContext">The operational context, controlling things such as if and when exceptions are thrown.</param>
 	/// <param name="cancellationToken">The stopping token.</param>
-	/// <returns>A existing or new aggregate, or null.</returns>
-	/// <remarks>Null can be returned if the aggregate exists, but is in a deleted state. This is controlled by the <paramref name="operationContext"/>.</remarks>
-	Task<T?> GetOrCreateAsync<T>(
+	/// <returns>An existing or new aggregate, or the reason it could not be read.</returns>
+	/// <remarks><see cref="Failures.AggregateDeleted"/> is reported if the aggregate exists but is in a deleted state. This is controlled by the <paramref name="operationContext"/>.</remarks>
+	Task<Result<T, AggregateReadFailure>> GetOrCreateAsync<T>(
 		string? aggregateId,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -49,8 +51,8 @@ public interface IEventStore
 	/// <param name="aggregateId">The id of the <see cref="IAggregate"/>.</param>
 	/// <param name="operationContext">The <see cref="EventStoreOperationContext"/> that controls how the aggregate is retrieved.</param>
 	/// <param name="cancellationToken">The stopping token.</param>
-	/// <returns>The requested <see cref="IAggregate"/> of <typeparamref name="T"/> based on the <paramref name="aggregateId"/>, or null.</returns>
-	Task<T?> GetAsync<T>(
+	/// <returns>The requested <see cref="IAggregate"/> of <typeparamref name="T"/> based on the <paramref name="aggregateId"/>, or the reason it could not be read.</returns>
+	Task<Result<T, AggregateReadFailure>> GetAsync<T>(
 		string aggregateId,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -64,13 +66,13 @@ public interface IEventStore
 	/// <param name="version">The version of the aggregate to get.</param>
 	/// <param name="operationContext">The <see cref="EventStoreOperationContext"/> that controls how the aggregate is retrieved.</param>
 	/// <param name="cancellationToken">The stopping token.</param>
-	/// <returns>The requested <see cref="IAggregate"/> of <typeparamref name="T"/> based on the <paramref name="aggregateId"/>, or null.</returns>
+	/// <returns>The requested <see cref="IAggregate"/> of <typeparamref name="T"/> based on the <paramref name="aggregateId"/>, or the reason it could not be read.</returns>
 	/// <remarks><para>The resulting aggregate, if any, will be in a locked state preventing any modifications.</para>
 	/// <para>This includes applying new events, or attempting to save, delete or restore the aggregate.</para>
 	/// </remarks>
-	Task<T?> GetAtAsync<T>(
+	Task<Result<T, AggregateReadFailure>> GetAtAsync<T>(
 		string aggregateId,
-		int version,
+		long version,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
 	)
@@ -82,10 +84,10 @@ public interface IEventStore
 	/// <param name="aggregate">The <see cref="IAggregate"/> to save.</param>
 	/// <param name="operationContext">The <see cref="EventStoreOperationContext"/> that controls how the aggregate is saved.</param>
 	/// <param name="cancellationToken">The stopping token.</param>
-	/// <returns>An <see cref="SaveResult{TAggregate}"/> detailing the result of the save operation.</returns>
+	/// <returns>The outcome of the save, or the reason it did not happen.</returns>
 	/// <remarks>The underlying persistence store should ensure that no existing events are overridden, and
 	/// the events and additional data are persisted in a transactional way.</remarks>
-	Task<SaveResult<T>> SaveAsync<T>(
+	Task<Result<SaveOutcome<T>, AggregateSaveFailure>> SaveAsync<T>(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -93,23 +95,16 @@ public interface IEventStore
 		where T : class, IAggregate, new();
 
 	/// <summary>
-	/// Determines if the <see cref="IAggregate"/> of type <typeparamref name="T"/> as specified by <paramref name="aggregateId"/> exists
-	/// in the deleted state.
-	/// </summary>
-	/// <param name="aggregateId">The Id of the <see cref="IAggregate"/> to check.</param>
-	/// <param name="cancellationToken">The stopping token.</param>
-	/// <returns>Returns true if the aggregate exists in the deleted state, otherwise, returns false.</returns>
-	Task<bool> IsDeletedAsync<T>(string aggregateId, CancellationToken cancellationToken = default)
-		where T : class, IAggregate, new();
-
-	/// <summary>
 	/// Gets an <see cref="IAggregate"/> of <typeparamref name="T"/> given the specified <paramref name="aggregateId"/>.
 	/// </summary>
 	/// <param name="aggregateId">The Id of the deleted aggregate to get.</param>
 	/// <param name="cancellationToken">The stopping token.</param>
-	/// <returns>If the aggregate is not found, returns null. If the aggregate was found, but is not deleted
-	/// an exception is thrown. Otherwise, returns the aggregate.</returns>
-	Task<T?> GetDeletedAsync<T>(string aggregateId, CancellationToken cancellationToken = default)
+	/// <returns>The deleted aggregate, <see cref="Failures.AggregateNotFound"/> when no stream exists, or
+	/// <see cref="Failures.AggregateNotDeleted"/> when the aggregate was found but is live.</returns>
+	Task<Result<T, AggregateReadFailure>> GetDeletedAsync<T>(
+		string aggregateId,
+		CancellationToken cancellationToken = default
+	)
 		where T : class, IAggregate, new();
 
 	/// <summary>
@@ -118,10 +113,10 @@ public interface IEventStore
 	/// <param name="aggregate">The aggregate to delete.</param>
 	/// <param name="operationContext">The <see cref="EventStoreOperationContext"/> that controls how the aggregate is deleted.</param>
 	/// <param name="cancellationToken">The stopping token.</param>
-	/// <returns>Indicates if the operation successfully deleted the aggregate.</returns>
+	/// <returns>The outcome of the delete, or the reason it did not happen.</returns>
 	/// <remarks>If the <see cref="EventStoreOperationContext.PermanentlyDelete"/> is true, the aggregate and all
 	/// of it's associated data is permanently deleted. If false (the default), the aggregate is soft-deleted.</remarks>
-	Task<bool> DeleteAsync<T>(
+	Task<Result<SaveOutcome<T>, AggregateDeleteFailure>> DeleteAsync<T>(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -134,8 +129,8 @@ public interface IEventStore
 	/// <param name="aggregate">The aggregate to restore, usually obtained from <see cref="GetDeletedAsync{T}(string, CancellationToken)"/>.</param>
 	/// <param name="operationContext">The <see cref="EventStoreOperationContext"/> that controls how the aggregate is restored.</param>
 	/// <param name="cancellationToken">The stopping token.</param>
-	/// <returns>Returns true if the aggregate was successfully restored, otherwise, false.</returns>
-	Task<bool> RestoreAsync<T>(
+	/// <returns>The outcome of the restore, or the reason it did not happen.</returns>
+	Task<Result<SaveOutcome<T>, AggregateRestoreFailure>> RestoreAsync<T>(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -157,9 +152,9 @@ public interface IEventStore
 	/// </summary>
 	/// <param name="aggregateId">The id of the aggregate to check.</param>
 	/// <param name="cancellationToken">The stopping token.</param>
-	/// <returns>A <see cref="ExistsState"/> that determines the existence (in either a deleted or non-deleted state),
+	/// <returns>A <see cref="AggregateExistence"/> that determines the existence (in either a deleted or non-deleted state),
 	/// or if it exists at all. If the aggregate does exist, it's version is also returned.</returns>
-	Task<ExistsState> ExistsAsync<T>(string aggregateId, CancellationToken cancellationToken = default)
+	Task<AggregateExistence> ExistsAsync<T>(string aggregateId, CancellationToken cancellationToken = default)
 		where T : class, IAggregate, new();
 
 	/// <summary>
@@ -181,8 +176,8 @@ public interface IEventStore
 	/// <returns>If no <paramref name="versionTo"/> is specified all available events greater than <paramref name="versionFrom"/> are returned.</returns>
 	IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync<T>(
 		string aggregateId,
-		int versionFrom,
-		int? versionTo,
+		long versionFrom,
+		long? versionTo,
 		CancellationToken cancellationToken
 	)
 		where T : class, IAggregate, new();

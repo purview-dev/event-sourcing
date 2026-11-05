@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 	<!--
 		The shared provider-agnostic contract suites (Contracts/**) are linked from SharedTestingFramework into
 		this compilation rather than consumed cross-assembly through [InheritsTests]. TUnit's
@@ -15,12 +15,17 @@
 			Link="Contracts\%(Filename)%(Extension)"
 		/>
 		<Compile
+			Include="..\SharedTestingFramework\Contracts\SubscriptionCheckpoint*.cs"
+			Link="Contracts\%(Filename)%(Extension)"
+		/>
+		<Compile
 			Include="..\SharedTestingFramework\Contracts\SnapshotStore*.cs"
 			Link="Contracts\%(Filename)%(Extension)"
 		/>
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\..\src\Admin.SqlServer\Admin.SqlServer.csproj" />
 		<ProjectReference Include="..\..\src\Samples\Samples.csproj" />
 	</ItemGroup>
 </Project>

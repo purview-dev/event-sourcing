@@ -1,12 +1,14 @@
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
+using Purview.EventSourcing.Failures;
+using Purview.Results;
 
 namespace Purview.EventSourcing.Postgres.Events;
 
 partial class PostgresEventStore<T>
 {
 	///<inheritdoc/>
-	public async Task<bool> DeleteAsync(
+	public async Task<Result<SaveOutcome<T>, AggregateDeleteFailure>> DeleteAsync(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -16,12 +18,20 @@ partial class PostgresEventStore<T>
 			throw NullAggregate(aggregate);
 
 		if (aggregate.Details.IsDeleted)
-			throw AggregateIsDeletedException(aggregate.Id());
+		{
+			return AggregateDeleteFailure.Failure<SaveOutcome<T>>(
+				new AggregateAlreadyDeleted(aggregate.AggregateType, aggregate.Id())
+			);
+		}
 
 		operationContext ??= EventStoreOperationContext.DefaultContext();
 
 		if (aggregate.IsNew())
-			return false;
+		{
+			return AggregateDeleteFailure.Failure<SaveOutcome<T>>(
+				new AggregateNotFound(aggregate.AggregateType, aggregate.Id())
+			);
+		}
 
 		if (operationContext.PermanentlyDelete)
 			return await PermanentlyDeleteAsync(aggregate, operationContext, cancellationToken);
@@ -46,12 +56,15 @@ partial class PostgresEventStore<T>
 			cancellationToken,
 			new EventRecord(deleteAggregateEvent, metadata)
 		);
+		if (result.Result.IsFailure)
+			return result.Result.Error.ToDeleteFailure<T>();
+
 		await result.AfterCommitAsync(cancellationToken);
 
-		return result.Result.Saved;
+		return result.Result.Value;
 	}
 
-	async Task<bool> PermanentlyDeleteAsync(
+	async Task<Result<SaveOutcome<T>, AggregateDeleteFailure>> PermanentlyDeleteAsync(
 		T aggregate,
 		EventStoreOperationContext operationContext,
 		CancellationToken cancellationToken = default
@@ -63,7 +76,11 @@ partial class PostgresEventStore<T>
 		var aggregateId = aggregate.Id();
 		var streamVersion = await GetStreamVersionAsync(aggregateId, true, cancellationToken);
 		if (streamVersion == null)
-			return false;
+		{
+			return AggregateDeleteFailure.Failure<SaveOutcome<T>>(
+				new AggregateNotFound(aggregate.AggregateType, aggregateId)
+			);
+		}
 
 		_eventStoreTelemetry.PermanentDeleteRequested(aggregateId);
 		using var activity = _eventStoreTelemetry.DeleteAggregate(aggregateId, _aggregateTypeFullName);
@@ -77,7 +94,7 @@ partial class PostgresEventStore<T>
 			aggregate.Details.IsDeleted = true;
 			aggregate.Details.Locked = true;
 
-			return true;
+			return new SaveOutcome<T>(aggregate, SaveOutcomeKind.Written);
 		}
 #pragma warning disable CA1031
 		catch (Exception ex)
@@ -85,7 +102,7 @@ partial class PostgresEventStore<T>
 		{
 			_eventStoreTelemetry.PermanentDeleteFailed(aggregateId, ex);
 
-			return false;
+			throw;
 		}
 		finally
 		{

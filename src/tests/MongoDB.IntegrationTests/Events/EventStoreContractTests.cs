@@ -4,6 +4,7 @@ using Purview.EventSourcing.ChangeFeed;
 using Purview.EventSourcing.Contracts;
 using Purview.EventSourcing.Fixtures.MongoDB;
 using Purview.EventSourcing.MongoDB.StorageClient;
+using Purview.EventSourcing.Tenancy;
 
 namespace Purview.EventSourcing.MongoDB.Events;
 
@@ -70,4 +71,7 @@ public sealed class EventStoreContractTests<TAggregate>(MongoDBEventStoreFixture
 
 		await eventClient.SubmitBatchAsync(batch, cancellationToken);
 	}
+
+	protected override IEventStoreCore<TAggregate> CreateTenantScopedEventStore(TenantScope scope, Guid runId) =>
+		fixture.CreateEventStore<TAggregate>(currentTenant: new EventStoreTenantScopeStub(scope), runId: runId);
 }

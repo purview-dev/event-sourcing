@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace Purview.EventSourcing.Admin.Abstractions.Models;
+namespace Purview.EventSourcing.Admin.Models;
 
 /// <summary>
 /// Represents the projected state of an aggregate at a point in time or version.

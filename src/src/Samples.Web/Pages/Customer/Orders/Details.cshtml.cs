@@ -17,8 +17,10 @@ sealed class DetailsModel(IQueryableEventStore customerStore, IQueryableEventSto
 			return RedirectToPage("/Customer/Index");
 
 		var ct = HttpContext.RequestAborted;
-		CurrentCustomer = await customerStore.GetAsync<CustomerAggregate>(customerId, ct);
-		Order = await orderStore.GetAsync<OrderAggregate>(id, ct);
+		var currentCustomerResult = await customerStore.GetAsync<CustomerAggregate>(customerId, ct);
+		CurrentCustomer = currentCustomerResult.IsSuccess ? currentCustomerResult.Value : null;
+		var orderResult = await orderStore.GetAsync<OrderAggregate>(id, ct);
+		Order = orderResult.IsSuccess ? orderResult.Value : null;
 
 		return Order == null || Order.CustomerId != customerId ? NotFound() : Page();
 	}
@@ -35,7 +37,8 @@ sealed class DetailsModel(IQueryableEventStore customerStore, IQueryableEventSto
 		if (string.IsNullOrEmpty(customerId))
 			return RedirectToPage("/Customer/Index");
 
-		var order = await orderStore.GetAsync<OrderAggregate>(id, HttpContext.RequestAborted);
+		var orderResult = await orderStore.GetAsync<OrderAggregate>(id, HttpContext.RequestAborted);
+		var order = orderResult.IsSuccess ? orderResult.Value : null;
 		if (order == null || order.CustomerId != customerId)
 			return NotFound();
 		if (order.Status != OrderStatusCode.Draft)
@@ -48,7 +51,7 @@ sealed class DetailsModel(IQueryableEventStore customerStore, IQueryableEventSto
 			async () =>
 			{
 				order.AddLineItem(productId.Trim(), productName.Trim(), quantity, unitPrice);
-				await orderStore.SaveAsync(order, HttpContext.RequestAborted);
+				return await orderStore.SaveAsync(order, HttpContext.RequestAborted);
 			},
 			"Line item added.",
 			RedirectToPage(new { id })
@@ -61,7 +64,8 @@ sealed class DetailsModel(IQueryableEventStore customerStore, IQueryableEventSto
 		if (string.IsNullOrEmpty(customerId))
 			return RedirectToPage("/Customer/Index");
 
-		var order = await orderStore.GetAsync<OrderAggregate>(id, HttpContext.RequestAborted);
+		var orderResult = await orderStore.GetAsync<OrderAggregate>(id, HttpContext.RequestAborted);
+		var order = orderResult.IsSuccess ? orderResult.Value : null;
 		if (order == null || order.CustomerId != customerId)
 			return NotFound();
 		if (order.Status != OrderStatus.Draft)
@@ -74,7 +78,7 @@ sealed class DetailsModel(IQueryableEventStore customerStore, IQueryableEventSto
 			async () =>
 			{
 				order.RemoveLineItem(productId);
-				await orderStore.SaveAsync(order, HttpContext.RequestAborted);
+				return await orderStore.SaveAsync(order, HttpContext.RequestAborted);
 			},
 			"Line item removed.",
 			RedirectToPage(new { id })
@@ -87,7 +91,8 @@ sealed class DetailsModel(IQueryableEventStore customerStore, IQueryableEventSto
 		if (string.IsNullOrEmpty(customerId))
 			return RedirectToPage("/Customer/Index");
 
-		var order = await orderStore.GetAsync<OrderAggregate>(id, HttpContext.RequestAborted);
+		var orderResult = await orderStore.GetAsync<OrderAggregate>(id, HttpContext.RequestAborted);
+		var order = orderResult.IsSuccess ? orderResult.Value : null;
 		if (order == null || order.CustomerId != customerId)
 			return NotFound();
 		if (order.Status != OrderStatus.Draft)
@@ -100,7 +105,7 @@ sealed class DetailsModel(IQueryableEventStore customerStore, IQueryableEventSto
 			async () =>
 			{
 				order.SetShippingAddress(address);
-				await orderStore.SaveAsync(order, HttpContext.RequestAborted);
+				return await orderStore.SaveAsync(order, HttpContext.RequestAborted);
 			},
 			"Shipping address updated.",
 			RedirectToPage(new { id })
@@ -113,7 +118,8 @@ sealed class DetailsModel(IQueryableEventStore customerStore, IQueryableEventSto
 		if (string.IsNullOrEmpty(customerId))
 			return RedirectToPage("/Customer/Index");
 
-		var order = await orderStore.GetAsync<OrderAggregate>(id, HttpContext.RequestAborted);
+		var orderResult = await orderStore.GetAsync<OrderAggregate>(id, HttpContext.RequestAborted);
+		var order = orderResult.IsSuccess ? orderResult.Value : null;
 		if (order == null || order.CustomerId != customerId)
 			return NotFound();
 		if (order.Status != OrderStatus.Draft)
@@ -126,7 +132,7 @@ sealed class DetailsModel(IQueryableEventStore customerStore, IQueryableEventSto
 			async () =>
 			{
 				order.UpdateNotes(string.IsNullOrWhiteSpace(notes) ? null : notes.Trim());
-				await orderStore.SaveAsync(order, HttpContext.RequestAborted);
+				return await orderStore.SaveAsync(order, HttpContext.RequestAborted);
 			},
 			"Notes updated.",
 			RedirectToPage(new { id })
@@ -139,7 +145,8 @@ sealed class DetailsModel(IQueryableEventStore customerStore, IQueryableEventSto
 		if (string.IsNullOrEmpty(customerId))
 			return RedirectToPage("/Customer/Index");
 
-		var order = await orderStore.GetAsync<OrderAggregate>(id, HttpContext.RequestAborted);
+		var orderResult = await orderStore.GetAsync<OrderAggregate>(id, HttpContext.RequestAborted);
+		var order = orderResult.IsSuccess ? orderResult.Value : null;
 		if (order == null || order.CustomerId != customerId)
 			return NotFound();
 		if (order.Status != OrderStatus.Draft)
@@ -152,7 +159,7 @@ sealed class DetailsModel(IQueryableEventStore customerStore, IQueryableEventSto
 			async () =>
 			{
 				order.CancelOrder();
-				await orderStore.SaveAsync(order, HttpContext.RequestAborted);
+				return await orderStore.SaveAsync(order, HttpContext.RequestAborted);
 			},
 			"Order cancelled.",
 			RedirectToPage(new { id })

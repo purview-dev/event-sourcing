@@ -1,41 +1,35 @@
-﻿using System.Linq.Expressions;
-using LinqKit;
+using System.Linq.Expressions;
+using System.Runtime.CompilerServices;
 
 namespace Purview.EventSourcing.CosmosDb.Snapshot;
 
 partial class CosmosDbSnapshotEventStore<T>
 {
 	/// <inheritdoc/>
-	public IAsyncEnumerable<T> GetQueryEnumerableAsync(
+	public async IAsyncEnumerable<T> GetQueryEnumerableAsync(
 		Expression<Func<T, bool>> whereClause,
 		Func<IQueryable<T>, IQueryable<T>>? orderByClause,
 		int maxRecordsPerIteration = ContinuationRequest.DefaultMaxRecords,
-		CancellationToken cancellationToken = default
+		[EnumeratorCancellation] CancellationToken cancellationToken = default
 	)
 	{
-		var expressionToRun = BuildQueryExpression(whereClause);
+		ArgumentNullException.ThrowIfNull(whereClause, nameof(whereClause));
 
-		return _cosmosDbClient
-			.GetQueryEnumerableAsync(
-				whereClause,
-				orderByClause,
-				_partitionKey,
-				maxRecordsPerIteration,
-				cancellationToken
-			)
-			.SelectAsync(FulfilRequirements);
+		await foreach (
+			var aggregate in EnumerateAsync(whereClause, orderByClause, maxRecordsPerIteration, cancellationToken)
+		)
+			yield return aggregate;
 	}
 
 	/// <inheritdoc/>
-	public IAsyncEnumerable<T> GetListEnumerableAsync(
+	public async IAsyncEnumerable<T> GetListEnumerableAsync(
 		Func<IQueryable<T>, IQueryable<T>>? orderByClause,
 		int maxRecordsPerIteration = ContinuationRequest.DefaultMaxRecords,
-		CancellationToken cancellationToken = default
+		[EnumeratorCancellation] CancellationToken cancellationToken = default
 	)
 	{
-		return _cosmosDbClient
-			.GetListEnumerableAsync(orderByClause, _partitionKey, maxRecordsPerIteration, cancellationToken)
-			.SelectAsync(FulfilRequirements);
+		await foreach (var aggregate in EnumerateAsync(null, orderByClause, maxRecordsPerIteration, cancellationToken))
+			yield return aggregate;
 	}
 
 	/// <inheritdoc/>
@@ -49,20 +43,9 @@ partial class CosmosDbSnapshotEventStore<T>
 		ArgumentNullException.ThrowIfNull(whereClause, nameof(whereClause));
 		ArgumentNullException.ThrowIfNull(request, nameof(request));
 
-		var expressionToRun = BuildQueryExpression(whereClause);
-		var results = await _cosmosDbClient.QueryAsync(
-			expressionToRun,
-			orderByClause,
-			request,
-			_partitionKey,
-			cancellationToken
-		);
+		using var activity = _telemetry.QuerySnapshots("Query", typeof(T).FullName ?? typeof(T).Name);
 
-		results.Results = [.. results.Results.Select(FulfilRequirements)];
-		if (request.IncludeTotalCount)
-			results.TotalCount = await _cosmosDbClient.CountAsync(expressionToRun, _partitionKey, cancellationToken);
-
-		return results;
+		return await ExecuteQueryAsync(whereClause, orderByClause, request, cancellationToken);
 	}
 
 	/// <inheritdoc/>
@@ -72,22 +55,11 @@ partial class CosmosDbSnapshotEventStore<T>
 		CancellationToken cancellationToken = default
 	)
 	{
+		using var activity = _telemetry.QuerySnapshots("List", typeof(T).FullName ?? typeof(T).Name);
+
 		ArgumentNullException.ThrowIfNull(request, nameof(request));
 
-		var expressionToRun = BuildQueryExpression();
-		var results = await _cosmosDbClient.QueryAsync(
-			expressionToRun,
-			orderByClause,
-			request,
-			_partitionKey,
-			cancellationToken
-		);
-
-		results.Results = [.. results.Results.Select(FulfilRequirements)];
-		if (request.IncludeTotalCount)
-			results.TotalCount = await _cosmosDbClient.CountAsync(expressionToRun, _partitionKey, cancellationToken);
-
-		return results;
+		return await ExecuteQueryAsync(null, orderByClause, request, cancellationToken);
 	}
 
 	/// <inheritdoc/>
@@ -96,6 +68,8 @@ partial class CosmosDbSnapshotEventStore<T>
 		CancellationToken cancellationToken = default
 	)
 	{
+		using var activity = _telemetry.QuerySnapshots("SingleOrDefault", typeof(T).FullName ?? typeof(T).Name);
+
 		// Leave as 2 as it'll throw when expected.
 		var query = await GetSpecificNumberAsync(whereClause, null, 2, cancellationToken: cancellationToken);
 		return query.SingleOrDefault();
@@ -108,17 +82,17 @@ partial class CosmosDbSnapshotEventStore<T>
 		CancellationToken cancellationToken = default
 	)
 	{
+		using var activity = _telemetry.QuerySnapshots("FirstOrDefault", typeof(T).FullName ?? typeof(T).Name);
+
 		var query = await GetSpecificNumberAsync(whereClause, orderByClause, 1, cancellationToken: cancellationToken);
 		return query.FirstOrDefault();
 	}
 
 	/// <inheritdoc/>
-	public Task<long> CountAsync(Expression<Func<T, bool>>? whereClause, CancellationToken cancellationToken = default)
-	{
-		var expressionToRun = BuildQueryExpression(whereClause);
-
-		return _cosmosDbClient.CountAsync(expressionToRun, _partitionKey, cancellationToken);
-	}
+	public Task<long> CountAsync(
+		Expression<Func<T, bool>>? whereClause,
+		CancellationToken cancellationToken = default
+	) => _cosmosDbClient.CountAsync(whereClause, cancellationToken);
 
 	async Task<IEnumerable<T>> GetSpecificNumberAsync(
 		Expression<Func<T, bool>> whereClause,
@@ -127,7 +101,6 @@ partial class CosmosDbSnapshotEventStore<T>
 		CancellationToken cancellationToken = default
 	)
 	{
-		// We call QueryAsync because we need the query by the AggregateType.
 		var query = await QueryAsync(
 			whereClause,
 			orderByClause,
@@ -135,20 +108,53 @@ partial class CosmosDbSnapshotEventStore<T>
 			cancellationToken: cancellationToken
 		);
 
-		return query.Results.Select(FulfilRequirements);
+		return query.Results;
 	}
 
-	Expression<Func<T, bool>> BuildQueryExpression(Expression<Func<T, bool>>? whereClause = null)
+	async IAsyncEnumerable<T> EnumerateAsync(
+		Expression<Func<T, bool>>? whereClause,
+		Func<IQueryable<T>, IQueryable<T>>? orderByClause,
+		int maxRecordsPerIteration,
+		[EnumeratorCancellation] CancellationToken cancellationToken
+	)
 	{
-		var aggregateTypeName = GetAggregateTypeName();
-		Expression<Func<T, bool>> defaultClause = m => m.AggregateType == aggregateTypeName;
+		ContinuationRequest request = new() { MaxRecords = maxRecordsPerIteration };
+		ContinuationResponse<T> response;
+		do
+		{
+			response = await ExecuteQueryAsync(whereClause, orderByClause, request, cancellationToken);
+			foreach (var result in response.Results)
+				yield return result;
 
-		if (whereClause == null)
-			return PredicateBuilder.New(defaultClause);
+			request = response;
+		} while (response.HasMoreRecords);
+	}
 
-		var aggregateClause = PredicateBuilder.Extend(defaultClause, whereClause, PredicateOperator.And);
-		var expressionToRun = aggregateClause.Expand();
+	async Task<ContinuationResponse<T>> ExecuteQueryAsync(
+		Expression<Func<T, bool>>? whereClause,
+		Func<IQueryable<T>, IQueryable<T>>? orderByClause,
+		ContinuationRequest request,
+		CancellationToken cancellationToken
+	)
+	{
+		var (values, continuationToken) = await _cosmosDbClient.QueryPageAsync(
+			whereClause,
+			orderByClause,
+			request.MaxRecords,
+			request.ContinuationToken,
+			cancellationToken
+		);
 
-		return expressionToRun;
+		var results = values.Select(FulfilRequirements).ToArray();
+
+		return new ContinuationResponse<T>
+		{
+			Results = results,
+			RequestedCount = request.MaxRecords,
+			ContinuationToken = continuationToken,
+			TotalCount = request.IncludeTotalCount
+				? await _cosmosDbClient.CountAsync(whereClause, cancellationToken)
+				: null,
+		};
 	}
 }

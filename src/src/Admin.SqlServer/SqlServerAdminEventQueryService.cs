@@ -1,12 +1,15 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Purview.EventSourcing.Admin.Abstractions.Models;
-using Purview.EventSourcing.Admin.Abstractions.Queries;
-using Purview.EventSourcing.Admin.Abstractions.Services;
+using Purview.EventSourcing.Admin.Failures;
+using Purview.EventSourcing.Admin.Models;
+using Purview.EventSourcing.Admin.Queries;
+using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.Admin.SQLServer.Internal;
 using Purview.EventSourcing.SqlServer.Events;
 using Purview.EventSourcing.SqlServer.Events.EntityFramework;
+using Purview.EventSourcing.Tenancy;
+using Purview.Results;
 
 namespace Purview.EventSourcing.Admin.SQLServer;
 
@@ -19,11 +22,14 @@ namespace Purview.EventSourcing.Admin.SQLServer;
 /// database.
 /// </remarks>
 /// <param name="options">The configured <see cref="SqlServerEventStoreOptions"/>.</param>
-public sealed class SqlServerAdminEventQueryService(IOptions<SqlServerEventStoreOptions> options)
-	: IAdminEventQueryService
+/// <param name="currentTenant">Optional tenant scope; when omitted the query is not tenant-filtered.</param>
+public sealed class SqlServerAdminEventQueryService(
+	IOptions<SqlServerEventStoreOptions> options,
+	ICurrentTenant? currentTenant = null
+) : IAdminEventQueryService
 {
 	///<inheritdoc/>
-	public async Task<PagedResult<EventEnvelopeResponse>?> GetRangeAsync(
+	public async Task<Result<PagedResult<EventEnvelopeResponse>, AdminQueryFailure>> GetRangeAsync(
 		string aggregateType,
 		string aggregateId,
 		EventRangeQuery query,
@@ -90,17 +96,17 @@ public sealed class SqlServerAdminEventQueryService(IOptions<SqlServerEventStore
 		return new PagedResult<EventEnvelopeResponse>(items, page, pageSize, totalCount);
 	}
 
-	static EventStoreDbContext CreateContext(SqlServerEventStoreOptions options, SqlServerAdminTableDescriptor table)
+	EventStoreDbContext CreateContext(SqlServerEventStoreOptions options, SqlServerAdminTableDescriptor table)
 	{
 		DbContextOptionsBuilder<EventStoreDbContext> builder = new();
 		builder.UseSqlServer(options.ConnectionString);
-		return new EventStoreDbContext(builder.Options, table.SchemaName, table.TableName);
+		return new EventStoreDbContext(builder.Options, table.SchemaName, table.TableName, currentTenant);
 	}
 
 	static JsonElement ParsePayload(string? payload)
 	{
 		if (string.IsNullOrWhiteSpace(payload))
-			return JsonDocument.Parse("null").RootElement.Clone();
+			return JsonSerializer.SerializeToElement("null");
 
 		using var document = JsonDocument.Parse(payload);
 		return document.RootElement.Clone();

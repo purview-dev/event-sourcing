@@ -1,6 +1,8 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Purview.EventSourcing.Aggregates;
+using Purview.EventSourcing.Failures;
 using Purview.EventSourcing.Samples.Domain;
+using Purview.Results;
 
 namespace Purview.EventSourcing.Samples.QuickStart;
 
@@ -24,9 +26,12 @@ sealed class ValidatorScenarios() : IAsyncDisposable
 		return scope.ServiceProvider;
 	}
 
+	// Registered first so the phone number is the only thing wrong with the aggregate: ZodSharp validates
+	// the whole graph, and an unregistered customer also fails on its null name and email.
 	static CustomerAggregate CreateAggregate(int numberOfChars = 200)
 	{
 		CustomerAggregate agg = new();
+		agg.RegisterCustomer("Quick Start", "quickstart@example.com");
 
 		return agg.ChangePhoneNumber(new string('1', numberOfChars));
 	}
@@ -74,21 +79,25 @@ sealed class ValidatorScenarios() : IAsyncDisposable
 		DisplaySummary("ZodSharp", result);
 	}
 
-	static void DisplaySummary(string type, SaveResult<CustomerAggregate> result)
+	static void DisplaySummary(string type, Result<SaveOutcome<CustomerAggregate>, AggregateSaveFailure> result)
 	{
 		Console.WriteLine($"Validated '{type}':");
-		if (result.IsValid)
+
+		if (result.IsSuccess || result.Error is not AggregateInvalid invalid)
 			Console.WriteLine("  FAILED: Did not validate correctly!!");
 		else
 		{
-			if (result.FailureCount != 1)
-				Console.WriteLine($"  FAILED: Should be exactly 1 error, but found {result.FailureCount}");
-			else if (result.ValidationResult.Failures[0].PropertyName != nameof(CustomerAggregate.PhoneNumber))
+			var failures = invalid.ValidationResult.Failures;
+			if (failures.Length != 1)
 				Console.WriteLine(
-					$"   FAILED: Error should have validatedd '{nameof(CustomerAggregate.PhoneNumber)}', but found '{result.ValidationResult.Failures[0].PropertyName}'"
+					$"  FAILED: Should be exactly 1 error, but found {failures.Length}: {string.Join(" | ", failures.Select(f => $"{f.PropertyName}={f.ErrorMessage}"))}"
+				);
+			else if (failures[0].PropertyName != nameof(CustomerAggregate.PhoneNumber))
+				Console.WriteLine(
+					$"   FAILED: Error should have validated '{nameof(CustomerAggregate.PhoneNumber)}', but found '{failures[0].PropertyName}'"
 				);
 			else
-				Console.WriteLine($"  SUCCESS: Found {result.ValidationResult.Failures[0].ErrorMessage}");
+				Console.WriteLine($"  SUCCESS: Found {failures[0].ErrorMessage}");
 		}
 
 		Console.WriteLine();

@@ -1,4 +1,4 @@
-﻿namespace Purview.EventSourcing;
+namespace Purview.EventSourcing;
 
 partial class AggregateEventNameMapperTests
 {

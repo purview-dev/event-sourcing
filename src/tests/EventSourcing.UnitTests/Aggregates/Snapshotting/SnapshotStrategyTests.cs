@@ -17,7 +17,7 @@ public sealed class SnapshotStrategyTests
 		}
 	}
 
-	static TestAggregate CreateAggregate(int savedVersion)
+	static TestAggregate CreateAggregate(long savedVersion)
 	{
 		TestAggregate aggregate = new() { Details = { Id = Guid.NewGuid().ToString() } };
 		aggregate.Details.SavedVersion = savedVersion;
@@ -35,7 +35,7 @@ public sealed class SnapshotStrategyTests
 	[Arguments(3, 5, false)] // 3 % 5 != 0
 	[Arguments(7, 5, false)] // 7 % 5 != 0
 	public async Task IntervalStrategy_GivenSavedVersionAndInterval_ReturnsExpected(
-		int savedVersion,
+		long savedVersion,
 		int interval,
 		bool expectedResult
 	)

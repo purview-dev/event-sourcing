@@ -1,0 +1,25 @@
+<Project>
+	<!--
+		The build properties the aggregate source generator reads via build_property.*.
+
+		This project is not packable: the generator ships inside the Purview.EventSourcing package,
+		whose Sdk/buildTransitive/Purview.EventSourcing.targets declares the same properties for
+		PackageReference consumers. These declarations make the properties compiler-visible for
+		projects that reference this generator directly (Purview.BuildSdk's
+		ImportProjectReferencedBuildTransitiveAssets), and satisfy the framework's PSGF0003
+		validation of the PurviewGeneratorVisibleProperty items in SourceGenerator.csproj.
+
+		Keep this list and the Purview.EventSourcing.targets list in step.
+	-->
+	<ItemGroup Label="Compiler Visible Generator Properties">
+		<CompilerVisibleProperty Include="DisableEventSourcingSourceGenerator">
+			<Description>Specifies whether to disable the Purview EventSourcing source generators.</Description>
+		</CompilerVisibleProperty>
+		<CompilerVisibleProperty Include="PurviewEventContractManifestEnabled">
+			<Description>When true, the Purview EventSourcing generator emits the deterministic event-contract manifest as generated source and materializes it to EventContractManifest.json after build.</Description>
+		</CompilerVisibleProperty>
+		<CompilerVisibleProperty Include="PurviewEventContractBaselineFileName">
+			<Description>Overrides the AdditionalFiles name (default EventContractManifest.json) used as the approved event-contract baseline.</Description>
+		</CompilerVisibleProperty>
+	</ItemGroup>
+</Project>

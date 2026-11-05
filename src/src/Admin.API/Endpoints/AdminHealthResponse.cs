@@ -3,7 +3,7 @@ namespace Purview.EventSourcing.Admin.API.Endpoints;
 /// <summary>
 /// The operational health summary returned by the Admin portal.
 /// </summary>
-/// <param name="Status">Always <c>Ready</c> when the endpoint responds.</param>
+/// <param name="Status">One of <see cref="AdminHealthStatus"/>: whether storage responded to the probe, or <c>Unknown</c> when no probe is registered.</param>
 /// <param name="TimestampUtc">The UTC time the summary was produced.</param>
 /// <param name="TransactionGuarantee">The merged transaction guarantee.</param>
 /// <param name="SupportsEventStreams">Whether event streams are persisted.</param>

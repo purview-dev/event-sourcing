@@ -121,7 +121,7 @@ public sealed class EventContractCompatibilityTests : AggregateSourceGeneratorTe
 			}
 			""";
 
-		var result = await GenerateAsync(
+		using var result = await GenerateAsync(
 			removedAggregateSource,
 			ManifestTestHelpers.WithBaseline(baselineJson),
 			cancellationToken
@@ -135,7 +135,7 @@ public sealed class EventContractCompatibilityTests : AggregateSourceGeneratorTe
 	{
 		var baselineJson = await GenerateBaselineAsync(OrderAggregateWithTwoEvents, cancellationToken);
 
-		var result = await GenerateAsync(
+		using var result = await GenerateAsync(
 			OrderAggregateSingleEvent,
 			ManifestTestHelpers.WithBaseline(baselineJson),
 			cancellationToken
@@ -149,7 +149,7 @@ public sealed class EventContractCompatibilityTests : AggregateSourceGeneratorTe
 	{
 		var baselineJson = await GenerateBaselineAsync(OrderAggregateWithTwoEvents, cancellationToken);
 
-		var result = await GenerateAsync(
+		using var result = await GenerateAsync(
 			OrderAggregateRemovedField,
 			ManifestTestHelpers.WithBaseline(baselineJson),
 			cancellationToken
@@ -165,7 +165,7 @@ public sealed class EventContractCompatibilityTests : AggregateSourceGeneratorTe
 	{
 		var baselineJson = await GenerateBaselineAsync(OrderAggregateWithTwoEvents, cancellationToken);
 
-		var result = await GenerateAsync(
+		using var result = await GenerateAsync(
 			OrderAggregateChangedFieldType,
 			ManifestTestHelpers.WithBaseline(baselineJson),
 			cancellationToken
@@ -209,14 +209,14 @@ public sealed class EventContractCompatibilityTests : AggregateSourceGeneratorTe
 			}
 			""";
 
-		var baselineRun = await GenerateAsync(
+		using var baselineRun = await GenerateAsync(
 			nullableOriginal,
 			ManifestTestHelpers.WithManifestEnabledAndNullableContext(),
 			cancellationToken
 		);
 		var baselineJson = ManifestTestHelpers.ExtractManifestJson(ManifestTestHelpers.GetManifestSource(baselineRun));
 
-		var result = await GenerateAsync(
+		using var result = await GenerateAsync(
 			nonNullableCurrent,
 			ManifestTestHelpers.WithBaselineAndNullableContext(baselineJson),
 			cancellationToken
@@ -246,7 +246,7 @@ public sealed class EventContractCompatibilityTests : AggregateSourceGeneratorTe
 
 		var baselineJson = await GenerateBaselineAsync(MinimalOrderAggregate, cancellationToken);
 
-		var result = await GenerateAsync(
+		using var result = await GenerateAsync(
 			requiredCurrent,
 			ManifestTestHelpers.WithBaseline(baselineJson),
 			cancellationToken
@@ -279,7 +279,7 @@ public sealed class EventContractCompatibilityTests : AggregateSourceGeneratorTe
 
 		var baselineJson = await GenerateBaselineAsync(MinimalOrderAggregate, cancellationToken);
 
-		var result = await GenerateAsync(
+		using var result = await GenerateAsync(
 			addedRequiredField,
 			ManifestTestHelpers.WithBaseline(baselineJson),
 			cancellationToken
@@ -295,7 +295,7 @@ public sealed class EventContractCompatibilityTests : AggregateSourceGeneratorTe
 	{
 		var baselineJson = await GenerateBaselineAsync(OrderAggregateVersionTwo, cancellationToken);
 
-		var result = await GenerateAsync(
+		using var result = await GenerateAsync(
 			OrderAggregateVersionOne,
 			ManifestTestHelpers.WithBaseline(baselineJson),
 			cancellationToken
@@ -309,7 +309,7 @@ public sealed class EventContractCompatibilityTests : AggregateSourceGeneratorTe
 		CancellationToken cancellationToken
 	)
 	{
-		var result = await GenerateAsync(
+		using var result = await GenerateAsync(
 			OrderAggregateSingleEvent,
 			ManifestTestHelpers.WithBaseline("{ this is not valid json"),
 			cancellationToken
@@ -326,7 +326,7 @@ public sealed class EventContractCompatibilityTests : AggregateSourceGeneratorTe
 		const string unsupportedVersion = /*lang=json,strict*/
 			"""{"formatVersion":99,"aggregates":[]}""";
 
-		var result = await GenerateAsync(
+		using var result = await GenerateAsync(
 			OrderAggregateSingleEvent,
 			ManifestTestHelpers.WithBaseline(unsupportedVersion),
 			cancellationToken
@@ -371,14 +371,14 @@ public sealed class EventContractCompatibilityTests : AggregateSourceGeneratorTe
 			}
 			""";
 
-		var baselineRun = await GenerateAsync(
+		using var baselineRun = await GenerateAsync(
 			minimalNullableBaseline,
 			ManifestTestHelpers.WithManifestEnabledAndNullableContext(),
 			cancellationToken
 		);
 		var baselineJson = ManifestTestHelpers.ExtractManifestJson(ManifestTestHelpers.GetManifestSource(baselineRun));
 
-		var result = await GenerateAsync(
+		using var result = await GenerateAsync(
 			addedOptionalField,
 			ManifestTestHelpers.WithBaselineAndNullableContext(baselineJson),
 			cancellationToken
@@ -398,7 +398,7 @@ public sealed class EventContractCompatibilityTests : AggregateSourceGeneratorTe
 	{
 		var baselineJson = await GenerateBaselineAsync(OrderAggregateVersionOne, cancellationToken);
 
-		var result = await GenerateAsync(
+		using var result = await GenerateAsync(
 			OrderAggregateVersionTwo,
 			ManifestTestHelpers.WithBaseline(baselineJson),
 			cancellationToken
@@ -418,7 +418,7 @@ public sealed class EventContractCompatibilityTests : AggregateSourceGeneratorTe
 	{
 		var baselineJson = await GenerateBaselineAsync(MinimalOrderAggregate, cancellationToken);
 
-		var result = await GenerateAsync(
+		using var result = await GenerateAsync(
 			OrderAggregateWithTwoEvents,
 			ManifestTestHelpers.WithBaseline(baselineJson),
 			cancellationToken
@@ -435,7 +435,7 @@ public sealed class EventContractCompatibilityTests : AggregateSourceGeneratorTe
 
 	async Task<string> GenerateBaselineAsync(string source, CancellationToken cancellationToken)
 	{
-		var result = await GenerateAsync(source, ManifestTestHelpers.WithManifestEnabled(), cancellationToken);
+		using var result = await GenerateAsync(source, ManifestTestHelpers.WithManifestEnabled(), cancellationToken);
 		return ManifestTestHelpers.ExtractManifestJson(ManifestTestHelpers.GetManifestSource(result));
 	}
 }

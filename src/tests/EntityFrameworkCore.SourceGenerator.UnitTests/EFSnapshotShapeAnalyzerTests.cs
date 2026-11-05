@@ -1,4 +1,4 @@
-using Purview.EventSourcing.EntityFrameworkCore.SourceGenerator.Heleprs;
+using Purview.EventSourcing.EntityFrameworkCore.SourceGenerator.Helpers;
 
 namespace Purview.EventSourcing.EntityFrameworkCore.SourceGenerator;
 
@@ -25,7 +25,7 @@ sealed class AssetDetails
 }
 """;
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.UnsupportedDictionary);
 	}
@@ -48,7 +48,7 @@ sealed class AssetDetails
 	public IReadOnlyDictionary<string, int> Values { get; } = new Dictionary<string, int>();
 }
 """;
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.UnsupportedDictionary);
 	}
@@ -76,7 +76,7 @@ static class Consumer
 	public static void Query() => Store.QueryAsync(report => report.Values.Count > 0);
 }
 """;
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.OpaqueQuery);
 	}
@@ -100,7 +100,7 @@ readonly record struct Capture(UserInfo User, System.DateTimeOffset OccurredAt);
 readonly record struct UserInfo(System.Guid Id, string? DisplayName);
 """;
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.UnconstructibleSnapshotType);
 	}
@@ -128,7 +128,7 @@ readonly record struct Capture(UserInfo User, System.DateTimeOffset OccurredAt)
 readonly record struct UserInfo(System.Guid Id, string? DisplayName);
 """;
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.UnconstructibleSnapshotType);
 	}
@@ -150,7 +150,7 @@ sealed class ReportAggregate
 readonly record struct Amount(decimal Value);
 """;
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.UnconstructibleSnapshotType);
 	}
@@ -182,7 +182,7 @@ sealed class Info
 }
 """;
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.UnconstructibleSnapshotType);
 	}
@@ -212,7 +212,7 @@ readonly record struct Inner(Details Details);
 readonly record struct Details(string Name);
 """;
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.UnconstructibleSnapshotType);
 	}
@@ -252,7 +252,7 @@ namespace Testing
 }
 """;
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.UnconstructibleSnapshotType);
 	}
@@ -292,7 +292,7 @@ namespace Testing
 }
 """;
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.UnconstructibleSnapshotType);
 	}
@@ -327,7 +327,7 @@ sealed class Info
 }
 """;
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.NonWritableValueTypeMember);
 	}
@@ -357,7 +357,7 @@ sealed class Info
 }
 """;
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.NonWritableValueTypeMember);
 		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.UnconstructibleSnapshotType);
@@ -390,7 +390,7 @@ sealed class Info
 }
 """;
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.NonWritableValueTypeMember);
 	}

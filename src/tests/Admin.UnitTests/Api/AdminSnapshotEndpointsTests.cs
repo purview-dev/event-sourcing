@@ -1,11 +1,12 @@
 using System.Linq.Expressions;
 using System.Net;
-using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Persistence;
+using Purview.EventSourcing.Failures;
 using Purview.EventSourcing.Services;
+using Purview.Results;
 
 namespace Purview.EventSourcing.Admin.API;
 
@@ -153,12 +154,15 @@ public sealed class AdminSnapshotEndpointsTests
 
 		public int SaveCount { get; private set; }
 
-		public Task<T?> GetAsync<T>(
+		public Task<Result<T, AggregateReadFailure>> GetAsync<T>(
 			string aggregateId,
 			EventStoreOperationContext? operationContext,
 			CancellationToken cancellationToken = default
 		)
-			where T : class, IAggregate, new() => Task.FromResult(Snapshot as T);
+			where T : class, IAggregate, new() =>
+			Task.FromResult<Result<T, AggregateReadFailure>>(
+				Snapshot as T ?? AggregateReadFailure.Failure<T>(new AggregateNotFound(typeof(T).Name, aggregateId))
+			);
 
 		public Task<T?> FirstOrDefaultAsync<T>(
 			Expression<Func<T, bool>> whereClause,
@@ -167,7 +171,7 @@ public sealed class AdminSnapshotEndpointsTests
 		)
 			where T : class, IAggregate, new() => Task.FromResult(Snapshot as T);
 
-		public Task<SaveResult<T>> SaveAsync<T>(
+		public Task<Result<SaveOutcome<T>, AggregateSaveFailure>> SaveAsync<T>(
 			T aggregate,
 			EventStoreOperationContext? operationContext,
 			CancellationToken cancellationToken = default
@@ -175,43 +179,43 @@ public sealed class AdminSnapshotEndpointsTests
 			where T : class, IAggregate, new()
 		{
 			SaveCount++;
-			return Task.FromResult(
-				new SaveResult<T>(aggregate, Validation.ValidationResult.Success, saved: true, skipped: false)
+			return Task.FromResult<Result<SaveOutcome<T>, AggregateSaveFailure>>(
+				new SaveOutcome<T>(aggregate, SaveOutcomeKind.Written)
 			);
 		}
 
 		public Task<T> CreateAsync<T>(string? aggregateId = null, CancellationToken cancellationToken = default)
 			where T : class, IAggregate, new() => throw new NotSupportedException();
 
-		public Task<T?> GetOrCreateAsync<T>(
+		public Task<Result<T, AggregateReadFailure>> GetOrCreateAsync<T>(
 			string? aggregateId,
 			EventStoreOperationContext? operationContext,
 			CancellationToken cancellationToken = default
 		)
 			where T : class, IAggregate, new() => throw new NotSupportedException();
 
-		public Task<T?> GetAtAsync<T>(
+		public Task<Result<T, AggregateReadFailure>> GetAtAsync<T>(
 			string aggregateId,
-			int version,
+			long version,
 			EventStoreOperationContext? operationContext,
 			CancellationToken cancellationToken = default
 		)
 			where T : class, IAggregate, new() => throw new NotSupportedException();
 
-		public Task<T?> GetDeletedAsync<T>(string aggregateId, CancellationToken cancellationToken = default)
+		public Task<Result<T, AggregateReadFailure>> GetDeletedAsync<T>(
+			string aggregateId,
+			CancellationToken cancellationToken = default
+		)
 			where T : class, IAggregate, new() => throw new NotSupportedException();
 
-		public Task<bool> IsDeletedAsync<T>(string aggregateId, CancellationToken cancellationToken = default)
-			where T : class, IAggregate, new() => throw new NotSupportedException();
-
-		public Task<bool> DeleteAsync<T>(
+		public Task<Result<SaveOutcome<T>, AggregateDeleteFailure>> DeleteAsync<T>(
 			T aggregate,
 			EventStoreOperationContext? operationContext,
 			CancellationToken cancellationToken = default
 		)
 			where T : class, IAggregate, new() => throw new NotSupportedException();
 
-		public Task<bool> RestoreAsync<T>(
+		public Task<Result<SaveOutcome<T>, AggregateRestoreFailure>> RestoreAsync<T>(
 			T aggregate,
 			EventStoreOperationContext? operationContext,
 			CancellationToken cancellationToken = default
@@ -224,7 +228,10 @@ public sealed class AdminSnapshotEndpointsTests
 		)
 			where T : class, IAggregate, new() => throw new NotSupportedException();
 
-		public Task<ExistsState> ExistsAsync<T>(string aggregateId, CancellationToken cancellationToken = default)
+		public Task<AggregateExistence> ExistsAsync<T>(
+			string aggregateId,
+			CancellationToken cancellationToken = default
+		)
 			where T : class, IAggregate, new() => throw new NotSupportedException();
 
 		public T FulfilRequirements<T>(T aggregate)
@@ -232,8 +239,8 @@ public sealed class AdminSnapshotEndpointsTests
 
 		public IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync<T>(
 			string aggregateId,
-			int versionFrom,
-			int? versionTo,
+			long versionFrom,
+			long? versionTo,
 			CancellationToken cancellationToken
 		)
 			where T : class, IAggregate, new() => throw new NotSupportedException();

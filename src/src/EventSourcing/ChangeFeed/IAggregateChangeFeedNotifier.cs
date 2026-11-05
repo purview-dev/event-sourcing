@@ -46,7 +46,7 @@ public interface IAggregateChangeFeedNotifier<T>
 	/// <returns>An awaitable task.</returns>
 	Task AfterSaveAsync(
 		T aggregate,
-		int previousSavedVersion,
+		long previousSavedVersion,
 		bool isNew,
 		EventRecord[] events,
 		CancellationToken cancellationToken = default

@@ -1,12 +1,12 @@
-﻿using Purview.EventSourcing.Aggregates.Persistence;
+using Purview.EventSourcing.Aggregates.Persistence;
 using Purview.EventSourcing.Fixtures.CosmosDb;
 
 namespace Purview.EventSourcing.CosmosDb.Snapshots;
 
-// Holds the fixture and shared helpers for Cosmos-specific snapshot tests (dictionary/partition-key
-// queries). The provider-agnostic snapshot contract suite lives in SnapshotStoreContractTests.
+// Holds the fixture and shared helpers for Cosmos-specific snapshot tests (paging and query
+// translation). The provider-agnostic snapshot contract suite lives in SnapshotStoreContractTests.
 [ClassDataSource<CosmosDbSnapshotEventStoreFixture>(Shared = SharedType.PerTestSession)]
-[NotInParallel(nameof(CosmosDbClient))]
+[NotInParallel(CosmosDbTestConstraints.Container)]
 public partial class CosmosDbSnapshotEventStoreTests(CosmosDbSnapshotEventStoreFixture fixture)
 {
 	static PersistenceAggregate CreateAggregate(string? id = null, Action<PersistenceAggregate>? action = null)
@@ -17,4 +17,10 @@ public partial class CosmosDbSnapshotEventStoreTests(CosmosDbSnapshotEventStoreF
 
 		return aggregate;
 	}
+}
+
+static class CosmosDbTestConstraints
+{
+	// Tests share a single emulator container, so they are serialized against this key.
+	public const string Container = "CosmosDbContainer";
 }

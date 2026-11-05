@@ -45,7 +45,10 @@ See `docs/wiki/Dependency-Guardrails.md` for the full rationale.
 
 ```csharp
 // The store invokes the registered IAggregateValidator<TAggregate> before saving.
-await store.SaveAsync(order, cancellationToken);
+var result = await store.SaveAsync(order, cancellationToken);
+if (result.IsFailure && result.Error is AggregateInvalid invalid)
+    foreach (var failure in invalid.ValidationResult.Failures)
+        Console.WriteLine($"{failure.PropertyName}: {failure.ErrorMessage}");
 ```
 
 ## What it provides

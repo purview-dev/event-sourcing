@@ -1,4 +1,4 @@
-namespace Purview.EventSourcing.Admin.Abstractions.Models;
+namespace Purview.EventSourcing.Admin.Models;
 
 /// <summary>
 /// Describes the metadata associated with a single event in an aggregate stream.

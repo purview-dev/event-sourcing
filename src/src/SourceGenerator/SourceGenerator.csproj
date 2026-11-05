@@ -11,6 +11,14 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<!-- Every build property this generator reads. PSGF0003 fails the build unless each one is
+		     declared in Sdk/buildTransitive, which is what consumers actually receive. -->
+		<PurviewGeneratorVisibleProperty Include="DisableEventSourcingSourceGenerator" />
+		<PurviewGeneratorVisibleProperty Include="PurviewEventContractManifestEnabled" />
+		<PurviewGeneratorVisibleProperty Include="PurviewEventContractBaselineFileName" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
 		<AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
 	</ItemGroup>

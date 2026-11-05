@@ -1,28 +1,40 @@
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
+using Purview.EventSourcing.Failures;
 using Purview.EventSourcing.MongoDB.Events.Entities;
+using Purview.Results;
 
 namespace Purview.EventSourcing.MongoDB;
 
 partial class MongoDBEventStore<T>
 {
 	///<inheritdoc/>
-	public async Task<bool> DeleteAsync(
+	public async Task<Result<SaveOutcome<T>, AggregateDeleteFailure>> DeleteAsync(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
 	)
 	{
+		using var activity = _eventStoreTelemetry.DeleteAggregate(aggregate.Id(), _aggregateTypeFullName);
+
 		if (aggregate == null)
 			throw NullAggregate(aggregate);
 
 		if (aggregate.Details.IsDeleted)
-			throw AggregateIsDeletedException(aggregate.Id());
+		{
+			return AggregateDeleteFailure.Failure<SaveOutcome<T>>(
+				new AggregateAlreadyDeleted(aggregate.AggregateType, aggregate.Id())
+			);
+		}
 
 		operationContext ??= EventStoreOperationContext.DefaultContext();
 
 		if (aggregate.IsNew())
-			return false;
+		{
+			return AggregateDeleteFailure.Failure<SaveOutcome<T>>(
+				new AggregateNotFound(aggregate.AggregateType, aggregate.Id())
+			);
+		}
 
 		if (operationContext.PermanentlyDelete)
 			return await PermanentlyDeleteAsync(aggregate, operationContext, cancellationToken);
@@ -46,10 +58,10 @@ partial class MongoDBEventStore<T>
 			new EventRecord(deleteAggregateEvent, metadata)
 		);
 
-		return result.Saved;
+		return result.IsFailure ? result.Error.ToDeleteFailure<T>() : result.Value;
 	}
 
-	async Task<bool> PermanentlyDeleteAsync(
+	async Task<Result<SaveOutcome<T>, AggregateDeleteFailure>> PermanentlyDeleteAsync(
 		T aggregate,
 		EventStoreOperationContext operationContext,
 		CancellationToken cancellationToken = default
@@ -61,14 +73,19 @@ partial class MongoDBEventStore<T>
 		var aggregateId = aggregate.Id();
 		var streamVersion = await GetStreamVersionAsync(aggregateId, true, cancellationToken);
 		if (streamVersion == null)
-			return false;
+		{
+			return AggregateDeleteFailure.Failure<SaveOutcome<T>>(
+				new AggregateNotFound(aggregate.AggregateType, aggregateId)
+			);
+		}
 
 		_eventStoreTelemetry.PermanentDeleteRequested(aggregateId);
 		try
 		{
-			var ids = Enumerable
-				.Range(1, streamVersion.Version)
-				.Select(id => CreateEventId(aggregateId, id).ToString());
+			// The stream version is a long, so the id range is built over longs: Enumerable.Range is int-only.
+			List<string> ids = [];
+			for (var version = 1L; version <= streamVersion.Version; version++)
+				ids.Add(CreateEventId(aggregateId, version));
 
 			List<string> entitiesToDelete = [.. ids];
 			entitiesToDelete.Add(streamVersion.Id);
@@ -91,7 +108,7 @@ partial class MongoDBEventStore<T>
 			aggregate.Details.IsDeleted = true;
 			aggregate.Details.Locked = true;
 
-			return true;
+			return new SaveOutcome<T>(aggregate, SaveOutcomeKind.Written);
 		}
 #pragma warning disable CA1031
 		catch (Exception ex)
@@ -99,7 +116,7 @@ partial class MongoDBEventStore<T>
 		{
 			_eventStoreTelemetry.PermanentDeleteFailed(aggregateId, ex);
 
-			return false;
+			throw;
 		}
 		finally
 		{

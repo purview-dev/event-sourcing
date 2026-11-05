@@ -1,4 +1,4 @@
-namespace Purview.EventSourcing.Admin.Abstractions.Models;
+namespace Purview.EventSourcing.Admin.Models;
 
 /// <summary>
 /// Summarizes the current state of an aggregate stream.

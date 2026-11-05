@@ -2,7 +2,9 @@ using System.Data.Common;
 using Microsoft.Data.SqlClient;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Snapshotting;
+using Purview.EventSourcing.Failures;
 using Purview.EventSourcing.Internal;
+using Purview.Results;
 
 namespace Purview.EventSourcing.SqlServer.Snapshot;
 
@@ -13,29 +15,29 @@ partial class SqlServerSnapshotEventStore<T>
 		_eventStore.CreateAsync(aggregateId, cancellationToken);
 
 	///<inheritdoc/>
-	public Task<T?> GetOrCreateAsync(
+	public Task<Result<T, AggregateReadFailure>> GetOrCreateAsync(
 		string? aggregateId,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
 	) => _eventStore.GetOrCreateAsync(aggregateId, operationContext, cancellationToken);
 
 	///<inheritdoc/>
-	public Task<T?> GetAsync(
+	public Task<Result<T, AggregateReadFailure>> GetAsync(
 		string aggregateId,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
 	) => _eventStore.GetAsync(aggregateId, operationContext, cancellationToken);
 
 	///<inheritdoc/>
-	public Task<T?> GetAtAsync(
+	public Task<Result<T, AggregateReadFailure>> GetAtAsync(
 		string aggregateId,
-		int version,
+		long version,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
 	) => _eventStore.GetAtAsync(aggregateId, version, operationContext, cancellationToken);
 
 	///<inheritdoc/>
-	public async Task<SaveResult<T>> SaveAsync(
+	public async Task<Result<SaveOutcome<T>, AggregateSaveFailure>> SaveAsync(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -46,8 +48,8 @@ partial class SqlServerSnapshotEventStore<T>
 
 		var result = await _eventStore.SaveAsync(aggregate, operationContext, cancellationToken);
 		if (
-			result
-			&& !result.Skipped
+			result.IsSuccess
+			&& result.Value.Written
 			&& SnapshotStrategyResolver.ShouldSnapshot(
 				aggregate,
 				eventsApplied,
@@ -110,8 +112,8 @@ partial class SqlServerSnapshotEventStore<T>
 		try
 		{
 			if (
-				innerOperation.Result.Saved
-				&& !innerOperation.Result.Skipped
+				innerOperation.Saved
+				&& !innerOperation.Skipped
 				&& SnapshotStrategyResolver.ShouldSnapshot(
 					aggregate,
 					eventsApplied,
@@ -163,15 +165,13 @@ partial class SqlServerSnapshotEventStore<T>
 	}
 
 	///<inheritdoc/>
-	public Task<bool> IsDeletedAsync(string aggregateId, CancellationToken cancellationToken = default) =>
-		_eventStore.IsDeletedAsync(aggregateId, cancellationToken);
+	public Task<Result<T, AggregateReadFailure>> GetDeletedAsync(
+		string aggregateId,
+		CancellationToken cancellationToken = default
+	) => _eventStore.GetDeletedAsync(aggregateId, cancellationToken);
 
 	///<inheritdoc/>
-	public Task<T?> GetDeletedAsync(string aggregateId, CancellationToken cancellationToken = default) =>
-		_eventStore.GetDeletedAsync(aggregateId, cancellationToken);
-
-	///<inheritdoc/>
-	public async Task<bool> DeleteAsync(
+	public async Task<Result<SaveOutcome<T>, AggregateDeleteFailure>> DeleteAsync(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -185,7 +185,7 @@ partial class SqlServerSnapshotEventStore<T>
 		try
 		{
 			var result = await _eventStore.DeleteAsync(aggregate, operationContext, cancellationToken);
-			if (result)
+			if (result.IsSuccess)
 			{
 				await _sqlServerClient.DeleteAsync(aggregate.Details.Id, cancellationToken);
 				_telemetry.SnapshotDeleteComplete(aggregate.Details.Id, _aggregateName);
@@ -201,7 +201,7 @@ partial class SqlServerSnapshotEventStore<T>
 	}
 
 	///<inheritdoc/>
-	public async Task<bool> RestoreAsync(
+	public async Task<Result<SaveOutcome<T>, AggregateRestoreFailure>> RestoreAsync(
 		T aggregate,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -210,7 +210,7 @@ partial class SqlServerSnapshotEventStore<T>
 		ArgumentNullException.ThrowIfNull(aggregate, nameof(aggregate));
 
 		var result = await _eventStore.RestoreAsync(aggregate, operationContext, cancellationToken);
-		if (result)
+		if (result.IsSuccess)
 			await SnapshotAsync(aggregate, cancellationToken);
 
 		return result;
@@ -223,7 +223,7 @@ partial class SqlServerSnapshotEventStore<T>
 	) => _eventStore.GetAggregateIdsAsync(includeDeleted, cancellationToken);
 
 	///<inheritdoc/>
-	public Task<ExistsState> ExistsAsync(string aggregateId, CancellationToken cancellationToken = default) =>
+	public Task<AggregateExistence> ExistsAsync(string aggregateId, CancellationToken cancellationToken = default) =>
 		_eventStore.ExistsAsync(aggregateId, cancellationToken);
 
 	///<inheritdoc/>
@@ -232,8 +232,8 @@ partial class SqlServerSnapshotEventStore<T>
 	///<inheritdoc/>
 	public IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync(
 		string aggregateId,
-		int versionFrom,
-		int? versionTo,
+		long versionFrom,
+		long? versionTo,
 		CancellationToken cancellationToken
 	) => _eventStore.GetEventRangeAsync(aggregateId, versionFrom, versionTo, cancellationToken);
 

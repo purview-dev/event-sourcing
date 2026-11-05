@@ -1,12 +1,14 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
-using Purview.EventSourcing.Admin.Abstractions.Models;
-using Purview.EventSourcing.Admin.Abstractions.Queries;
-using Purview.EventSourcing.Admin.Abstractions.Services;
+using Microsoft.Extensions.Logging;
+using Purview.EventSourcing.Admin.Models;
+using Purview.EventSourcing.Admin.Queries;
 using Purview.EventSourcing.Admin.Security;
+using Purview.EventSourcing.Admin.Services;
 using Purview.EventSourcing.Manifest;
 using Purview.EventSourcing.Outbox;
 using Purview.EventSourcing.Services;
@@ -44,8 +46,9 @@ public static class AdminOperationalEndpoints
 
 	/// <summary>
 	/// Maps the <c>GET /health</c> endpoint that reports operational readiness for the Admin portal.
-	/// Readiness reflects whether the event-store capability contract can be resolved; it does not
-	/// probe live storage.
+	/// Readiness probes the configured storage when the provider registers an
+	/// <see cref="IAdminStorageProbe"/>; without one the status is <c>Unknown</c> and the response
+	/// describes only the capability contract.
 	/// </summary>
 	/// <param name="group">The route group to map the endpoint onto.</param>
 	/// <param name="policyName">The host authorization policy required by the endpoint.</param>
@@ -58,7 +61,9 @@ public static class AdminOperationalEndpoints
 			.MapGet("/health", GetHealthAsync)
 			.WithName("GetAdminHealth")
 			.WithSummary("Get Admin portal health")
-			.WithDescription("Reports whether the Admin portal can resolve the event-store capability contract.")
+			.WithDescription(
+				"Reports whether the configured storage is reachable, and the event-store capability contract."
+			)
 			.WithTags(AdminPortalTag)
 			.Produces<AdminHealthResponse>()
 			.RequireAuthorization(policyName);
@@ -93,10 +98,15 @@ public static class AdminOperationalEndpoints
 		IEventStoreCapabilitiesProvider capabilitiesProvider,
 		IAdminAuditLogger auditLogger,
 		HttpContext httpContext,
-		CancellationToken cancellationToken
+		CancellationToken cancellationToken,
+		// Explicitly from services: a GET endpoint otherwise infers an unannotated complex parameter
+		// as a request body, which minimal APIs reject.
+		[FromServices] IAdminStorageProbe? storageProbe = null,
+		[FromServices] ILogger<AdminHealthResponse>? logger = null
 	)
 	{
 		var capabilities = capabilitiesProvider.GetCapabilities();
+		var status = await ProbeStorageAsync(storageProbe, logger, cancellationToken);
 
 		await auditLogger.LogAsync(
 			new AdminAuditEntry(
@@ -113,7 +123,7 @@ public static class AdminOperationalEndpoints
 
 		return TypedResults.Ok(
 			new AdminHealthResponse(
-				Status: "Ready",
+				Status: status,
 				TimestampUtc: DateTimeOffset.UtcNow,
 				TransactionGuarantee: capabilities.TransactionGuarantee,
 				SupportsEventStreams: capabilities.SupportsEventStreams,
@@ -122,6 +132,42 @@ public static class AdminOperationalEndpoints
 				OperationalLimitations: capabilities.OperationalLimitations
 			)
 		);
+	}
+
+	/// <summary>
+	/// Resolves the reported health status, probing storage when the registered provider supports it.
+	/// </summary>
+	/// <remarks>
+	/// The failure is logged rather than returned: a storage error can carry endpoint or credential
+	/// detail, and this endpoint answers an unauthenticated-adjacent monitoring caller.
+	/// </remarks>
+	static async Task<string> ProbeStorageAsync(
+		IAdminStorageProbe? storageProbe,
+		ILogger? logger,
+		CancellationToken cancellationToken
+	)
+	{
+		if (storageProbe is null)
+			return AdminHealthStatus.Unknown;
+
+		try
+		{
+			return await storageProbe.IsReachableAsync(cancellationToken)
+				? AdminHealthStatus.Healthy
+				: AdminHealthStatus.Unhealthy;
+		}
+		catch (OperationCanceledException)
+		{
+			throw;
+		}
+#pragma warning disable CA1031
+		catch (Exception ex)
+#pragma warning restore CA1031
+		{
+			logger?.LogError(ex, "The Admin portal storage probe failed.");
+
+			return AdminHealthStatus.Unhealthy;
+		}
 	}
 
 	/// <summary>
@@ -246,7 +292,7 @@ public static class AdminOperationalEndpoints
 			.RequireAuthorization(policyName);
 	}
 
-	static async Task<Results<Ok<UnknownEventsResponse>, NotFound>> GetUnknownEventsAsync(
+	static async Task<IResult> GetUnknownEventsAsync(
 		string aggregateType,
 		string aggregateId,
 		IAdminEventQueryService queryService,
@@ -283,10 +329,10 @@ public static class AdminOperationalEndpoints
 				Sort: "Version asc"
 			);
 			var result = await queryService.GetRangeAsync(aggregateType, aggregateId, query, cancellationToken);
-			if (result is null)
-				return TypedResults.NotFound();
+			if (result.IsFailure)
+				return result.Error.ToHttpResult();
 
-			foreach (var envelope in result.Items)
+			foreach (var envelope in result.Value.Items)
 			{
 				totalEvents++;
 				var eventType = envelope.Metadata.EventType;
@@ -297,7 +343,7 @@ public static class AdminOperationalEndpoints
 					unknown.Add(eventType);
 			}
 
-			if (!result.HasNextPage)
+			if (!result.Value.HasNextPage)
 				break;
 
 			page++;

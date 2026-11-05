@@ -3,6 +3,7 @@ using Purview.EventSourcing.Aggregates.Persistence;
 using Purview.EventSourcing.ChangeFeed;
 using Purview.EventSourcing.Contracts;
 using Purview.EventSourcing.Fixtures.Postgres;
+using Purview.EventSourcing.Tenancy;
 
 namespace Purview.EventSourcing.Postgres.Events;
 
@@ -66,4 +67,7 @@ public sealed class EventStoreContractTests<TAggregate>(PostgresEventStoreFixtur
 			);
 		}
 	}
+
+	protected override IEventStoreCore<TAggregate> CreateTenantScopedEventStore(TenantScope scope, Guid runId) =>
+		fixture.CreateEventStore<TAggregate>(runId: runId, currentTenant: new EventStoreTenantScopeStub(scope));
 }

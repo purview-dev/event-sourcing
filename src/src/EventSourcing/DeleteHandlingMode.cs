@@ -1,22 +1,22 @@
 ﻿namespace Purview.EventSourcing;
 
 /// <summary>
-/// Controls how to handle aggregates in a deleted state during get and save/ restore operations.
+/// Controls how a soft-deleted aggregate is reported by get operations.
 /// </summary>
+/// <remarks>
+/// The mode no longer decides whether an exception is thrown: a deleted aggregate is an expected
+/// outcome, reported as <see cref="Failures.AggregateDeleted"/>. It decides only whether the caller
+/// wants that state back instead.
+/// </remarks>
 public enum DeleteHandlingMode
 {
 	/// <summary>
-	/// If the aggregate is marked as deleted, returns null. This is the default.
+	/// A deleted aggregate is reported as <see cref="Failures.AggregateDeleted"/>. This is the default.
 	/// </summary>
-	ReturnsNull = 0,
+	ReturnsFailure = 0,
 
 	/// <summary>
-	/// Should throw an exception.
-	/// </summary>
-	ThrowsException,
-
-	/// <summary>
-	/// Returns the aggregate in it's deleted state.
+	/// A deleted aggregate is returned in its deleted state.
 	/// </summary>
 	ReturnsAggregate,
 }

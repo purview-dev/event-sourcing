@@ -1,7 +1,7 @@
 using Azure;
 using MongoDB.Driver;
 using Npgsql;
-using Purview.EventSourcing.AzureStorage.Exceptions;
+using Purview.EventSourcing.Exceptions;
 using Purview.Telemetry;
 
 namespace Purview.EventSourcing.Samples.Web.Services;
@@ -19,7 +19,7 @@ interface ISampleSeedServiceTelemetry
 	void ArgumentFailed(string currentKey, ArgumentException ex);
 
 	[Error]
-	void AzureCommitFailed(string currentKey, CommitException ex);
+	void CommitFailed(string currentKey, CommitException ex);
 
 	[Error]
 	void FormatFailed(string currentKey, FormatException ex);
@@ -35,7 +35,4 @@ interface ISampleSeedServiceTelemetry
 
 	[Error]
 	void RequestFailed(string currentKey, RequestFailedException ex);
-
-	[Error]
-	void SqlServerCommitFailed(string currentKey, SqlServer.Events.Exceptions.CommitException ex);
 }

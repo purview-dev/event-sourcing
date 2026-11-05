@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Primitives;
 using Purview.EventSourcing.Aggregates.Persistence.Events;
@@ -31,6 +31,12 @@ public sealed class PersistenceAggregate : AggregateBase, IAggregateTest
 	[JsonInclude]
 	public ComplexTestType? ComplexTestType { get; private set; }
 
+	[JsonInclude]
+	public string? SubjectName { get; private set; }
+
+	public void SetSubjectName(string name, string dataSubjectId) =>
+		RecordAndApply(new SubjectNameSetEvent { Name = name, DataSubjectId = dataSubjectId });
+
 	public void RegisterOldEventType()
 	{
 		Register<OldEvent>(Apply);
@@ -45,6 +51,7 @@ public sealed class PersistenceAggregate : AggregateBase, IAggregateTest
 		Register<ComplexPropertySetEvent>(@event => ComplexTestType = @event.ComplexProperty);
 		Register<StringValueKVPsAddedEvent>(Apply);
 		Register<KVPsAddedEvent>(Apply);
+		Register<SubjectNameSetEvent>(@event => SubjectName = @event.Name);
 	}
 
 	void Apply(StringValueKVPsAddedEvent obj)

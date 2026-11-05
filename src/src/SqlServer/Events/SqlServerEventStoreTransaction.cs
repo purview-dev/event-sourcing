@@ -417,8 +417,8 @@ sealed class SqlServerEventStoreTransaction(string? correlationId = null) : ISql
 		where T : class, IAggregate, new()
 	{
 		public IAggregate Aggregate => aggregate;
-		public bool Saved => operation.Result.Saved;
-		public bool Skipped => operation.Result.Skipped;
+		public bool Saved => operation.Saved;
+		public bool Skipped => operation.Skipped;
 
 		public Task AfterCommitAsync(CancellationToken cancellationToken) =>
 			operation.AfterCommitAsync(cancellationToken);

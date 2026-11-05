@@ -58,7 +58,7 @@ public partial class AggregateBaseTests
 	public async Task ClearUnsavedEvents_GivenEventsAndClearEventsCalledWithSpecificVersion_ClearEventsThatAreGreaterThanOrOrEqualToSpecifiedVersion(
 		int eventsToCreate,
 		int versionToClear,
-		int expectedVersion
+		long expectedVersion
 	)
 	{
 		// Arrange

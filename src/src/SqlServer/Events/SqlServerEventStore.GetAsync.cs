@@ -2,6 +2,8 @@ using System.Globalization;
 using Microsoft.Extensions.Caching.Distributed;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
+using Purview.EventSourcing.Failures;
+using Purview.Results;
 
 namespace Purview.EventSourcing.SqlServer.Events;
 
@@ -9,13 +11,13 @@ partial class SqlServerEventStore<T>
 {
 	///<inheritdoc/>
 	[System.Diagnostics.DebuggerStepThrough]
-	public Task<T?> GetAsync(
+	public Task<Result<T, AggregateReadFailure>> GetAsync(
 		string aggregateId,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
 	) => GetCoreAsync(aggregateId, operationContext, cancellationToken);
 
-	async Task<T?> GetCoreAsync(
+	async Task<Result<T, AggregateReadFailure>> GetCoreAsync(
 		string aggregateId,
 		EventStoreOperationContext? operationContext,
 		CancellationToken cancellationToken = default
@@ -44,9 +46,9 @@ partial class SqlServerEventStore<T>
 			{
 				_eventStoreTelemetry.AggregateRetrievedFromCache(aggregateId, _aggregateTypeFullName);
 
-				return ReturnAggregate(aggregate.Details.IsDeleted, aggregateId, operationContext)
+				return ReturnAggregate(aggregate.Details.IsDeleted, operationContext)
 					? PrepareAggregateForReturn(aggregate, _aggregateRequirementsManager)
-					: null;
+					: Deleted(aggregateId);
 			}
 
 			// Single-flight: when the aggregate will be written back to the cache, serialize
@@ -72,20 +74,20 @@ partial class SqlServerEventStore<T>
 				{
 					_eventStoreTelemetry.AggregateRetrievedFromCache(aggregateId, _aggregateTypeFullName);
 
-					return ReturnAggregate(cached.Details.IsDeleted, aggregateId, operationContext)
+					return ReturnAggregate(cached.Details.IsDeleted, operationContext)
 						? PrepareAggregateForReturn(cached, _aggregateRequirementsManager)
-						: null;
+						: Deleted(aggregateId);
 				}
 			}
 
 			var streamVersion = await GetStreamVersionAsync(aggregateId, true, cancellationToken);
 			if (streamVersion == null)
-				return null;
+				return NotFound(aggregateId);
 
-			if (!ReturnAggregate(streamVersion.IsDeleted, aggregateId, operationContext))
-				return null;
+			if (!ReturnAggregate(streamVersion.IsDeleted, operationContext))
+				return Deleted(aggregateId);
 
-			int? streamVersionIdentifier = null;
+			long? streamVersionIdentifier = null;
 			if (!operationContext.SkipSnapshot)
 				aggregate = await GetLatestSnapshotAsync(aggregateId, cancellationToken);
 
@@ -111,6 +113,7 @@ partial class SqlServerEventStore<T>
 				_aggregateTypeFullName,
 				getStopwatch.ElapsedMilliseconds
 			);
+			_metrics.GetDuration(getStopwatch.Elapsed.TotalMilliseconds, _aggregateTypeShortName);
 		}
 
 		async Task<bool> IsCacheHitFreshAsync(T aggregate, string aggregateId, CancellationToken cancellationToken)
@@ -139,7 +142,7 @@ partial class SqlServerEventStore<T>
 	async Task GetAndApplyEventsAsync(
 		T aggregate,
 		StreamVersionData streamVersion,
-		int? maxVersion,
+		long? maxVersion,
 		CancellationToken cancellationToken
 	)
 	{

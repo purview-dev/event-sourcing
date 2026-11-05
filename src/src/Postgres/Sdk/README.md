@@ -100,5 +100,5 @@ The snapshot query model writes members through their property accessors (`Prope
 - [Homepage](https://purview.dev/projects/event-sourcing/)
 - [Documentation](https://purview.dev/docs/event-sourcing/)
 - [Provider feature matrix](https://github.com/purview-dev/event-sourcing/blob/main/docs/wiki/Provider-Feature-Matrix.md)
-  - Includes behavior notes/caveats (`IsDeletedAsync` missing behavior, tolerant replay, principal requirements)
+  - Includes behavior notes/caveats (`ExistsAsync` missing-stream behavior, tolerant replay, principal requirements)
   - Includes snapshot payload/query-translation guidance for scalar value objects vs directly mapped complex mirrors

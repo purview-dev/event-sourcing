@@ -1,6 +1,7 @@
 using System.Data.Common;
 using System.Diagnostics;
 using Purview.EventSourcing.Aggregates;
+using Purview.EventSourcing.Failures;
 using Purview.EventSourcing.Internal;
 
 namespace Purview.EventSourcing;
@@ -155,9 +156,15 @@ public sealed class EventStoreTransaction : IEventStoreTransaction
 		{
 			try
 			{
-				var (saved, skipped) = await enlisted.SaveAsync(CorrelationId, cancellationToken);
+				var (saved, skipped, failure) = await enlisted.SaveAsync(CorrelationId, cancellationToken);
 				results.Add(
-					new TransactionAggregateResult(enlisted.Aggregate, saved: saved, skipped: skipped, error: null)
+					new TransactionAggregateResult(
+						enlisted.Aggregate,
+						saved: saved,
+						skipped: skipped,
+						error: null,
+						failure: failure
+					)
 				);
 
 				// Stop processing remaining aggregates on first failure.
@@ -247,7 +254,8 @@ public sealed class EventStoreTransaction : IEventStoreTransaction
 						operation.Aggregate,
 						operation.Saved,
 						operation.Skipped,
-						postCommitError
+						postCommitError,
+						operation.Failure
 					)
 				);
 			}
@@ -281,7 +289,8 @@ public sealed class EventStoreTransaction : IEventStoreTransaction
 					operation.Aggregate,
 					saved: false,
 					skipped: !isFailedOperation && !wasRolledBack && operation.Skipped,
-					error: isFailedOperation || operation.Skipped ? null : rollbackError
+					error: isFailedOperation || operation.Skipped ? null : rollbackError,
+					failure: operation.Failure
 				)
 			);
 		}
@@ -315,7 +324,10 @@ public sealed class EventStoreTransaction : IEventStoreTransaction
 
 		string? TransactionBoundaryKey { get; }
 
-		Task<(bool saved, bool skipped)> SaveAsync(string correlationId, CancellationToken cancellationToken);
+		Task<(bool saved, bool skipped, AggregateSaveFailure? failure)> SaveAsync(
+			string correlationId,
+			CancellationToken cancellationToken
+		);
 
 		DbConnection CreateTransactionConnection();
 
@@ -336,6 +348,8 @@ public sealed class EventStoreTransaction : IEventStoreTransaction
 		bool Saved { get; }
 
 		bool Skipped { get; }
+
+		AggregateSaveFailure? Failure { get; }
 
 		Task AfterCommitAsync(CancellationToken cancellationToken);
 
@@ -387,7 +401,7 @@ public sealed class EventStoreTransaction : IEventStoreTransaction
 
 		public string? TransactionBoundaryKey => _transactionalEventStore?.TransactionBoundaryKey;
 
-		public async Task<(bool saved, bool skipped)> SaveAsync(
+		public async Task<(bool saved, bool skipped, AggregateSaveFailure? failure)> SaveAsync(
 			string correlationId,
 			CancellationToken cancellationToken
 		)
@@ -402,7 +416,14 @@ public sealed class EventStoreTransaction : IEventStoreTransaction
 			var result = _eventStoreImpl is not null
 				? await _eventStoreImpl.SaveAsync(_aggregate, context, cancellationToken)
 				: await _eventStore!.SaveAsync(_aggregate, context, cancellationToken);
-			return (result.Saved, result.Skipped);
+
+			return result.IsSuccess
+				? (
+					result.Value.Kind is not SaveOutcomeKind.NoChanges,
+					result.Value.Kind is not SaveOutcomeKind.Written,
+					null
+				)
+				: (false, false, result.Error);
 		}
 
 		public DbConnection CreateTransactionConnection() =>
@@ -456,9 +477,11 @@ public sealed class EventStoreTransaction : IEventStoreTransaction
 	{
 		public IAggregate Aggregate => aggregate;
 
-		public bool Saved => operation.Result.Saved;
+		public bool Saved => operation.Saved;
 
-		public bool Skipped => operation.Result.Skipped;
+		public bool Skipped => operation.Skipped;
+
+		public AggregateSaveFailure? Failure => operation.Result.IsFailure ? operation.Result.Error : null;
 
 		public Task AfterCommitAsync(CancellationToken cancellationToken) =>
 			operation.AfterCommitAsync(cancellationToken);

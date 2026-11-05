@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text.Json.Serialization;
 using MongoDB.Bson.Serialization.Attributes;
 using Purview.EventSourcing.MongoDB.StorageClient;
@@ -33,6 +33,11 @@ public sealed class StreamVersionEntity : IEntity
 	public int EntityType { get; set; } = EntityTypes.StreamVersionType;
 
 	/// <summary>
+	/// The tenant that owns the document; null in a single-tenant deployment.
+	/// </summary>
+	public string? TenantId { get; set; }
+
+	/// <summary>
 	/// Indicates whether the aggregate is soft-deleted.
 	/// </summary>
 	public bool IsDeleted { get; set; }
@@ -45,7 +50,7 @@ public sealed class StreamVersionEntity : IEntity
 	/// <summary>
 	/// This is the most recently saved version of the aggregate.
 	/// </summary>
-	public int Version { get; set; }
+	public long Version { get; set; }
 
 	/// <summary>
 	/// The time the record was last updated.

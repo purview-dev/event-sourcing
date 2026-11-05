@@ -6,6 +6,7 @@
 - [Provider Feature Matrix](Provider-Feature-Matrix.md)
 - [Provider Capabilities](Provider-Capabilities.md)
 - [Transactional Outbox](Transactional-Outbox.md)
+- [Subscriptions](Subscriptions.md)
 - [Transaction Guarantees](Transaction-Guarantees.md)
 - [Event Contract Manifest](Event-Contract-Manifest.md)
 - [Source Generator Performance](Source-Generator-Performance.md)
@@ -19,3 +20,10 @@
 - [Source Generator Code Fixes](Code-Fixes.md)
 - [SQL Server Guide](SQL-Server-Guide.md)
 - [Release Flow](Release-Flow.md)
+- **[Production Readiness Status](Production-Readiness-Status.md)**
+- _Proposal:_ [Subscriptions and Retention](Subscriptions-And-Retention-Design.md)
+- _Proposal:_ [Crypto Key Management](Crypto-Key-Management-Design.md)
+- _Proposal:_ [Durable Admin Audit](Admin-Audit-Durability-Design.md)
+- _Proposal:_ [Retention](Retention-Design.md)
+- _Proposal:_ [Observability Parity](Observability-Parity-Design.md)
+- _Proposal:_ [Resilience Testing](Resilience-Testing-Design.md)

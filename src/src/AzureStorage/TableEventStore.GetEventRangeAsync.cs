@@ -11,8 +11,8 @@ partial class TableEventStore<T>
 	///<inheritdoc/>
 	public async IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync(
 		string aggregateId,
-		int versionFrom,
-		int? versionTo,
+		long versionFrom,
+		long? versionTo,
 		[EnumeratorCancellation] CancellationToken cancellationToken
 	)
 	{
@@ -45,8 +45,8 @@ partial class TableEventStore<T>
 
 	internal async IAsyncEnumerable<EventEntity> GetEventRangeEntitiesAsync(
 		string aggregateId,
-		int versionFrom,
-		int? versionTo,
+		long versionFrom,
+		long? versionTo,
 		[EnumeratorCancellation] CancellationToken cancellationToken
 	)
 	{
@@ -60,13 +60,13 @@ partial class TableEventStore<T>
 
 	async Task<EventRecord?> DeserializeEventAsync(
 		EventEntity eventEntity,
-		int aggregateVersion,
+		long aggregateVersion,
 		CancellationToken cancellationToken
 	)
 	{
 		cancellationToken.ThrowIfCancellationRequested();
 
-		static UnknownEvent ReturnUnknownEvent(EventEntity eventEntity, int aggregateVersion) =>
+		static UnknownEvent ReturnUnknownEvent(EventEntity eventEntity, long aggregateVersion) =>
 			new()
 			{
 				SchemaVersion = eventEntity.SchemaVersion,
@@ -166,6 +166,31 @@ partial class TableEventStore<T>
 
 				using (eventStream)
 				{
+					// The blob holds the same envelope as the table would, so an oversized event is
+					// erased by the same key and must be unprotected the same way.
+					if (_payloadProtector is not null)
+					{
+						using StreamReader reader = new(eventStream);
+						var blobPayload = await reader.ReadToEndAsync(cancellationToken);
+						if (_payloadProtector.IsProtected(blobPayload))
+						{
+							var unprotectedBlob = await _payloadProtector.UnprotectAsync(
+								blobPayload,
+								cancellationToken
+							);
+							if (unprotectedBlob is null)
+								return new EventRecord(ReturnUnknownEvent(eventEntity, aggregateVersion), metadata);
+
+							var protectedEvent = DeserializeEvent(unprotectedBlob, blobEventType);
+
+							return protectedEvent == null ? null : new EventRecord(protectedEvent, metadata);
+						}
+
+						var plainEvent = DeserializeEvent(blobPayload, blobEventType);
+
+						return plainEvent == null ? null : new EventRecord(plainEvent, metadata);
+					}
+
 					var blobEvent = await DeserializeEventAsync(eventStream, blobEventType, cancellationToken);
 					if (blobEvent == null)
 						return null;

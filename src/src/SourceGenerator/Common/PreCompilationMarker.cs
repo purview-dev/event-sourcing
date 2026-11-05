@@ -22,6 +22,6 @@ static class PreCompilationMarker
 		System.Text.Encoding.UTF8
 	);
 
-	public static IncrementalValueProvider<SourceText> Provider(IncrementalGeneratorInitializationContext context) =>
-		context.AnalyzerConfigOptionsProvider.Select(static (_, _) => Source);
+	public static IncrementalValueProvider<string> Provider(IncrementalGeneratorInitializationContext context) =>
+		context.AnalyzerConfigOptionsProvider.Select(static (_, _) => HintName);
 }

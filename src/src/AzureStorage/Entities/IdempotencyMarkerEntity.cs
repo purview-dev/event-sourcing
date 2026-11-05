@@ -1,4 +1,4 @@
-﻿using Azure;
+using Azure;
 using Azure.Data.Tables;
 
 namespace Purview.EventSourcing.AzureStorage.Entities;
@@ -10,7 +10,7 @@ namespace Purview.EventSourcing.AzureStorage.Entities;
 /// The marker records which event versions were persisted for a given idempotency id, allowing the store to
 /// detect and skip already-applied saves.
 /// </remarks>
-public sealed class IdempotencyMarkerEntity : ITableEntity
+public sealed class IdempotencyMarkerEntity : ITableEntity, IHasTenant
 {
 	/// <summary>
 	/// Initializes a new instance of the <see cref="IdempotencyMarkerEntity"/> class with the given keys.
@@ -51,5 +51,10 @@ public sealed class IdempotencyMarkerEntity : ITableEntity
 	/// <summary>
 	/// Gets or sets the entity tag used for optimistic concurrency.
 	/// </summary>
+	/// <summary>
+	/// The tenant that owns the row; null in a single-tenant deployment.
+	/// </summary>
+	public string? TenantId { get; set; }
+
 	public ETag ETag { get; set; }
 }

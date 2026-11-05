@@ -43,7 +43,7 @@ public interface IAggregateChangeFeedProcessor
 	/// <remarks>Returns a <see cref="Task.CompletedTask"/>.</remarks>
 	Task AfterSaveAsync(
 		IAggregate aggregate,
-		int previousSavedVersion,
+		long previousSavedVersion,
 		bool isNew,
 		EventRecord[] events,
 		CancellationToken cancellationToken = default
@@ -114,7 +114,7 @@ public interface IAggregateChangeFeedProcessor<T>
 	/// <remarks>Returns a <see cref="Task.CompletedTask"/>.</remarks>
 	Task AfterSaveAsync(
 		T aggregate,
-		int previousSavedVersion,
+		long previousSavedVersion,
 		bool isNew,
 		EventRecord[] events,
 		CancellationToken cancellationToken = default

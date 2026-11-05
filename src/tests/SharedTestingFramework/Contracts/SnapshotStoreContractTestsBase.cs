@@ -55,14 +55,15 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 		aggregate.AppendString(aggregateId);
 
 		// Act
-		bool result = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
+		var result = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
 		// Assert
-		await Assert.That(result).IsTrue();
+		await Assert.That(result.IsSuccess).IsTrue();
 		await Assert.That(aggregate.IsNew()).IsFalse();
 
 		// Verify by re-getting the aggregate, knowing that the cache is disabled.
-		var aggregateFromStore = await store.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		var aggregateFromStoreResult = await store.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		var aggregateFromStore = aggregateFromStoreResult.IsSuccess ? aggregateFromStoreResult.Value : null;
 
 		await Assert.That(aggregateFromStore).IsNotNull();
 		await Assert.That(aggregateFromStore!.Id()).IsEqualTo(aggregate.Id());
@@ -129,16 +130,17 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 		);
 
 		// Act
-		bool saveResult = await store.SaveAsync(
+		var saveResult = await store.SaveAsync(
 			aggregate,
 			CreateOperationContext(),
 			cancellationToken: cancellationToken
 		);
 
 		// Assert
-		await Assert.That(saveResult).IsTrue();
+		await Assert.That(saveResult.IsSuccess).IsTrue();
 
-		var fromDb = await store.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		var fromDbResult = await store.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		var fromDb = fromDbResult.IsSuccess ? fromDbResult.Value : null;
 
 		await Assert.That(fromDb).IsNotNull();
 		await Assert.That(fromDb.IncrementInt32).IsEqualTo(3);
@@ -168,12 +170,12 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 		var aggregate = CreateAggregate(id: aggregateId);
 		aggregate.IncrementInt32Value();
 
-		bool firstSave = await store.SaveAsync(
+		var firstSave = await store.SaveAsync(
 			aggregate,
 			CreateOperationContext(),
 			cancellationToken: cancellationToken
 		);
-		await Assert.That(firstSave).IsTrue();
+		await Assert.That(firstSave.IsSuccess).IsTrue();
 
 		var firstVersion = aggregate.Details.CurrentVersion;
 
@@ -181,15 +183,16 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 		aggregate.IncrementInt32Value();
 		aggregate.SetInt32Value(99);
 
-		bool secondSave = await store.SaveAsync(
+		var secondSave = await store.SaveAsync(
 			aggregate,
 			CreateOperationContext(),
 			cancellationToken: cancellationToken
 		);
-		await Assert.That(secondSave).IsTrue();
+		await Assert.That(secondSave.IsSuccess).IsTrue();
 
 		// Act - read from the store.
-		var fromDb = await store.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		var fromDbResult = await store.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		var fromDb = fromDbResult.IsSuccess ? fromDbResult.Value : null;
 
 		// Assert - should have the latest state.
 		await Assert.That(fromDb).IsNotNull();
@@ -210,27 +213,29 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 		var aggregate = CreateAggregate(id: aggregateId);
 		aggregate.IncrementInt32Value();
 
-		bool saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
-		await Assert.That(saveResult).IsTrue();
+		var saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
+		await Assert.That(saveResult.IsSuccess).IsTrue();
 
-		var aggregateFromStore = await store.GetAsync(
+		var aggregateFromStoreResult = await store.GetAsync(
 			aggregateId,
 			new EventStoreOperationContext { SnapshotCacheMode = SnapshotCachingOptions.None },
 			cancellationToken: cancellationToken
 		);
+		var aggregateFromStore = aggregateFromStoreResult.IsSuccess ? aggregateFromStoreResult.Value : null;
 		await Assert.That(aggregateFromStore).IsNotNull();
 
 		// Act
 		var deleteResult = await store.DeleteAsync(aggregate, cancellationToken: cancellationToken);
 
-		aggregateFromStore = await store.GetAsync(
+		aggregateFromStoreResult = await store.GetAsync(
 			aggregateId,
 			new EventStoreOperationContext { SnapshotCacheMode = SnapshotCachingOptions.None },
 			cancellationToken: cancellationToken
 		);
+		aggregateFromStore = aggregateFromStoreResult.IsSuccess ? aggregateFromStoreResult.Value : null;
 
 		// Assert
-		await Assert.That(deleteResult).IsTrue();
+		await Assert.That(deleteResult.IsSuccess).IsTrue();
 		await Assert.That(aggregateFromStore).IsNull();
 	}
 
@@ -244,25 +249,28 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 		var aggregate = CreateAggregate(id: aggregateId);
 		aggregate.IncrementInt32Value();
 
-		bool saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
-		await Assert.That(saveResult).IsTrue();
+		var saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
+		await Assert.That(saveResult.IsSuccess).IsTrue();
 
-		var aggregateFromStore = await store.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		var aggregateFromStoreResult = await store.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		var aggregateFromStore = aggregateFromStoreResult.IsSuccess ? aggregateFromStoreResult.Value : null;
 		await Assert.That(aggregateFromStore).IsNotNull();
 
 		var deleteResult = await store.DeleteAsync(aggregate, cancellationToken: cancellationToken);
-		await Assert.That(deleteResult).IsTrue();
+		await Assert.That(deleteResult.IsSuccess).IsTrue();
 
-		aggregateFromStore = await store.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		aggregateFromStoreResult = await store.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		aggregateFromStore = aggregateFromStoreResult.IsSuccess ? aggregateFromStoreResult.Value : null;
 		await Assert.That(aggregateFromStore).IsNull();
 
 		// Act
 		var restoreResult = await store.RestoreAsync(aggregate, cancellationToken: cancellationToken);
 
-		aggregateFromStore = await store.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		aggregateFromStoreResult = await store.GetAsync(aggregateId, cancellationToken: cancellationToken);
+		aggregateFromStore = aggregateFromStoreResult.IsSuccess ? aggregateFromStoreResult.Value : null;
 
 		// Assert
-		await Assert.That(restoreResult).IsTrue();
+		await Assert.That(restoreResult.IsSuccess).IsTrue();
 		await Assert.That(aggregateFromStore).IsNotNull();
 	}
 
@@ -287,9 +295,9 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 			for (var eventIndex = 0; eventIndex < numberOfEvents; eventIndex++)
 				aggregate.IncrementInt32Value();
 
-			bool saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
+			var saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
-			await Assert.That(saveResult).IsTrue();
+			await Assert.That(saveResult.IsSuccess).IsTrue();
 		}
 
 		// Act
@@ -318,9 +326,9 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 			var aggregate = CreateAggregate($"agg_{aggregateIndex}");
 			aggregate.IncrementInt32Value();
 
-			bool saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
+			var saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
-			await Assert.That(saveResult).IsTrue();
+			await Assert.That(saveResult.IsSuccess).IsTrue();
 		}
 
 		// Act
@@ -355,9 +363,9 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 			for (var eventIndex = 0; eventIndex < numberOfEvents; eventIndex++)
 				aggregate.IncrementInt32Value();
 
-			bool saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
+			var saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
-			await Assert.That(saveResult).IsTrue();
+			await Assert.That(saveResult.IsSuccess).IsTrue();
 		}
 
 		// Act
@@ -399,9 +407,9 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 			for (var eventIndex = 0; eventIndex < numberOfEvents; eventIndex++)
 				aggregate.IncrementInt32Value();
 
-			bool saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
+			var saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
-			await Assert.That(saveResult).IsTrue();
+			await Assert.That(saveResult.IsSuccess).IsTrue();
 		}
 
 		// These are non-matching.
@@ -413,9 +421,9 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 			for (var eventIndex = 0; eventIndex < (numberOfEvents * 2); eventIndex++)
 				aggregate.IncrementInt32Value();
 
-			bool saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
+			var saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
-			await Assert.That(saveResult).IsTrue();
+			await Assert.That(saveResult.IsSuccess).IsTrue();
 		}
 
 		// Act
@@ -462,8 +470,8 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 
 			var saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
-			await Assert.That(saveResult.ToBoolean()).IsTrue();
-			await Assert.That(saveResult.Skipped).IsFalse();
+			await Assert.That(saveResult.IsSuccess).IsTrue();
+			await Assert.That(saveResult.IsSuccess && saveResult.Value.Written).IsTrue();
 		}
 
 		// Act
@@ -495,8 +503,8 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 		for (var x = 0; x < matchingIncrement; x++)
 			aggregate.IncrementInt32Value();
 
-		bool saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
-		await Assert.That(saveResult).IsTrue();
+		var saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
+		await Assert.That(saveResult.IsSuccess).IsTrue();
 
 		// Act
 		var result = await store.SingleOrDefaultAsync(
@@ -522,8 +530,8 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 			for (var x = 0; x < eventsToCreate; x++)
 				aggregate.IncrementInt32Value();
 
-			bool saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
-			await Assert.That(saveResult).IsTrue();
+			var saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
+			await Assert.That(saveResult.IsSuccess).IsTrue();
 		}
 
 		// Act
@@ -555,13 +563,13 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 
 			aggregate.SetInt32Value(i + 1);
 
-			bool saveResult = await store.SaveAsync(
+			var saveResult = await store.SaveAsync(
 				aggregate,
 				CreateOperationContext(),
 				cancellationToken: cancellationToken
 			);
 
-			await Assert.That(saveResult).IsTrue();
+			await Assert.That(saveResult.IsSuccess).IsTrue();
 		}
 
 		// Act
@@ -595,9 +603,9 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 
 			aggregate.SetInt32Value(i + 1);
 
-			bool saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
+			var saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
-			await Assert.That(saveResult).IsTrue();
+			await Assert.That(saveResult.IsSuccess).IsTrue();
 		}
 
 		// Act
@@ -631,9 +639,9 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 				aggregate.IncrementInt32Value();
 			}
 
-			bool saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
+			var saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
-			await Assert.That(saveResult).IsTrue();
+			await Assert.That(saveResult.IsSuccess).IsTrue();
 		}
 
 		// Act
@@ -663,9 +671,9 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 			for (var x = 0; x < matchingIncrement; x++)
 				aggregate.IncrementInt32Value();
 
-			bool saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
+			var saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
-			await Assert.That(saveResult).IsTrue();
+			await Assert.That(saveResult.IsSuccess).IsTrue();
 		}
 
 		// Act
@@ -693,9 +701,9 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 		for (var x = 0; x < matchingIncrement; x++)
 			aggregate.IncrementInt32Value();
 
-		bool saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
+		var saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
-		await Assert.That(saveResult).IsTrue();
+		await Assert.That(saveResult.IsSuccess).IsTrue();
 
 		// Act
 		var result = await store.FirstOrDefaultAsync(
@@ -722,9 +730,9 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 			for (var x = 0; x < matchingIncrement; x++)
 				aggregate.IncrementInt32Value();
 
-			bool saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
+			var saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
-			await Assert.That(saveResult).IsTrue();
+			await Assert.That(saveResult.IsSuccess).IsTrue();
 		}
 
 		// Act
@@ -753,12 +761,12 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 			for (var eventIndex = 0; eventIndex < numberOfEvents; eventIndex++)
 				aggregate.IncrementInt32Value();
 
-			bool saveResult = await store.SaveAsync(
+			var saveResult = await store.SaveAsync(
 				aggregate,
 				CreateOperationContext(),
 				cancellationToken: cancellationToken
 			);
-			await Assert.That(saveResult).IsTrue();
+			await Assert.That(saveResult.IsSuccess).IsTrue();
 		}
 
 		// Act
@@ -780,8 +788,8 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 		var aggregate = CreateAggregate();
 		aggregate.IncrementInt32Value();
 
-		bool saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
-		await Assert.That(saveResult).IsTrue();
+		var saveResult = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
+		await Assert.That(saveResult.IsSuccess).IsTrue();
 
 		// Act
 		var count = await store.CountAsync(m => m.IncrementInt32 == -1, cancellationToken: cancellationToken);
@@ -809,12 +817,12 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 			for (var eventIndex = 0; eventIndex < numberOfEvents; eventIndex++)
 				aggregate.IncrementInt32Value();
 
-			bool saveResult = await store.SaveAsync(
+			var saveResult = await store.SaveAsync(
 				aggregate,
 				CreateOperationContext(),
 				cancellationToken: cancellationToken
 			);
-			await Assert.That(saveResult).IsTrue();
+			await Assert.That(saveResult.IsSuccess).IsTrue();
 		}
 
 		// Act
@@ -850,12 +858,12 @@ public abstract class SnapshotStoreContractTestsBase<TAggregate>
 			for (var eventIndex = 0; eventIndex < numberOfEvents; eventIndex++)
 				aggregate.IncrementInt32Value();
 
-			bool saveResult = await store.SaveAsync(
+			var saveResult = await store.SaveAsync(
 				aggregate,
 				CreateOperationContext(),
 				cancellationToken: cancellationToken
 			);
-			await Assert.That(saveResult).IsTrue();
+			await Assert.That(saveResult.IsSuccess).IsTrue();
 		}
 
 		// Act

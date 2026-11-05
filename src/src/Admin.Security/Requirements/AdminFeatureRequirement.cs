@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
-using Purview.EventSourcing.Admin.Abstractions.Models;
+using Purview.EventSourcing.Admin.Models;
 
 namespace Purview.EventSourcing.Admin.Security.Requirements;
 

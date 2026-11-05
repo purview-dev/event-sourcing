@@ -15,6 +15,11 @@ namespace Purview.EventSourcing.SqlServer.Events;
 public sealed partial class SqlServerEventStoreTransactionIntegrationTests(SqlServerEventStoreFixture fixture)
 {
 	[Test]
+	[SuppressMessage(
+		"Maintainability",
+		"CA1506",
+		Justification = "SQL Server transaction integration scenario intentionally touches the full transaction surface."
+	)]
 	public async Task CommitAsync_GivenEnlistedRawSqlOperation_CommitsAggregateAndRawSqlTogether(
 		CancellationToken cancellationToken
 	)
@@ -49,7 +54,8 @@ public sealed partial class SqlServerEventStoreTransactionIntegrationTests(SqlSe
 		);
 
 		var result = await transaction.CommitAsync(cancellationToken);
-		var savedAggregate = await eventStore.GetAsync(aggregateId, null, cancellationToken);
+		var savedAggregateResult = await eventStore.GetAsync(aggregateId, null, cancellationToken);
+		var savedAggregate = savedAggregateResult.IsSuccess ? savedAggregateResult.Value : null;
 		var rowCount = await GetAuditRowCountAsync(fixture.ConnectionString, tableName, cancellationToken);
 
 		await Assert.That(result.Success).IsTrue();
@@ -59,6 +65,11 @@ public sealed partial class SqlServerEventStoreTransactionIntegrationTests(SqlSe
 	}
 
 	[Test]
+	[SuppressMessage(
+		"Maintainability",
+		"CA1506",
+		Justification = "SQL Server transaction integration scenario intentionally touches the full transaction surface."
+	)]
 	public async Task CommitAsync_GivenEnlistedEfOperation_CommitsAggregateAndEfSaveTogether(
 		CancellationToken cancellationToken
 	)
@@ -85,7 +96,8 @@ public sealed partial class SqlServerEventStoreTransactionIntegrationTests(SqlSe
 		);
 
 		var result = await transaction.CommitAsync(cancellationToken);
-		var savedAggregate = await eventStore.GetAsync(aggregateId, null, cancellationToken);
+		var savedAggregateResult = await eventStore.GetAsync(aggregateId, null, cancellationToken);
+		var savedAggregate = savedAggregateResult.IsSuccess ? savedAggregateResult.Value : null;
 		var rowCount = await GetAuditRowCountAsync(fixture.ConnectionString, tableName, cancellationToken);
 
 		await Assert.That(result.Success).IsTrue();
@@ -135,7 +147,8 @@ public sealed partial class SqlServerEventStoreTransactionIntegrationTests(SqlSe
 		);
 
 		var result = await transaction.CommitAsync(cancellationToken);
-		var savedAggregate = await eventStore.GetAsync(aggregateId, null, cancellationToken);
+		var savedAggregateResult = await eventStore.GetAsync(aggregateId, null, cancellationToken);
+		var savedAggregate = savedAggregateResult.IsSuccess ? savedAggregateResult.Value : null;
 		var rowCount = await GetAuditRowCountAsync(fixture.ConnectionString, tableName, cancellationToken);
 
 		await Assert.That(result.Success).IsFalse();
@@ -146,6 +159,11 @@ public sealed partial class SqlServerEventStoreTransactionIntegrationTests(SqlSe
 	}
 
 	[Test]
+	[SuppressMessage(
+		"Maintainability",
+		"CA1506",
+		Justification = "SQL Server transaction integration scenario intentionally touches the full transaction surface."
+	)]
 	public async Task CommitAsync_GivenMultipleCrossImplementationStoresAndRawSql_CommitsAllInSingleTransaction(
 		CancellationToken cancellationToken
 	)
@@ -187,8 +205,10 @@ public sealed partial class SqlServerEventStoreTransactionIntegrationTests(SqlSe
 		);
 
 		var result = await transaction.CommitAsync(cancellationToken);
-		var savedFirst = await primaryStore.GetAsync(firstAggregateId, null, cancellationToken);
-		var savedSecond = await snapshotStore.GetAsync(secondAggregateId, null, cancellationToken);
+		var savedFirstResult = await primaryStore.GetAsync(firstAggregateId, null, cancellationToken);
+		var savedFirst = savedFirstResult.IsSuccess ? savedFirstResult.Value : null;
+		var savedSecondResult = await snapshotStore.GetAsync(secondAggregateId, null, cancellationToken);
+		var savedSecond = savedSecondResult.IsSuccess ? savedSecondResult.Value : null;
 		var rowCount = await GetAuditRowCountAsync(fixture.ConnectionString, tableName, cancellationToken);
 
 		await Assert.That(result.Success).IsTrue();
@@ -200,6 +220,11 @@ public sealed partial class SqlServerEventStoreTransactionIntegrationTests(SqlSe
 	}
 
 	[Test]
+	[SuppressMessage(
+		"Maintainability",
+		"CA1506",
+		Justification = "SQL Server transaction integration scenario intentionally touches the full transaction surface."
+	)]
 	public async Task CommitAsync_GivenMultipleCrossImplementationStoresAndFailingRawSql_RollsBackAllChanges(
 		CancellationToken cancellationToken
 	)
@@ -242,8 +267,10 @@ public sealed partial class SqlServerEventStoreTransactionIntegrationTests(SqlSe
 		);
 
 		var result = await transaction.CommitAsync(cancellationToken);
-		var savedFirst = await primaryStore.GetAsync(firstAggregateId, null, cancellationToken);
-		var savedSecond = await snapshotStore.GetAsync(secondAggregateId, null, cancellationToken);
+		var savedFirstResult = await primaryStore.GetAsync(firstAggregateId, null, cancellationToken);
+		var savedFirst = savedFirstResult.IsSuccess ? savedFirstResult.Value : null;
+		var savedSecondResult = await snapshotStore.GetAsync(secondAggregateId, null, cancellationToken);
+		var savedSecond = savedSecondResult.IsSuccess ? savedSecondResult.Value : null;
 		var rowCount = await GetAuditRowCountAsync(fixture.ConnectionString, tableName, cancellationToken);
 
 		await Assert.That(result.Success).IsFalse();

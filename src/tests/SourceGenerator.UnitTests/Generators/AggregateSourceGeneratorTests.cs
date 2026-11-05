@@ -24,7 +24,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert
@@ -56,7 +56,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert that 4 attribute files + 1 generated aggregate file
 		await Assert
@@ -82,7 +82,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert
@@ -112,7 +112,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert
@@ -137,7 +137,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert that only attribute files, no generated aggregate
 		await Assert
@@ -167,7 +167,7 @@ namespace Testing
 ";
 
 		var generatorOnlyOptions = EventSourcingGeneratorTestOptions.Default with { AnalyzerTypes = [] };
-		var result = await GenerateAsync(source, generatorOnlyOptions, cancellationToken);
+		using var result = await GenerateAsync(source, generatorOnlyOptions, cancellationToken);
 
 		await Assert
 			.That(result.AllSyntaxTrees.Length)
@@ -196,7 +196,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.AggregateMustBePartial);
 		await Assert
@@ -227,7 +227,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		await Assert
@@ -268,7 +268,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert
 			.That(result)
@@ -307,7 +307,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert
 			.That(result)
@@ -346,7 +346,11 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.ScalarComplexValueMayNotTranslateInSQLSnapshots);
 	}
 
@@ -378,7 +382,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert
 			.That(result)
@@ -420,7 +424,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).DoesNotHaveDiagnostic("EVENTSTORE018");
 		await Assert.That(result).DoesNotHaveDiagnostic("EVENTSTORE019");
@@ -463,7 +467,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert
 			.That(result)
@@ -508,7 +512,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var aggregate = query.GetClass("ReportUploadAggregate", "Testing");
@@ -569,7 +573,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).DoesNotHaveDiagnostic("EVENTSTORE018");
 		await Assert.That(result).DoesNotHaveDiagnostic("EVENTSTORE019");
@@ -607,7 +611,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var aggregate = query.GetClass("ReportUploadAggregate", "Testing");
@@ -644,7 +648,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert that no generator exceptions
 		foreach (var genResult in result.DriverResult.Results)
@@ -683,7 +687,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert that event class uses the default namespace pattern and is a [EventContract] record
 		await Assert.That(result.Generated().HasNamespace("Testing.OrderEvents")).IsTrue();
@@ -712,7 +716,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result.Generated().HasClass("OrderAggregateJsonConverter", "Testing")).IsTrue();
 		await Assert.That(result.Generated().HasClass("OrderAggregateJsonModel", "Testing")).IsTrue();
@@ -751,7 +755,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var orderCreated = query.GetRecord("OrderCreatedEvent", "Testing.OrderEvents");
@@ -782,7 +786,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		// Events are [EventContract] records: equality/hash is compiler-generated, so there is no
@@ -819,7 +823,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var aggregate = query.GetClass("OrderAggregate", "Testing");
@@ -855,7 +859,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var aggregate = query.GetClass("OrderAggregate", "Testing");
@@ -890,7 +894,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var aggregate = query.GetClass("OrderAggregate", "Testing");
@@ -926,7 +930,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var aggregate = query.GetClass("ProfileAggregate", "Testing");
@@ -958,7 +962,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var aggregate = query.GetClass("ProductAggregate", "Testing");
@@ -992,7 +996,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var aggregate = query.GetClass("ProfileAggregate", "Testing");
@@ -1028,7 +1032,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var aggregate = query.GetClass("ProfileAggregate", "Testing");
@@ -1066,7 +1070,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 		var query = result.Generated();
 		var errors = result
 			.CompilationResult.Compilation.GetDiagnostics(cancellationToken)
@@ -1119,7 +1123,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var aggregate = query.GetClass("CustomerAggregate", "Testing");
@@ -1151,7 +1155,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var aggregate = query.GetClass("ToggleAggregate", "Testing");
@@ -1180,7 +1184,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var aggregate = query.GetClass("EmptyAggregate", "Testing");
@@ -1217,7 +1221,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert that both event records exist in the default events namespace
 		await Assert.That(result.Generated().HasRecord("OrderCreatedEvent", "Testing.OrderEvents")).IsTrue();
@@ -1243,7 +1247,7 @@ public partial class NotAnAggregate
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result.DriverResult.GeneratedTrees).Count().IsEqualTo(ExpectedFileCountPlusGen);
 
@@ -1280,7 +1284,11 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result.Generated().HasRecord("NonPartialMethodEvent", "Testing.MixedEvents")).IsFalse();
 		await Assert.That(result).HasDiagnostic("EVENTSTORE007");
@@ -1310,7 +1318,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var interfaceOnlyAggregate = result.Generated().GetClass("InterfaceOnlyAggregate", "Testing");
 		await Assert.That(interfaceOnlyAggregate.Node.BaseList?.ToString()).Contains("AggregateBase");
@@ -1345,7 +1353,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert that the generated partial class uses 'internal' access modifier
 		var internalAggregate = result.Generated().GetClass("InternalAggregate", "Testing");
@@ -1366,7 +1374,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert that attribute files are generated
 		await Assert.That(result.DriverResult.GeneratedTrees).Count().IsEqualTo(ExpectedFileCount);
@@ -1405,7 +1413,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert that no generator exceptions
 		foreach (var genResult in result.DriverResult.Results)
@@ -1440,7 +1448,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 		var generatedSource = result.GetSource();
 
 		// Assert that generated file starts with auto-generated header
@@ -1470,7 +1478,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert that default version is 1
 		var query = result.Generated();
@@ -1503,7 +1511,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert that explicit version 3
 		var query = result.Generated();
@@ -1539,7 +1547,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var orderCreatedSchemaVersion = query
@@ -1576,7 +1584,11 @@ public partial class OrderAggregate : AggregateBase
 }
 ";
 
-		var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.EventSchemaVersionMustBePositive);
 	}
@@ -1605,7 +1617,11 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.DuplicateEventSchemaVersionOnAggregate);
 	}
@@ -1625,7 +1641,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		const string aggregateNamespace = "Purview.EventSourcing.Aggregates";
 		var query = result.Generated();
@@ -1659,7 +1675,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		await Assert.That(query.HasRecord("OrderCreatedEvent", "Testing.OrderEvents")).IsTrue();
@@ -1693,7 +1709,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		await Assert.That(query.HasRecord("OrderCreatedDomainEvent", "Testing.OrderEvents")).IsTrue();
@@ -1729,7 +1745,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		await Assert.That(query.HasRecord("OrderCreatedCustomEvent", "Testing.OrderEvents")).IsTrue();
@@ -1764,7 +1780,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		await Assert.That(query.HasNamespace("Testing.Custom.Events")).IsTrue();
@@ -1799,7 +1815,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		await Assert.That(query.HasNamespace("Testing.Domain.Ordering")).IsTrue();
@@ -1836,7 +1852,11 @@ public partial class NotARealAggregate : Testing.AggregateBase
 }
 ";
 
-		var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic("EVENTSTORE002");
 	}
@@ -1862,7 +1882,11 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic("EVENTSTORE003");
 	}
@@ -1884,7 +1908,11 @@ public partial class GenericAggregate<TValue> : AggregateBase
 }
 ";
 
-		var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic("EVENTSTORE004");
 	}
@@ -1909,7 +1937,11 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic("EVENTSTORE005");
 	}
@@ -1940,7 +1972,11 @@ namespace Testing
 }}
 ";
 
-		var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic("EVENTSTORE011");
 	}
@@ -1965,7 +2001,11 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic("EVENTSTORE008");
 	}
@@ -1990,7 +2030,11 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic("EVENTSTORE008");
 	}
@@ -2019,7 +2063,11 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.DuplicateGeneratedEventName);
 	}
@@ -2042,7 +2090,11 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.EventParameterMustMapToWritableProperty);
 	}
@@ -2067,7 +2119,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.EventParameterMustMapToWritableProperty);
 
@@ -2109,7 +2161,7 @@ public partial class MappingAggregate
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.EventParameterMustMapToWritableProperty);
 
@@ -2152,7 +2204,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var stockReceived = query.GetRecord("StockReceivedEvent", "Testing.MappingEvents");
@@ -2195,7 +2247,11 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic(DiagnosticLibrary.EventParameterMustMapToWritableProperty);
 	}
@@ -2218,7 +2274,11 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).HasDiagnostic("EVENTSTORE010");
 	}
@@ -2255,7 +2315,7 @@ namespace Second
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 		var aggregateTrees = result.PrimarySyntaxTrees;
 
 		await Assert.That(aggregateTrees.Length).IsEqualTo(2);
@@ -2308,7 +2368,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		const string eventsNamespace = "Testing.OrderEvents";
@@ -2360,7 +2420,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var productUpdated = query.GetRecord("ProductUpdatedEvent", "Testing.ProductEvents");
@@ -2407,7 +2467,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert that attribute files + 1 generated aggregate
 		await Assert.That(result.DriverResult.GeneratedTrees).Count().IsEqualTo(ExpectedFileCountPlusGen);
@@ -2450,7 +2510,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result.DriverResult.GeneratedTrees).Count().IsEqualTo(ExpectedFileCountPlusGen);
 
@@ -2485,7 +2545,7 @@ namespace Company.Domain.Orders
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		// Assert that events namespace follows the pattern
@@ -2535,7 +2595,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var aggregate = query.GetClass("CounterAggregate", "Testing");
@@ -2588,7 +2648,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var bioUpdated = query.GetRecord("BioUpdatedEvent", "Testing.ProfileEvents");
@@ -2620,7 +2680,7 @@ public partial class ProfileAggregate
 }
 """;
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		await Assert
@@ -2655,7 +2715,7 @@ public partial class ProfileAggregate
 }
 """;
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 		var cs8777 = result
 			.CompilationResult.Compilation.GetDiagnostics(cancellationToken)
 			.Where(d => d.Id == "CS8777")
@@ -2699,7 +2759,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		// Assert
 		var publicAggregate = result.Generated().GetClass("PublicAggregate", "Testing");
@@ -2730,7 +2790,7 @@ namespace Testing
 ";
 
 		// Act
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		// Assert that command method matches partial declaration
@@ -2760,7 +2820,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var aggregate = query.GetClass("CustomerAggregate", "Testing");
@@ -2815,7 +2875,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var aggregate = query.GetClass("CustomerAggregate", "Testing");
@@ -2886,7 +2946,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(
+		using var result = await GenerateAsync(
 			source,
 			EventSourcingGeneratorTestOptions.Default.Compile(),
 			cancellationToken
@@ -2927,7 +2987,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(
+		using var result = await GenerateAsync(
 			source,
 			EventSourcingGeneratorTestOptions.Default.Compile(),
 			cancellationToken
@@ -2999,7 +3059,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(
+		using var result = await GenerateAsync(
 			source,
 			EventSourcingGeneratorTestOptions.Default.Compile(),
 			cancellationToken
@@ -3045,7 +3105,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(
+		using var result = await GenerateAsync(
 			source,
 			EventSourcingGeneratorTestOptions.Default.Compile(),
 			cancellationToken
@@ -3099,7 +3159,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).HasDiagnostics(DiagnosticLibrary.AggregateMethodShouldBeVerbPhrase.Id, 4);
 		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.UnableToInferEventName);
@@ -3135,7 +3195,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).HasDiagnostics(DiagnosticLibrary.EventNameOverrideShouldBePastTense, 4);
 	}
@@ -3168,7 +3228,11 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.EventNameOverrideShouldBePastTense);
 		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.UnableToInferEventName);
@@ -3197,7 +3261,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 		var warnings = result
 			.DriverResult.Diagnostics.Where(static d => d.Severity == DiagnosticSeverity.Info)
 			.ToArray();
@@ -3226,7 +3290,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.EventParameterNullabilityMismatch);
 	}
@@ -3258,7 +3322,11 @@ public partial class ItemAggregate : AggregateBase
 }}
 ";
 
-		var result = await GenerateAsync(source, EventSourcingGeneratorTestOptions.NoValidation, cancellationToken);
+		using var result = await GenerateAsync(
+			source,
+			EventSourcingGeneratorTestOptions.NoValidation,
+			cancellationToken
+		);
 
 		await Assert
 			.That(result)
@@ -3286,7 +3354,7 @@ public partial class ItemAggregate : AggregateBase
 }}
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert
 			.That(result)
@@ -3319,7 +3387,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.UnsupportedEventMethodSignature);
 
@@ -3369,7 +3437,7 @@ public partial class ManualAggregate
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var aggregate = query.GetClass("ManualAggregate", "Testing");
@@ -3415,7 +3483,7 @@ public sealed partial class ManualCollectionAggregate
 }}
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		var query = result.Generated();
 		var aggregate = query.GetClass("ManualCollectionAggregate", "Testing");
@@ -3447,7 +3515,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.UnsupportedEventMethodSignature);
 
@@ -3487,7 +3555,7 @@ namespace Testing
 }
 ";
 
-		var result = await GenerateAsync(source, cancellationToken);
+		using var result = await GenerateAsync(source, cancellationToken);
 
 		await Assert.That(result).DoesNotHaveDiagnostic(DiagnosticLibrary.UnsupportedEventMethodSignature);
 

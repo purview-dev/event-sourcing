@@ -4,6 +4,7 @@ using MongoDB.Bson.Serialization.Conventions;
 using MongoDB.Bson.Serialization.IdGenerators;
 using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
+using Purview.EventSourcing.Tenancy;
 
 namespace Purview.EventSourcing.MongoDB.StorageClient;
 
@@ -16,6 +17,44 @@ sealed partial class MongoDBClient : IDisposable
 	readonly IMongoDatabase _database;
 
 	readonly string _collectionName;
+
+	readonly ICurrentTenant _currentTenant;
+
+	/// <summary>
+	/// Narrows a filter to the current tenant.
+	/// </summary>
+	/// <remarks>
+	/// Applied by every read and delete rather than by each caller: a query that forgets the tenant is the
+	/// failure this exists to prevent. A document with no recorded owner stays visible, so data written
+	/// before tenancy was configured is still readable.
+	/// </remarks>
+	/// <summary>
+	/// Records the current tenant on a document before it is written.
+	/// </summary>
+	/// <remarks>
+	/// Applied centrally so a new write path cannot omit it; an unstamped document would then be hidden
+	/// from its own tenant by <see cref="Scoped{T}"/>.
+	/// </remarks>
+	T Stamp<T>(T document)
+	{
+		if (document is IEntity entity)
+			entity.TenantId = _currentTenant.Current.TenantId;
+
+		return document;
+	}
+
+	FilterDefinition<T> Scoped<T>(FilterDefinition<T> predicate)
+	{
+		var scope = _currentTenant.Current;
+		if (scope.IsSystem)
+			return predicate;
+
+		FilterDefinitionBuilder<T> builder = new();
+
+		// An unowned document is visible only to the system scope: treating it as visible to every
+		// tenant would turn a missed stamp on any write path into silent cross-tenant exposure.
+		return builder.And(predicate, builder.Eq(nameof(IEntity.TenantId), scope.TenantId));
+	}
 
 	static readonly Lazy<bool> Initialized = new(Init);
 
@@ -74,11 +113,13 @@ sealed partial class MongoDBClient : IDisposable
 		IMongoDBClientTelemetry telemetry,
 		MongoDBConfiguration configuration,
 		string? databaseOverride = null,
-		string? collectionOverride = null
+		string? collectionOverride = null,
+		ICurrentTenant? currentTenant = null
 	)
 	{
 		_telemetry = telemetry;
 		_configuration = configuration;
+		_currentTenant = currentTenant ?? new SystemCurrentTenant();
 
 		var settings = MongoClientSettings.FromConnectionString(configuration.ConnectionString);
 		settings.ApplicationName = configuration.ApplicationName;

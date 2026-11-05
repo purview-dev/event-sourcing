@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text.Json.Serialization;
 using MongoDB.Bson.Serialization.Attributes;
 using Purview.EventSourcing.MongoDB.StorageClient;
@@ -28,6 +28,11 @@ public sealed class EventEntity : IEntity
 	public int EntityType { get; set; } = EntityTypes.EventType;
 
 	/// <summary>
+	/// The tenant that owns the document; null in a single-tenant deployment.
+	/// </summary>
+	public string? TenantId { get; set; }
+
+	/// <summary>
 	/// The identifier of the aggregate the event belongs to.
 	/// </summary>
 	public string AggregateId { get; set; } = default!;
@@ -35,7 +40,7 @@ public sealed class EventEntity : IEntity
 	/// <summary>
 	/// The aggregate version the event was applied at.
 	/// </summary>
-	public int Version { get; set; }
+	public long Version { get; set; }
 
 	/// <summary>
 	/// The serialized event payload.

@@ -1,0 +1,163 @@
+{
+	"Build": {
+		"Solution": "src/EventSourcing.slnx",
+		"TestRoot": "src/tests",
+		"TestPatterns": "*Tests.csproj",
+		"TestProjects": "*UnitTests.csproj",
+		"TestFilter": "/*/*/*/*[Category=Unit]"
+	},
+	"PackValidation": {
+		"RequireSymbolPackage": true,
+		"RequireSymbolFiles": true,
+		"RequiredContent": {
+			"purview.eventsourcing": [
+				"analyzers/dotnet/cs/Purview.EventSourcing.SourceGenerator.CodeFixes.dll",
+				"analyzers/dotnet/cs/Purview.EventSourcing.SourceGenerator.dll",
+				"buildTransitive/Purview.EventSourcing.targets",
+				"lib/$(TFM)/Purview.EventSourcing.dll",
+				"lib/$(TFM)/Purview.EventSourcing.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
+			"purview.eventsourcing.admin.abstractions": [
+				"lib/$(TFM)/Purview.EventSourcing.Admin.Abstractions.dll",
+				"lib/$(TFM)/Purview.EventSourcing.Admin.Abstractions.xml",
+				"README.md",
+				"purview-logo-light.png"
+			],
+			"purview.eventsourcing.admin.api": [
+				"lib/$(TFM)/Purview.EventSourcing.Admin.API.dll",
+				"lib/$(TFM)/Purview.EventSourcing.Admin.API.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
+			"purview.eventsourcing.admin.azurestorage": [
+				"lib/$(TFM)/Purview.EventSourcing.Admin.AzureStorage.dll",
+				"lib/$(TFM)/Purview.EventSourcing.Admin.AzureStorage.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
+			"purview.eventsourcing.admin.client": [
+				"lib/$(TFM)/Purview.EventSourcing.Admin.Client.dll",
+				"lib/$(TFM)/Purview.EventSourcing.Admin.Client.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
+			"purview.eventsourcing.admin.mongodb": [
+				"lib/$(TFM)/Purview.EventSourcing.Admin.MongoDB.dll",
+				"lib/$(TFM)/Purview.EventSourcing.Admin.MongoDB.runtimeconfig.json",
+				"lib/$(TFM)/Purview.EventSourcing.Admin.MongoDB.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
+			"purview.eventsourcing.admin.postgres": [
+				"lib/$(TFM)/Purview.EventSourcing.Admin.Postgres.dll",
+				"lib/$(TFM)/Purview.EventSourcing.Admin.Postgres.runtimeconfig.json",
+				"lib/$(TFM)/Purview.EventSourcing.Admin.Postgres.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
+			"purview.eventsourcing.admin.security": [
+				"lib/$(TFM)/Purview.EventSourcing.Admin.Security.dll",
+				"lib/$(TFM)/Purview.EventSourcing.Admin.Security.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
+			"purview.eventsourcing.admin.site": [
+				"content/**/*",
+				"contentFiles/**/*",
+				"lib/*/Purview.EventSourcing.Admin.Site.dll",
+				"lib/*/Purview.EventSourcing.Admin.Site.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
+			"purview.eventsourcing.admin.sqlserver": [
+				"lib/$(TFM)/Purview.EventSourcing.Admin.SqlServer.dll",
+				"lib/$(TFM)/Purview.EventSourcing.Admin.SqlServer.runtimeconfig.json",
+				"lib/$(TFM)/Purview.EventSourcing.Admin.SqlServer.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
+			"purview.eventsourcing.azurekeyvault": [
+				"lib/$(TFM)/Purview.EventSourcing.AzureKeyVault.dll",
+				"lib/$(TFM)/Purview.EventSourcing.AzureKeyVault.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
+			"purview.eventsourcing.azurestorage": [
+				"lib/$(TFM)/Purview.EventSourcing.AzureStorage.dll",
+				"lib/$(TFM)/Purview.EventSourcing.AzureStorage.xml",
+				"lib/$(TFM)/Purview.EventSourcing.ImplementationShared.dll",
+				"lib/$(TFM)/Purview.EventSourcing.ImplementationShared.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
+			"purview.eventsourcing.cosmosdb": [
+				"lib/$(TFM)/Purview.EventSourcing.CosmosDb.dll",
+				"lib/$(TFM)/Purview.EventSourcing.CosmosDb.xml",
+				"lib/$(TFM)/Purview.EventSourcing.ImplementationShared.dll",
+				"lib/$(TFM)/Purview.EventSourcing.ImplementationShared.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
+			"purview.eventsourcing.entityframeworkcore": [
+				"analyzers/dotnet/cs/Purview.EventSourcing.EntityFrameworkCore.SourceGenerator.dll",
+				"lib/$(TFM)/Purview.EventSourcing.EntityFrameworkCore.dll",
+				"lib/$(TFM)/Purview.EventSourcing.EntityFrameworkCore.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
+			"purview.eventsourcing.inmemory": [
+				"lib/$(TFM)/Purview.EventSourcing.ImplementationShared.dll",
+				"lib/$(TFM)/Purview.EventSourcing.ImplementationShared.xml",
+				"lib/$(TFM)/Purview.EventSourcing.InMemory.dll",
+				"lib/$(TFM)/Purview.EventSourcing.InMemory.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
+			"purview.eventsourcing.mongodb": [
+				"lib/$(TFM)/Purview.EventSourcing.ImplementationShared.dll",
+				"lib/$(TFM)/Purview.EventSourcing.ImplementationShared.xml",
+				"lib/$(TFM)/Purview.EventSourcing.MongoDB.dll",
+				"lib/$(TFM)/Purview.EventSourcing.MongoDB.runtimeconfig.json",
+				"lib/$(TFM)/Purview.EventSourcing.MongoDB.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
+			"purview.eventsourcing.postgres": [
+				"lib/$(TFM)/Purview.EventSourcing.ImplementationShared.dll",
+				"lib/$(TFM)/Purview.EventSourcing.ImplementationShared.xml",
+				"lib/$(TFM)/Purview.EventSourcing.Postgres.dll",
+				"lib/$(TFM)/Purview.EventSourcing.Postgres.runtimeconfig.json",
+				"lib/$(TFM)/Purview.EventSourcing.Postgres.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
+			"purview.eventsourcing.sqlserver": [
+				"lib/$(TFM)/Purview.EventSourcing.ImplementationShared.dll",
+				"lib/$(TFM)/Purview.EventSourcing.ImplementationShared.xml",
+				"lib/$(TFM)/Purview.EventSourcing.SqlServer.dll",
+				"lib/$(TFM)/Purview.EventSourcing.SqlServer.runtimeconfig.json",
+				"lib/$(TFM)/Purview.EventSourcing.SqlServer.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
+			"purview.eventsourcing.validation.fluentvalidation": [
+				"lib/$(TFM)/Purview.EventSourcing.Validation.FluentValidation.dll",
+				"lib/$(TFM)/Purview.EventSourcing.Validation.FluentValidation.xml",
+				"purview-logo-light.png",
+				"README.md"
+			],
+			"purview.eventsourcing.validation.zodsharp": [
+				"buildTransitive/Purview.EventSourcing.Validation.ZodSharp.targets",
+				"lib/$(TFM)/Purview.EventSourcing.Validation.ZodSharp.dll",
+				"lib/$(TFM)/Purview.EventSourcing.Validation.ZodSharp.xml",
+				"purview-logo-light.png",
+				"README.md"
+			]
+		}
+	},
+	"Release": {
+		"Mode": "None"
+	}
+}

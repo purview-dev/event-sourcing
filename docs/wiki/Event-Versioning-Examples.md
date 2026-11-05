@@ -496,7 +496,7 @@ public async Task Replay_WithV1Events_UpcastsToV2AndAppliesCorrectly()
     //    write an OrderCreatedEventV1 payload under the aggregate's stream.
 
     // 3. Load the aggregate (triggers replay with upcasting)
-    var aggregate = await eventStore.GetAsync<OrderAggregate>("123", cancellationToken);
+    var aggregate = (await eventStore.GetAsync<OrderAggregate>("123", cancellationToken)).Value;
 
     // 4. Verify the aggregate state matches the upcast event
     await Assert.That(aggregate.OrderId).IsEqualTo("123");
@@ -514,11 +514,11 @@ public async Task Replay_WithUnknownEventType_ReturnsUnknownEventAndContinues()
     // 1. Seed an event whose persisted type name does not resolve to a registered event type
 
     // 2. Load the aggregate
-    var aggregate = await eventStore.GetAsync<OrderAggregate>("123", cancellationToken);
+    var result = await eventStore.GetAsync<OrderAggregate>("123", cancellationToken);
 
     // 3. Verify replay continues without throwing
-    await Assert.That(aggregate).IsNotNull();
-    await Assert.That(aggregate.SkippedEvents).IsNotEmpty();
+    await Assert.That(result.IsSuccess).IsTrue();
+    await Assert.That(result.Value.SkippedEvents).IsNotEmpty();
 
     // 4. In a real test, you'd have a mixture of known and unknown events
     //    to verify partial replay works correctly

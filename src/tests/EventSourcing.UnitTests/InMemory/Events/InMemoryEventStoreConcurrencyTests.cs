@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
+using Purview.EventSourcing.Failures;
 
 namespace Purview.EventSourcing.InMemory.Events;
 
@@ -36,7 +37,7 @@ public sealed class InMemoryEventStoreConcurrencyTests
 	static EventStoreOperationContext CreateContext() => new() { RequiresValidPrincipalIdentifier = false };
 
 	[Test]
-	public async Task SaveAsync_GivenConflictingAggregateVersion_ThrowsConcurrencyException()
+	public async Task SaveAsync_GivenConflictingAggregateVersion_ReturnsConcurrencyConflict()
 	{
 		// Arrange
 		using var provider = CreateProvider();
@@ -56,10 +57,12 @@ public sealed class InMemoryEventStoreConcurrencyTests
 		TestAggregate staleWriter = new() { Details = { Id = "agg-1" } };
 		staleWriter.Increment(3);
 
-		// Act & Assert
-		await Assert
-			.That(async () => await eventStore.SaveAsync(staleWriter, context))
-			.Throws<Exceptions.ConcurrencyException>();
+		// Act
+		var result = await eventStore.SaveAsync(staleWriter, context);
+
+		// Assert
+		await Assert.That(result.IsFailure).IsTrue();
+		await Assert.That(result.Error is ConcurrencyConflict).IsTrue();
 	}
 
 	[Test]
@@ -78,7 +81,7 @@ public sealed class InMemoryEventStoreConcurrencyTests
 		var result = await eventStore.SaveAsync(aggregate, context);
 
 		// Assert
-		await Assert.That(result.Saved).IsTrue();
+		await Assert.That(result.IsSuccess && result.Value.Written).IsTrue();
 		await Assert.That(aggregate.Details.SavedVersion).IsEqualTo(2);
 	}
 }

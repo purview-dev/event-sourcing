@@ -147,7 +147,7 @@ public sealed class InventoryPageTests(AppHostFixture fixture)
 			return string.Empty;
 
 		var valueStart = html.IndexOf("value=\"", start, StringComparison.Ordinal) + 7;
-		var valueEnd = html.IndexOf('"', valueStart);
+		var valueEnd = html.IndexOf('"', valueStart, StringComparison.Ordinal);
 
 		return html[valueStart..valueEnd];
 	}
@@ -167,7 +167,7 @@ public sealed class InventoryPageTests(AppHostFixture fixture)
 				return string.Empty;
 
 			var valueStart = optionStart + 15;
-			var valueEnd = html.IndexOf('"', valueStart);
+			var valueEnd = html.IndexOf('"', valueStart, StringComparison.Ordinal);
 			if (valueEnd == -1)
 				return string.Empty;
 

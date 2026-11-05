@@ -1,7 +1,9 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using Azure.Data.Tables;
+using Purview.EventSourcing.AzureStorage.Entities;
+using Purview.EventSourcing.Tenancy;
 
 namespace Purview.EventSourcing.AzureStorage.StorageClients.Table;
 
@@ -13,11 +15,49 @@ sealed class AzureTableClient : IAsyncDisposable
 	readonly AzureStorageEventStoreOptions _configuration;
 	readonly string _tableName;
 
+	readonly ICurrentTenant _currentTenant;
+
+	/// <summary>
+	/// Narrows an OData filter to the current tenant.
+	/// </summary>
+	/// <remarks>
+	/// Composed here rather than by each caller: a query that forgets the tenant is the failure this
+	/// exists to prevent. An unowned row is visible only to the system scope: treating it as visible
+	/// to every tenant would turn a missed stamp into silent cross-tenant exposure.
+	/// </remarks>
+	string? ScopedFilter(string? filter)
+	{
+		var scope = _currentTenant.Current;
+		if (scope.IsSystem)
+			return filter;
+
+		var tenantFilter = $"TenantId eq '{scope.TenantId!.Replace("'", "''", StringComparison.Ordinal)}'";
+
+		return string.IsNullOrWhiteSpace(filter) ? tenantFilter : $"({filter}) and {tenantFilter}";
+	}
+
+	void Stamp(ITableEntity? entity)
+	{
+		if (entity is IHasTenant tenanted)
+			tenanted.TenantId = _currentTenant.Current.TenantId;
+	}
+
+	bool IsVisible(ITableEntity? entity) =>
+		_currentTenant.Current.IsSystem
+		|| entity is null
+		|| entity is not IHasTenant tenanted
+		|| string.Equals(tenanted.TenantId, _currentTenant.Current.TenantId, StringComparison.OrdinalIgnoreCase);
+
 	static readonly string[] SelectedColumnsForEntityExistsQuery = [nameof(ITableEntity.PartitionKey)];
 
-	public AzureTableClient(AzureStorageEventStoreOptions configuration, string? tableOverride = null)
+	public AzureTableClient(
+		AzureStorageEventStoreOptions configuration,
+		string? tableOverride = null,
+		ICurrentTenant? currentTenant = null
+	)
 	{
 		_configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+		_currentTenant = currentTenant ?? new SystemCurrentTenant();
 
 		_tableName = tableOverride ?? _configuration.Table;
 		_tableClient = new(InitializeAsync);
@@ -31,6 +71,7 @@ sealed class AzureTableClient : IAsyncDisposable
 		where T : class, ITableEntity, new()
 	{
 		ArgumentNullException.ThrowIfNull(entity, nameof(entity));
+		Stamp(entity);
 
 		var table = await _tableClient.GetValueAsync(cancellationToken);
 		Azure.Response response;
@@ -77,6 +118,11 @@ sealed class AzureTableClient : IAsyncDisposable
 		ArgumentNullException.ThrowIfNull(batchOperation, nameof(batchOperation));
 		if (!batchOperation.Any())
 			throw new InvalidOperationException("No entities in batch.");
+
+		// Stamped once for the whole batch rather than per call site, so a new write path cannot omit
+		// it; an unstamped row would then be hidden from its own tenant by the read filter.
+		foreach (var action in batchOperation.GetActions())
+			Stamp(action.Entity);
 
 		var tableClient = await _tableClient.GetValueAsync(cancellationToken);
 		var sets = batchOperation.GetActions().Chunk(size: MaximumBatchSize);
@@ -126,7 +172,7 @@ sealed class AzureTableClient : IAsyncDisposable
 	{
 		var table = await _tableClient.GetValueAsync(cancellationToken);
 
-		var results = table.QueryAsync<T>(filter, maxPerPage, fields, cancellationToken);
+		var results = table.QueryAsync<T>(ScopedFilter(filter), maxPerPage, fields, cancellationToken);
 		string? continuationToken = null;
 		await foreach (var result in results.AsPages(continuationToken, maxPerPage))
 		{
@@ -168,7 +214,7 @@ sealed class AzureTableClient : IAsyncDisposable
 	{
 		var table = await _tableClient.GetValueAsync(cancellationToken);
 
-		var results = table.QueryAsync<T>(filter, maxPerPage, fields, cancellationToken);
+		var results = table.QueryAsync<T>(ScopedFilter(filter), maxPerPage, fields, cancellationToken);
 		await foreach (var result in results.AsPages(continuationToken, maxPerPage))
 		{
 			return new() { ContinuationToken = result.ContinuationToken, Results = [.. result.Values] };
@@ -202,7 +248,9 @@ sealed class AzureTableClient : IAsyncDisposable
 			);
 			// The foreach is because it's a paged result set.
 			await foreach (var entity in pagedResults)
-				return entity;
+				// A point read is by key, so the tenant cannot be part of the query: another tenant's
+				// row is filtered out here instead.
+				return IsVisible(entity) ? entity : null;
 
 			return null;
 			//return await table.GetEntityAsync<T>(partitionKey, rowKey, fields, cancellationToken);

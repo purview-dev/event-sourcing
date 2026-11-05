@@ -188,7 +188,7 @@ static partial class SqlServerJsonIndexSchemaManager
 	)
 	{
 		var jsonPath = definition.JsonPath?.Trim();
-		if (string.IsNullOrWhiteSpace(jsonPath) || !jsonPath.StartsWith('$'))
+		if (string.IsNullOrWhiteSpace(jsonPath) || !jsonPath.StartsWith('$', StringComparison.Ordinal))
 			errors.Add($"{optionsName}.Indexes[{i}].JsonPath must start with '$'.");
 
 		return jsonPath;

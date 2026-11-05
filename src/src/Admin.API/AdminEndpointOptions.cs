@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
-using Purview.EventSourcing.Admin.Abstractions.Models;
+using Purview.EventSourcing.Admin.Models;
 using Purview.EventSourcing.Admin.Security;
 
 namespace Purview.EventSourcing.Admin.API;

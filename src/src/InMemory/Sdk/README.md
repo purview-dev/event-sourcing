@@ -29,10 +29,10 @@ builder.Services.AddInMemorySnapshotEventStore();
 ## Typical usage
 
 ```csharp
-var order = await store.GetAsync<OrderAggregate>(orderId, cancellationToken);
-if (order is null)
+var orderResult = await store.GetAsync<OrderAggregate>(orderId, cancellationToken);
+if (orderResult.IsFailure)
 {
-    order = await store.CreateAsync<OrderAggregate>(orderId, cancellationToken);
+    var order = await store.CreateAsync<OrderAggregate>(orderId, cancellationToken);
     order.CreateOrder(customerId);
     await store.SaveAsync(order, cancellationToken);
 }

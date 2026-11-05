@@ -1,6 +1,8 @@
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Test;
+using Purview.EventSourcing.Failures;
 using Purview.EventSourcing.Internal;
+using Purview.Results;
 
 namespace Purview.EventSourcing.SqlServer.Events;
 
@@ -48,46 +50,43 @@ public sealed class SqlServerEventStoreTransactionTests
 			CancellationToken cancellationToken = default
 		) => throw new NotSupportedException();
 
-		public Task<TestAggregate?> GetOrCreateAsync(
+		public Task<Result<TestAggregate, AggregateReadFailure>> GetOrCreateAsync(
 			string? aggregateId,
 			EventStoreOperationContext? operationContext,
 			CancellationToken cancellationToken = default
 		) => throw new NotSupportedException();
 
-		public Task<TestAggregate?> GetAsync(
+		public Task<Result<TestAggregate, AggregateReadFailure>> GetAsync(
 			string aggregateId,
 			EventStoreOperationContext? operationContext,
 			CancellationToken cancellationToken = default
 		) => throw new NotSupportedException();
 
-		public Task<TestAggregate?> GetAtAsync(
+		public Task<Result<TestAggregate, AggregateReadFailure>> GetAtAsync(
 			string aggregateId,
-			int version,
+			long version,
 			EventStoreOperationContext? operationContext,
 			CancellationToken cancellationToken = default
 		) => throw new NotSupportedException();
 
-		public Task<SaveResult<TestAggregate>> SaveAsync(
+		public Task<Result<SaveOutcome<TestAggregate>, AggregateSaveFailure>> SaveAsync(
 			TestAggregate aggregate,
 			EventStoreOperationContext? operationContext,
 			CancellationToken cancellationToken = default
 		) => throw new NotSupportedException();
 
-		public Task<bool> IsDeletedAsync(string aggregateId, CancellationToken cancellationToken = default) =>
-			throw new NotSupportedException();
-
-		public Task<TestAggregate?> GetDeletedAsync(
+		public Task<Result<TestAggregate, AggregateReadFailure>> GetDeletedAsync(
 			string aggregateId,
 			CancellationToken cancellationToken = default
 		) => throw new NotSupportedException();
 
-		public Task<bool> DeleteAsync(
+		public Task<Result<SaveOutcome<TestAggregate>, AggregateDeleteFailure>> DeleteAsync(
 			TestAggregate aggregate,
 			EventStoreOperationContext? operationContext,
 			CancellationToken cancellationToken = default
 		) => throw new NotSupportedException();
 
-		public Task<bool> RestoreAsync(
+		public Task<Result<SaveOutcome<TestAggregate>, AggregateRestoreFailure>> RestoreAsync(
 			TestAggregate aggregate,
 			EventStoreOperationContext? operationContext,
 			CancellationToken cancellationToken = default
@@ -102,15 +101,17 @@ public sealed class SqlServerEventStoreTransactionTests
 			yield break;
 		}
 
-		public Task<ExistsState> ExistsAsync(string aggregateId, CancellationToken cancellationToken = default) =>
-			throw new NotSupportedException();
+		public Task<AggregateExistence> ExistsAsync(
+			string aggregateId,
+			CancellationToken cancellationToken = default
+		) => throw new NotSupportedException();
 
 		public TestAggregate FulfilRequirements(TestAggregate aggregate) => aggregate;
 
 		public IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync(
 			string aggregateId,
-			int versionFrom,
-			int? versionTo,
+			long versionFrom,
+			long? versionTo,
 			CancellationToken cancellationToken = default
 		) => throw new NotSupportedException();
 

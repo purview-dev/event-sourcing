@@ -36,8 +36,10 @@ public sealed class CartCheckoutServiceTests(AppHostFixture fixture)
 		await Assert.That(result.Succeeded).IsTrue();
 		await Assert.That(result.Order).IsNotNull();
 
-		var savedOrder = await orderStore.GetAsync<OrderAggregate>(result.Order!.Id(), cancellationToken);
-		var savedInventory = await inventoryStore.GetAsync<InventoryAggregate>(inventory.Id(), cancellationToken);
+		var savedOrderResult = await orderStore.GetAsync<OrderAggregate>(result.Order!.Id(), cancellationToken);
+		var savedOrder = savedOrderResult.IsSuccess ? savedOrderResult.Value : null;
+		var savedInventoryResult = await inventoryStore.GetAsync<InventoryAggregate>(inventory.Id(), cancellationToken);
+		var savedInventory = savedInventoryResult.IsSuccess ? savedInventoryResult.Value : null;
 		var orderCount = await orderStore.CountAsync<OrderAggregate>(
 			order => order.CustomerId == customer.Id(),
 			cancellationToken
@@ -74,10 +76,11 @@ public sealed class CartCheckoutServiceTests(AppHostFixture fixture)
 				{
 					await using var hookScope = serviceProvider.CreateAsyncScope();
 					var inventoryStore = hookScope.ServiceProvider.GetRequiredService<IQueryableEventStore>();
-					var inventory = await inventoryStore.GetAsync<InventoryAggregate>(
+					var inventoryResult = await inventoryStore.GetAsync<InventoryAggregate>(
 						inventoryId,
 						hookCancellationToken
 					);
+					var inventory = inventoryResult.IsSuccess ? inventoryResult.Value : null;
 
 					inventory!.ReserveStock(3, "concurrent-order");
 					await inventoryStore.SaveAsync(inventory, hookCancellationToken);
@@ -107,7 +110,8 @@ public sealed class CartCheckoutServiceTests(AppHostFixture fixture)
 			order => order.CustomerId == customer.Id(),
 			cancellationToken
 		);
-		var savedInventory = await inventoryStore.GetAsync<InventoryAggregate>(inventory.Id(), cancellationToken);
+		var savedInventoryResult = await inventoryStore.GetAsync<InventoryAggregate>(inventory.Id(), cancellationToken);
+		var savedInventory = savedInventoryResult.IsSuccess ? savedInventoryResult.Value : null;
 
 		await Assert.That(result.Succeeded).IsFalse();
 		await Assert.That(result.ErrorMessage).Contains("Nothing was saved");
@@ -135,7 +139,7 @@ public sealed class CartCheckoutServiceTests(AppHostFixture fixture)
 		customer.RegisterCustomer($"Cart Test {Guid.NewGuid():N}", $"{Guid.NewGuid():N}@example.com");
 
 		var result = await customerStore.SaveAsync(customer, cancellationToken);
-		return result.Aggregate;
+		return result.Value.Aggregate;
 	}
 
 	static async Task<InventoryAggregate> CreateInventoryAsync(
@@ -154,7 +158,7 @@ public sealed class CartCheckoutServiceTests(AppHostFixture fixture)
 		);
 
 		var result = await inventoryStore.SaveAsync(inventory, cancellationToken);
-		return result.Aggregate;
+		return result.Value.Aggregate;
 	}
 
 	sealed class HookedTransactionFactory(

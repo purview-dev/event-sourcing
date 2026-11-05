@@ -1,4 +1,4 @@
-using Purview.EventSourcing.EntityFrameworkCore.SourceGenerator.Heleprs;
+using Purview.EventSourcing.EntityFrameworkCore.SourceGenerator.Helpers;
 
 namespace Purview.EventSourcing.EntityFrameworkCore.SourceGenerator;
 

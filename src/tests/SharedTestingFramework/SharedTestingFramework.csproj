@@ -19,11 +19,17 @@
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Extensions.Hosting" />
 		<PackageReference Include="Newtonsoft.Json" />
-		<PackageReference Include="Testcontainers.Azurite" />
-		<PackageReference Include="Testcontainers.CosmosDb" />
-		<PackageReference Include="Testcontainers.MongoDb" />
-		<PackageReference Include="Testcontainers.MsSql" />
-		<PackageReference Include="Testcontainers.PostgreSql" />
+		<!--
+			Purview.Containers is the umbrella: Core plus both backends, so WSL Containers is used on a
+			Windows host and Docker everywhere else. This project targets a platform-neutral framework,
+			which binds the
+			portable WSL facade and needs no further configuration. MongoDB and the Cosmos DB emulator
+			have no service module, so they are built from the generic ContainerBuilder.
+		-->
+		<PackageReference Include="Purview.Containers" />
+		<PackageReference Include="Purview.Containers.Azurite" />
+		<PackageReference Include="Purview.Containers.MsSql" />
+		<PackageReference Include="Purview.Containers.PostgreSql" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -143,7 +143,7 @@ public sealed class CustomerPageTests(AppHostFixture fixture)
 			return string.Empty;
 
 		var valueStart = html.IndexOf("value=\"", start, StringComparison.Ordinal) + 7;
-		var valueEnd = html.IndexOf('"', valueStart);
+		var valueEnd = html.IndexOf('"', valueStart, StringComparison.Ordinal);
 
 		return html[valueStart..valueEnd];
 	}
@@ -157,8 +157,7 @@ public sealed class CustomerPageTests(AppHostFixture fixture)
 			customer.RegisterCustomer($"{prefix}-customer-{i:D2}", $"{prefix}-{i:D2}@example.com");
 			var result = await store.SaveAsync(customer, cancellationToken);
 
-			await Assert.That(result).IsNotNull();
-			await Assert.That(result.IsValid).IsTrue().Because(result.ValidationResult.ToString()!);
+			await Assert.That(result.IsSuccess).IsTrue().Because(result.IsFailure ? $"{result.Error}" : string.Empty);
 		}
 
 		var totalCount = await store.CountAsync<CustomerAggregate>(cancellationToken);

@@ -123,20 +123,24 @@ public sealed class SeedDataService(IQueryableEventStore store) : ISeedDataServi
 		"77 Church Lane, Liverpool, L1 1AA",
 	];
 
-	public async Task SeedAsync(CancellationToken cancellationToken = default)
+	public async Task<bool> SeedAsync(CancellationToken cancellationToken = default)
 	{
-		await EnsureLocationsAsync(cancellationToken);
+		if (!await EnsureLocationsAsync(cancellationToken))
+			return false;
 
 		var customerCount = await store.CountAsync<CustomerAggregate>(null, cancellationToken);
 		if (customerCount > 0)
-			return;
+			return true;
 
 		var customerIds = await SeedCustomersAsync(cancellationToken);
+		if (customerIds is null)
+			return false;
+
 		var inventoryIds = await SeedInventoryAsync(cancellationToken);
-		await SeedOrdersAsync(customerIds, inventoryIds, cancellationToken);
+		return inventoryIds is not null && await SeedOrdersAsync(customerIds, inventoryIds, cancellationToken);
 	}
 
-	async Task EnsureLocationsAsync(CancellationToken cancellationToken)
+	async Task<bool> EnsureLocationsAsync(CancellationToken cancellationToken)
 	{
 		HashSet<string> existingLocationIds = new(StringComparer.OrdinalIgnoreCase);
 		await foreach (
@@ -165,11 +169,16 @@ public sealed class SeedDataService(IQueryableEventStore store) : ISeedDataServi
 
 			var location = await store.CreateAsync<LocationAggregate>(locationId, cancellationToken);
 			location.Create(locationId, locationName);
-			await store.SaveAsync(location, cancellationToken);
+
+			// Another instance seeding the same demo store wins the race; the caller retries.
+			if ((await store.SaveAsync(location, cancellationToken)).IsFailure)
+				return false;
 		}
+
+		return true;
 	}
 
-	async Task<string[]> SeedCustomersAsync(CancellationToken cancellationToken)
+	async Task<string[]?> SeedCustomersAsync(CancellationToken cancellationToken)
 	{
 		List<string> ids = [];
 		var phones = new[] { "+44 7700 900000", "+44 7700 900001", null, "+44 7700 900002", null };
@@ -191,13 +200,16 @@ public sealed class SeedDataService(IQueryableEventStore store) : ISeedDataServi
 				customer.Deactivate();
 
 			var result = await store.SaveAsync(customer, cancellationToken);
-			ids.Add(result.Aggregate.Id());
+			if (result.IsFailure)
+				return null;
+
+			ids.Add(result.Value.Aggregate.Id());
 		}
 
 		return [.. ids];
 	}
 
-	async Task<(string AggregateId, int Index)[]> SeedInventoryAsync(CancellationToken cancellationToken)
+	async Task<(string AggregateId, int Index)[]?> SeedInventoryAsync(CancellationToken cancellationToken)
 	{
 		List<(string, int)> ids = [];
 
@@ -210,13 +222,16 @@ public sealed class SeedDataService(IQueryableEventStore store) : ISeedDataServi
 			item.Create(productId, productName, locationId, locationName, initialQty);
 
 			var result = await store.SaveAsync(item, cancellationToken);
-			ids.Add((result.Aggregate.Id(), i));
+			if (result.IsFailure)
+				return null;
+
+			ids.Add((result.Value.Aggregate.Id(), i));
 		}
 
 		return [.. ids];
 	}
 
-	async Task SeedOrdersAsync(
+	async Task<bool> SeedOrdersAsync(
 		string[] customerIds,
 		(string AggregateId, int Index)[] inventoryItems,
 		CancellationToken cancellationToken
@@ -260,7 +275,10 @@ public sealed class SeedDataService(IQueryableEventStore store) : ISeedDataServi
 				await store.SaveAsync(cancelled, cancellationToken);
 			}
 
-			await store.SaveAsync(order, cancellationToken);
+			if ((await store.SaveAsync(order, cancellationToken)).IsFailure)
+				return false;
 		}
+
+		return true;
 	}
 }

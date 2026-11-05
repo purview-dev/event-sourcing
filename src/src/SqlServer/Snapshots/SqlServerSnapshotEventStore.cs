@@ -1,9 +1,10 @@
-﻿using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Options;
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Snapshotting;
 using Purview.EventSourcing.Internal;
 using Purview.EventSourcing.SqlServer.Client;
 using Purview.EventSourcing.SqlServer.Snapshots;
+using Purview.EventSourcing.Tenancy;
 
 namespace Purview.EventSourcing.SqlServer.Snapshot;
 
@@ -42,6 +43,7 @@ public sealed partial class SqlServerSnapshotEventStore<T>
 	/// <param name="telemetry">The telemetry contract used to emit activities, metrics, and logs.</param>
 	/// <param name="snapshotStrategy">Optional strategy that decides when an aggregate should be snapshotted; defaults to <see cref="AlwaysSnapshotStrategy{T}"/>.</param>
 	/// <param name="snapshotStrategySelector">Optional selector used to resolve a snapshot strategy for a given aggregate.</param>
+	/// <param name="currentTenant">Optional tenant scope applied to snapshot reads and writes.</param>
 	/// <exception cref="ArgumentNullException">
 	/// <paramref name="eventStore"/>, <paramref name="sqlServerEventStoreOptions"/>, or <paramref name="telemetry"/> is <see langword="null"/>.
 	/// </exception>
@@ -51,7 +53,8 @@ public sealed partial class SqlServerSnapshotEventStore<T>
 		IOptions<SqlServerSnapshotEventStoreOptions> sqlServerEventStoreOptions,
 		ISqlServerSnapshotEventStoreTelemetry telemetry,
 		ISnapshotStrategy<T>? snapshotStrategy = null,
-		ISnapshotStrategySelector? snapshotStrategySelector = null
+		ISnapshotStrategySelector? snapshotStrategySelector = null,
+		ICurrentTenant? currentTenant = null
 	)
 	{
 		_eventStore = eventStore;
@@ -63,7 +66,7 @@ public sealed partial class SqlServerSnapshotEventStore<T>
 		_aggregateName = TypeNameHelper.GetName(_aggregateType, "Aggregate");
 
 		var clientOptions = ResolveClientOptions(_sqlServerEventStoreOptions.Value, _aggregateName);
-		_sqlServerClient = new(clientOptions);
+		_sqlServerClient = new(clientOptions, currentTenant);
 	}
 
 	/// <summary>

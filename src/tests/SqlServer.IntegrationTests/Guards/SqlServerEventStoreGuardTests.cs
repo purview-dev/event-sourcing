@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Persistence;
 using Purview.EventSourcing.Aggregates.Persistence.Events;
 using Purview.EventSourcing.Fixtures.SqlServer;
@@ -30,15 +32,13 @@ public sealed class SqlServerEventStoreGuardTests(SqlServerEventStoreFixture fix
 
 		await eventStore.SaveAsync(aggregate, cancellationToken);
 
-		var aggregateResult =
-			await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken)
-			?? throw new NullReferenceException();
+		var aggregateResult = (await eventStore.GetAsync(aggregateId, cancellationToken: cancellationToken)).Value;
 
 		// Act
 		var result = await eventStore.DeleteAsync(aggregateResult, cancellationToken: cancellationToken);
 
 		// Assert
-		await Assert.That(result).IsTrue();
+		await Assert.That(result.IsSuccess).IsTrue();
 
 		cache.RemoveAsync(cacheKey, Any<CancellationToken>()).WasCalled(Times.Once);
 	}
@@ -65,13 +65,13 @@ public sealed class SqlServerEventStoreGuardTests(SqlServerEventStoreFixture fix
 		);
 
 		// Assert
-		await Assert.That(result).IsTrue();
+		await Assert.That(result.IsSuccess).IsTrue();
 		await Assert.That(aggregate.Details.IsDeleted).IsTrue();
 		await Assert.That(aggregate.Details.Locked).IsTrue();
 
 		// Verify all data was removed.
 		var exists = await eventStore.ExistsAsync(aggregateId, cancellationToken: cancellationToken);
-		await Assert.That(exists.Status).IsEqualTo(ExistsStatus.DoesNotExist);
+		await Assert.That(exists.Status).IsEqualTo(ExistenceStatus.DoesNotExist);
 	}
 
 	[Test]
@@ -88,16 +88,22 @@ public sealed class SqlServerEventStoreGuardTests(SqlServerEventStoreFixture fix
 		var telemetry = ctx.Telemetry;
 
 		// Act
-		bool result = await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
+		var result = await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
 		// Assert
-		await Assert.That(result).IsFalse();
+		await Assert.That(result.IsSuccess).IsTrue();
+		await Assert.That(result.Value.Kind).IsEqualTo(SaveOutcomeKind.NoChanges);
 
 		telemetry.SaveContainedNoChanges(aggregateId, Any<string>(), Any<string>()).WasCalled(Times.Once);
 	}
 
 	[Test]
 	[MethodDataSource(nameof(OldEventCountTestData))]
+	[SuppressMessage(
+		"Maintainability",
+		"CA1506:Avoid excessive class coupling",
+		Justification = "Test wiring: the store, its infrastructure and the result model are all named here."
+	)]
 	public async Task GetAsync_GivenAnAggregateWithNonRegisteredEventType_TelemetryLogsCannotApplyEvent(
 		int eventsToCreate,
 		int numberOfOldEventsToCreate,
@@ -117,11 +123,12 @@ public sealed class SqlServerEventStoreGuardTests(SqlServerEventStoreFixture fix
 		// Act
 		await eventStore.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
-		var result = await eventStore.GetAsync(
+		var resultResult = await eventStore.GetAsync(
 			aggregateId,
 			new EventStoreOperationContext { SkipSnapshot = true },
 			cancellationToken: cancellationToken
 		);
+		var result = resultResult.IsSuccess ? resultResult.Value : null;
 
 		// Assert
 		telemetry
@@ -131,7 +138,7 @@ public sealed class SqlServerEventStoreGuardTests(SqlServerEventStoreFixture fix
 				Any<string>(),
 				Any<string>(),
 				Is<string>(eventType => eventType!.Contains(nameof(OldEvent), StringComparison.Ordinal)),
-				Any<int>()
+				Any<long>()
 			)
 			.WasCalled(Times.Exactly(numberOfOldEventsToCreate));
 
@@ -141,6 +148,11 @@ public sealed class SqlServerEventStoreGuardTests(SqlServerEventStoreFixture fix
 
 	[Test]
 	[MethodDataSource(nameof(OldEventCountTestData))]
+	[SuppressMessage(
+		"Maintainability",
+		"CA1506:Avoid excessive class coupling",
+		Justification = "Test wiring: the store, its infrastructure and the result model are all named here."
+	)]
 	public async Task GetAsync_GivenAnAggregateWithUnknownEventType_TelemetryLogsSkippedUnknownEvent(
 		int eventsToCreate,
 		int numberOfOldEventsToCreate,
@@ -189,15 +201,16 @@ public sealed class SqlServerEventStoreGuardTests(SqlServerEventStoreFixture fix
 			);
 		}
 
-		var result = await eventStore.GetAsync(
+		var resultResult = await eventStore.GetAsync(
 			aggregateId,
 			new EventStoreOperationContext { SkipSnapshot = true },
 			cancellationToken: cancellationToken
 		);
+		var result = resultResult.IsSuccess ? resultResult.Value : null;
 
 		// Assert
 		telemetry
-			.SkippedUnknownEvent(aggregateId, Any<string>(), Any<string>(), unknownEventType, Any<int>())
+			.SkippedUnknownEvent(aggregateId, Any<string>(), Any<string>(), unknownEventType, Any<long>())
 			.WasCalled(Times.Exactly(numberOfOldEventsToCreate));
 
 		await Assert.That(result).IsNotNull();

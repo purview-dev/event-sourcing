@@ -1,6 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
-using Purview.EventSourcing.Admin.Abstractions.Models;
+using Purview.EventSourcing.Admin.Models;
 using Purview.EventSourcing.Admin.Security.Requirements;
 
 namespace Microsoft.AspNetCore.Authorization;

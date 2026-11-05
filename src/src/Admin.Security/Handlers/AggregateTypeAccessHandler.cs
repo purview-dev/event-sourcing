@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Authorization;
-using Purview.EventSourcing.Admin.Abstractions.Services;
 using Purview.EventSourcing.Admin.Security.Requirements;
+using Purview.EventSourcing.Admin.Services;
 
 namespace Purview.EventSourcing.Admin.Security.Handlers;
 

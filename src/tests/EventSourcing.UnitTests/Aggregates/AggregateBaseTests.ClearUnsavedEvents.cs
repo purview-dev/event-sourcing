@@ -1,4 +1,4 @@
-﻿namespace Purview.EventSourcing.Aggregates;
+namespace Purview.EventSourcing.Aggregates;
 
 partial class AggregateBaseTests
 {

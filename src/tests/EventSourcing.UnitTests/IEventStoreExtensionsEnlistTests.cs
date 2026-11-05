@@ -1,6 +1,5 @@
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Test;
-using ValidationResult = Purview.EventSourcing.Validation.ValidationResult;
 
 namespace Purview.EventSourcing;
 
@@ -27,7 +26,7 @@ public sealed class IEventStoreExtensionsEnlistTests
 		var eventStore = IEventStore.Mock();
 		eventStore
 			.SaveAsync(Any<TestAggregate>(), Any<EventStoreOperationContext?>(), Any<CancellationToken>())
-			.Returns(new SaveResult<TestAggregate>(aggregate, new ValidationResult(), true, false));
+			.Returns(new SaveOutcome<TestAggregate>(aggregate, SaveOutcomeKind.Written));
 
 		// Act
 		await using var transaction = eventStore.Enlist(aggregate);
@@ -54,7 +53,7 @@ public sealed class IEventStoreExtensionsEnlistTests
 		var eventStore = IEventStore.Mock();
 		eventStore
 			.SaveAsync(Any<TestAggregate>(), Any<EventStoreOperationContext?>(), Any<CancellationToken>())
-			.Returns(static (a, _, _) => new SaveResult<TestAggregate>(a, new ValidationResult(), true, false));
+			.Returns(static (a, _, _) => new SaveOutcome<TestAggregate>(a, SaveOutcomeKind.Written));
 
 		// Act
 		await using var transaction = eventStore.Enlist(agg1, agg2);
@@ -82,7 +81,7 @@ public sealed class IEventStoreExtensionsEnlistTests
 		var eventStore = IEventStore.Mock();
 		eventStore
 			.SaveAsync(Any<TestAggregate>(), Any<EventStoreOperationContext?>(), Any<CancellationToken>())
-			.Returns(new SaveResult<TestAggregate>(aggregate, new ValidationResult(), true, false));
+			.Returns(new SaveOutcome<TestAggregate>(aggregate, SaveOutcomeKind.Written));
 
 		// Act
 		await using var transaction = eventStore.Enlist(correlationId, aggregate);
@@ -136,7 +135,7 @@ public sealed class IEventStoreExtensionsEnlistTests
 		var eventStore = IEventStore.Mock();
 		eventStore
 			.SaveAsync(Any<TestAggregate>(), Any<EventStoreOperationContext?>(), Any<CancellationToken>())
-			.Returns(new SaveResult<TestAggregate>(aggregate, new ValidationResult(), true, false));
+			.Returns(new SaveOutcome<TestAggregate>(aggregate, SaveOutcomeKind.Written));
 
 		// Act
 		await using var transaction = eventStore.Enlist(context, aggregate);
@@ -226,7 +225,7 @@ public sealed class IEventStoreExtensionsEnlistTests
 		var eventStore = IEventStore.Mock();
 		eventStore
 			.SaveAsync(Any<TestAggregate>(), Any<EventStoreOperationContext?>(), Any<CancellationToken>())
-			.Returns(static (a, _, _) => new SaveResult<TestAggregate>(a, new ValidationResult(), true, false));
+			.Returns(static (a, _, _) => new SaveOutcome<TestAggregate>(a, SaveOutcomeKind.Written));
 
 		// Act
 		await using var transaction = eventStore.Enlist(context, agg1, agg2);

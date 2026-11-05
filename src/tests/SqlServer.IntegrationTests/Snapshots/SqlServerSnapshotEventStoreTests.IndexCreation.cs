@@ -38,7 +38,7 @@ partial class SQLServerSnapshotEventStoreTests
 
 		var saved = await store.SaveAsync(aggregate, cancellationToken: cancellationToken);
 
-		await Assert.That(saved.Saved).IsTrue();
+		await Assert.That(saved.IsSuccess && saved.Value.Written).IsTrue();
 		await Assert
 			.That(await ColumnExistsAsync(fixture.ConnectionString, tableName, computedColumnName, cancellationToken))
 			.IsTrue();

@@ -18,9 +18,11 @@ public sealed class CartCheckoutService(IEventStoreTransactionFactory transactio
 		if (items == null || items.Count == 0)
 			return CartCheckoutResult.Fail("Cart is empty.");
 
-		var customer = await store.GetAsync<CustomerAggregate>(customerId, cancellationToken);
-		if (customer is null || customer.Details.IsDeleted)
+		var customerResult = await store.GetAsync<CustomerAggregate>(customerId, cancellationToken);
+		if (customerResult.IsFailure)
 			return CartCheckoutResult.Fail("Customer not found.");
+
+		var customer = customerResult.Value;
 		if (!customer.IsActive)
 			return CartCheckoutResult.Fail($"Customer '{customer.Name}' is not active.");
 
@@ -29,11 +31,11 @@ public sealed class CartCheckoutService(IEventStoreTransactionFactory transactio
 		{
 			if (!inventoryReservations.TryGetValue(item.InventoryId, out var reservation))
 			{
-				var inventory = await store.GetAsync<InventoryAggregate>(item.InventoryId, cancellationToken);
-				if (inventory is null || inventory.Details.IsDeleted)
+				var inventoryResult = await store.GetAsync<InventoryAggregate>(item.InventoryId, cancellationToken);
+				if (inventoryResult.IsFailure)
 					return CartCheckoutResult.Fail($"Product '{item.ProductName}' is no longer available.");
 
-				reservation = new InventoryReservation(inventory);
+				reservation = new InventoryReservation(inventoryResult.Value);
 				inventoryReservations.Add(item.InventoryId, reservation);
 			}
 

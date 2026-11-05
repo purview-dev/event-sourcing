@@ -37,12 +37,12 @@ partial class MongoDBClient
 								case TransactionActionType.Insert:
 									await collection.InsertOneAsync(
 										session,
-										op.Document.ToBsonDocument(),
+										Stamp(op.Document).ToBsonDocument(),
 										cancellationToken: cancellationToken
 									);
 									break;
 								case TransactionActionType.Update:
-									var d = op.Document.ToBsonDocument();
+									var d = Stamp(op.Document).ToBsonDocument();
 									d.Remove("_id");
 
 									await collection.ReplaceOneAsync(
@@ -145,7 +145,7 @@ partial class MongoDBClient
 		}
 	}
 
-	static async Task SubmitBatchWithoutTransactionAsync(
+	async Task SubmitBatchWithoutTransactionAsync(
 		IMongoCollection<BsonDocument> collection,
 		IEnumerable<TableTransactionAction> actions,
 		CancellationToken cancellationToken
@@ -157,10 +157,13 @@ partial class MongoDBClient
 			switch (op.ActionType)
 			{
 				case TransactionActionType.Insert:
-					await collection.InsertOneAsync(op.Document.ToBsonDocument(), cancellationToken: cancellationToken);
+					await collection.InsertOneAsync(
+						Stamp(op.Document).ToBsonDocument(),
+						cancellationToken: cancellationToken
+					);
 					break;
 				case TransactionActionType.Update:
-					var d = op.Document.ToBsonDocument();
+					var d = Stamp(op.Document).ToBsonDocument();
 					d.Remove("_id");
 					await collection.ReplaceOneAsync(
 						m => m["_id"] == op.Document.Id,
@@ -184,7 +187,11 @@ partial class MongoDBClient
 		where T : class
 	{
 		var collection = GetCollection<T>();
-		var findResult = await collection.FindAsync(predicate, new FindOptions<T, T> { Limit = 1 }, cancellationToken);
+		var findResult = await collection.FindAsync(
+			Scoped(predicate),
+			new FindOptions<T, T> { Limit = 1 },
+			cancellationToken
+		);
 
 		return await findResult.SingleOrDefaultAsync(cancellationToken);
 	}
@@ -201,7 +208,7 @@ partial class MongoDBClient
 		var collection = GetCollection<T>();
 
 		var result = await collection.FindAsync<T>(
-			predicate,
+			Scoped<T>(predicate),
 			options: new() { Limit = 1 },
 			cancellationToken: cancellationToken
 		);
@@ -224,7 +231,7 @@ partial class MongoDBClient
 		var collection = GetCollection<T>();
 		var result = await collection.ReplaceOneAsync(
 			predicate,
-			document,
+			Stamp(document),
 			new ReplaceOptions { IsUpsert = true, BypassDocumentValidation = true },
 			cancellationToken
 		);
@@ -242,7 +249,7 @@ partial class MongoDBClient
 
 		var result = await collection.ReplaceOneAsync(
 			predicate,
-			document,
+			Stamp(document),
 			new ReplaceOptions { IsUpsert = true },
 			cancellationToken
 		);
@@ -273,7 +280,26 @@ partial class MongoDBClient
 	{
 		var collection = GetCollection<T>();
 
-		await collection.DeleteOneAsync(predicate, cancellationToken);
+		await collection.DeleteOneAsync(Scoped<T>(predicate), cancellationToken);
+	}
+
+	/// <summary>
+	/// Deletes every matching document, returning how many were removed.
+	/// </summary>
+	/// <remarks>
+	/// Scoped like every other read and write, so a tenant removes only its own documents and the
+	/// system scope removes them all.
+	/// </remarks>
+	public async Task<int> DeleteManyAsync<T>(
+		FilterDefinition<T> predicate,
+		CancellationToken cancellationToken = default
+	)
+		where T : class
+	{
+		var collection = GetCollection<T>();
+		var result = await collection.DeleteManyAsync(Scoped<T>(predicate), cancellationToken);
+
+		return (int)result.DeletedCount;
 	}
 
 	public async Task DeleteAsync<T>(FilterDefinition<T> predicate, CancellationToken cancellationToken = default)
@@ -281,7 +307,7 @@ partial class MongoDBClient
 	{
 		var collection = GetCollection<T>();
 
-		await collection.DeleteOneAsync(predicate, cancellationToken);
+		await collection.DeleteOneAsync(Scoped<T>(predicate), cancellationToken);
 	}
 
 	public async Task DeleteManyAsync<T>(
@@ -291,7 +317,11 @@ partial class MongoDBClient
 		where T : class
 	{
 		var collection = GetCollection<T>();
-		await collection.DeleteManyAsync(predicate, cancellationToken);
+
+		// Scoped, like every other operation on this client. It was not, which made it a delete that
+		// crossed tenants - unused so far, but sitting next to a scoped overload of the same name is
+		// exactly how the wrong one gets picked.
+		await collection.DeleteManyAsync(Scoped<T>(predicate), cancellationToken);
 	}
 
 	public async Task DeleteDatabaseAsync(CancellationToken cancellationToken = default) =>

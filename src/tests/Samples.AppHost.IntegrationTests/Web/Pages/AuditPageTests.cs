@@ -63,12 +63,12 @@ public sealed class AuditPageTests(AppHostFixture fixture)
 
 		var order = await store.CreateAsync<OrderAggregate>(cancellationToken: cancellationToken);
 		order
-			.CreateOrder(customerResult.Aggregate.Id())
+			.CreateOrder(customerResult.Value.Aggregate.Id())
 			.AddLineItem("SKU-AUDIT-001", "Audit Product", 1, 9.99m)
 			.SetShippingAddress("1 Audit Way");
 		var orderResult = await store.SaveAsync(order, cancellationToken);
 
-		return orderResult.Aggregate.Id();
+		return orderResult.Value.Aggregate.Id();
 	}
 
 	//sealed class AuditWebAppFactory : WebApplicationFactory<Program>

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup Label="NuGet Package Values">
 		<IsPackable>true</IsPackable>
 		<Title>Purview Event Sourcing Admin Portal API</Title>

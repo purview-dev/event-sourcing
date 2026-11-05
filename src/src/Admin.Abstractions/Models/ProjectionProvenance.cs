@@ -1,4 +1,4 @@
-namespace Purview.EventSourcing.Admin.Abstractions.Models;
+namespace Purview.EventSourcing.Admin.Models;
 
 /// <summary>
 /// Describes how a projection was produced from an aggregate event stream.

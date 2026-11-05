@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using Purview.EventSourcing.Aggregates;
+using Purview.EventSourcing.Failures;
 using Purview.EventSourcing.Samples.Domain;
 
 namespace Purview.EventSourcing.Samples.Services;
@@ -75,7 +76,11 @@ public sealed class StockTransferServiceTests
 		var store = IQueryableEventStore.Mock();
 		store
 			.GetAsync<InventoryAggregate>(Is("missing"), Any<EventStoreOperationContext?>(), Is(cancellationToken))
-			.Returns((InventoryAggregate?)null);
+			.Returns(
+				AggregateReadFailure.Failure<InventoryAggregate>(
+					new AggregateNotFound(nameof(InventoryAggregate), "missing")
+				)
+			);
 
 		var result = await CreateService(store: store).TransferAsync("missing", "inv-2", 5, "test", cancellationToken);
 
@@ -97,7 +102,11 @@ public sealed class StockTransferServiceTests
 			.Returns(sourceLocation);
 		store
 			.GetAsync<LocationAggregate>(Is("missing"), Any<EventStoreOperationContext?>(), Is(cancellationToken))
-			.Returns((LocationAggregate?)null);
+			.Returns(
+				AggregateReadFailure.Failure<LocationAggregate>(
+					new AggregateNotFound(nameof(LocationAggregate), "missing")
+				)
+			);
 
 		var result = await CreateService(store: store).TransferAsync("inv-1", "missing", 5, "test", cancellationToken);
 
@@ -116,7 +125,11 @@ public sealed class StockTransferServiceTests
 			.Returns(source);
 		store
 			.GetAsync<LocationAggregate>(Is("LOC-001"), Any<EventStoreOperationContext?>(), Is(cancellationToken))
-			.Returns((LocationAggregate?)null);
+			.Returns(
+				AggregateReadFailure.Failure<LocationAggregate>(
+					new AggregateNotFound(nameof(LocationAggregate), "missing")
+				)
+			);
 		store
 			.GetAsync<LocationAggregate>(Is("LOC-002"), Any<EventStoreOperationContext?>(), Is(cancellationToken))
 			.Returns(destinationLocation);
@@ -289,6 +302,11 @@ public sealed class StockTransferServiceTests
 	}
 
 	[Test]
+	[SuppressMessage(
+		"Maintainability",
+		"CA1506:Avoid excessive class coupling",
+		Justification = "Test wiring: the store, its infrastructure and the result model are all named here."
+	)]
 	public async Task TransferAsync_WhenTransactionCommitFails_ReturnsFail(CancellationToken cancellationToken)
 	{
 		var source = StockedItem("inv-1", "LOC-001", "Warehouse North", 100);

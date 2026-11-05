@@ -20,8 +20,8 @@ public interface IAggregateEventHistoryStoreCore<T>
 	/// <returns>The events and their persisted names in the requested range.</returns>
 	IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync(
 		string aggregateId,
-		int versionFrom,
-		int? versionTo,
+		long versionFrom,
+		long? versionTo,
 		CancellationToken cancellationToken
 	);
 }

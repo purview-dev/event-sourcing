@@ -1,6 +1,8 @@
 using Purview.EventSourcing.Aggregates;
 using Purview.EventSourcing.Aggregates.Events;
 using Purview.EventSourcing.Aggregates.Test;
+using Purview.EventSourcing.Failures;
+using Purview.Results;
 
 namespace Purview.EventSourcing;
 
@@ -34,7 +36,7 @@ public sealed class EventHistoryExtensionsTests
 
 		// Assert
 		await Assert.That(response.Results).Count().IsEqualTo(2);
-		await Assert.That(response.Results.Select(m => m.AggregateVersion)).IsEquivalentTo([2, 3]);
+		await Assert.That(response.Results.Select(m => m.AggregateVersion)).IsEquivalentTo([2L, 3L]);
 		await Assert.That(response.ContinuationToken).IsNull();
 	}
 
@@ -166,7 +168,7 @@ public sealed class EventHistoryExtensionsTests
 		await Assert.That(first.Results).Count().IsEqualTo(2);
 		await Assert.That(first.ContinuationToken).IsEqualTo("k2");
 		await Assert.That(second.Results).Count().IsEqualTo(2);
-		await Assert.That(second.Results.Select(m => m.AggregateVersion)).IsEquivalentTo([3, 4]);
+		await Assert.That(second.Results.Select(m => m.AggregateVersion)).IsEquivalentTo([3L, 4L]);
 		await Assert.That(second.ContinuationToken).IsNull();
 	}
 
@@ -200,7 +202,7 @@ public sealed class EventHistoryExtensionsTests
 		await Assert.That(exception.ParamName).IsEqualTo("request");
 	}
 
-	static (EventRecord eventRecord, string eventType) CreateEvent(string eventType, int version, DateTimeOffset when)
+	static (EventRecord eventRecord, string eventType) CreateEvent(string eventType, long version, DateTimeOffset when)
 	{
 		TestAuditEvent auditEvent = new()
 		{
@@ -234,8 +236,8 @@ public sealed class EventHistoryExtensionsTests
 
 		public async IAsyncEnumerable<(EventRecord EventRecord, string EventType)> GetEventRangeAsync(
 			string aggregateId,
-			int versionFrom,
-			int? versionTo,
+			long versionFrom,
+			long? versionTo,
 			[System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken
 		)
 		{
@@ -258,46 +260,43 @@ public sealed class EventHistoryExtensionsTests
 			CancellationToken cancellationToken = default
 		) => throw new NotImplementedException();
 
-		public Task<TestAggregate?> GetOrCreateAsync(
+		public Task<Result<TestAggregate, AggregateReadFailure>> GetOrCreateAsync(
 			string? aggregateId,
 			EventStoreOperationContext? operationContext,
 			CancellationToken cancellationToken = default
 		) => throw new NotImplementedException();
 
-		public Task<TestAggregate?> GetAsync(
+		public Task<Result<TestAggregate, AggregateReadFailure>> GetAsync(
 			string aggregateId,
 			EventStoreOperationContext? operationContext,
 			CancellationToken cancellationToken = default
 		) => throw new NotImplementedException();
 
-		public Task<TestAggregate?> GetAtAsync(
+		public Task<Result<TestAggregate, AggregateReadFailure>> GetAtAsync(
 			string aggregateId,
-			int version,
+			long version,
 			EventStoreOperationContext? operationContext,
 			CancellationToken cancellationToken = default
 		) => throw new NotImplementedException();
 
-		public Task<SaveResult<TestAggregate>> SaveAsync(
+		public Task<Result<SaveOutcome<TestAggregate>, AggregateSaveFailure>> SaveAsync(
 			TestAggregate aggregate,
 			EventStoreOperationContext? operationContext,
 			CancellationToken cancellationToken = default
 		) => throw new NotImplementedException();
 
-		public Task<bool> IsDeletedAsync(string aggregateId, CancellationToken cancellationToken = default) =>
-			throw new NotImplementedException();
-
-		public Task<TestAggregate?> GetDeletedAsync(
+		public Task<Result<TestAggregate, AggregateReadFailure>> GetDeletedAsync(
 			string aggregateId,
 			CancellationToken cancellationToken = default
 		) => throw new NotImplementedException();
 
-		public Task<bool> DeleteAsync(
+		public Task<Result<SaveOutcome<TestAggregate>, AggregateDeleteFailure>> DeleteAsync(
 			TestAggregate aggregate,
 			EventStoreOperationContext? operationContext,
 			CancellationToken cancellationToken = default
 		) => throw new NotImplementedException();
 
-		public Task<bool> RestoreAsync(
+		public Task<Result<SaveOutcome<TestAggregate>, AggregateRestoreFailure>> RestoreAsync(
 			TestAggregate aggregate,
 			EventStoreOperationContext? operationContext,
 			CancellationToken cancellationToken = default
@@ -315,8 +314,10 @@ public sealed class EventHistoryExtensionsTests
 			yield break;
 		}
 
-		public Task<ExistsState> ExistsAsync(string aggregateId, CancellationToken cancellationToken = default) =>
-			throw new NotImplementedException();
+		public Task<AggregateExistence> ExistsAsync(
+			string aggregateId,
+			CancellationToken cancellationToken = default
+		) => throw new NotImplementedException();
 
 		public TestAggregate FulfilRequirements(TestAggregate aggregate) => aggregate;
 	}

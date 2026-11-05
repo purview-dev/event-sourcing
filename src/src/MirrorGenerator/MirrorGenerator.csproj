@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>netstandard2.0</TargetFramework>
+		<IsRoslynComponent>true</IsRoslynComponent>
+		<!-- Build-time only, for this repository. It never reaches a consumer, so it is not packed and
+		     is referenced with PrivateAssets="all". -->
+		<IsPackable>false</IsPackable>
+		<EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+	</ItemGroup>
+</Project>

@@ -1,4 +1,4 @@
-namespace Purview.EventSourcing.Admin.Abstractions.Queries;
+namespace Purview.EventSourcing.Admin.Queries;
 
 /// <summary>
 /// Defines a query over a range of events within a single aggregate stream.

@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Purview.Telemetry;
 
@@ -35,7 +35,7 @@ public interface ISqlServerEventStoreTelemetry
 	/// <param name="aggregateTypeFullName">The full name of the aggregate type.</param>
 	/// <returns>The activity, or <see langword="null"/> when tracing is not enabled.</returns>
 	[Activity]
-	Activity? GetAggregateAtVersion(string aggregateId, int version, [Baggage] string aggregateTypeFullName);
+	Activity? GetAggregateAtVersion(string aggregateId, long version, [Baggage] string aggregateTypeFullName);
 
 	/// <summary>
 	/// Starts an activity representing a save-aggregate operation.
@@ -62,7 +62,7 @@ public interface ISqlServerEventStoreTelemetry
 	/// <param name="eventCount">The number of events applied.</param>
 	/// <param name="version">The resulting aggregate version.</param>
 	[Event]
-	void EventsReconstituted(Activity? activity, int eventCount, int version);
+	void EventsReconstituted(Activity? activity, int eventCount, long version);
 
 	/// <summary>
 	/// Records the completion of a save operation.
@@ -124,7 +124,7 @@ public interface ISqlServerEventStoreTelemetry
 	void GetAggregateAtSpecificVersionFailed(
 		string aggregateId,
 		string aggregateTypeFullName,
-		int specificVersion,
+		long specificVersion,
 		Exception exception
 	);
 
@@ -152,7 +152,7 @@ public interface ISqlServerEventStoreTelemetry
 	/// <param name="specificVersion">The version being retrieved.</param>
 	/// <param name="aggregateTypeFullName">The full name of the aggregate type.</param>
 	[Log(LogLevel.Debug)]
-	void GetAggregateAtSpecificVersionStart(string aggregateId, int specificVersion, string aggregateTypeFullName);
+	void GetAggregateAtSpecificVersionStart(string aggregateId, long specificVersion, string aggregateTypeFullName);
 
 	/// <summary>
 	/// Logs that a save operation contained no changes.
@@ -177,7 +177,7 @@ public interface ISqlServerEventStoreTelemetry
 		string aggregateTypeFullName,
 		string aggregateType,
 		string eventType,
-		int aggregateVersion
+		long aggregateVersion
 	);
 
 	/// <summary>
@@ -196,7 +196,7 @@ public interface ISqlServerEventStoreTelemetry
 		string aggregateType,
 		string eventType,
 		string eventTypeFullName,
-		int aggregateVersion
+		long aggregateVersion
 	);
 
 	/// <summary>
@@ -316,7 +316,7 @@ public interface ISqlServerEventStoreTelemetry
 	void GetAggregateAtSpecificVersionComplete(
 		string aggregateId,
 		string aggregateTypeFullName,
-		int specificVersion,
+		long specificVersion,
 		long elapsedMilliseconds
 	);
 
@@ -385,7 +385,7 @@ public interface ISqlServerEventStoreTelemetry
 	/// <param name="aggregateType">The short name of the aggregate type.</param>
 	/// <param name="isDeleted">Whether the aggregate is soft-deleted.</param>
 	[Log(LogLevel.Debug)]
-	void StreamVersionFound(string aggregateId, int streamVersion, string aggregateType, bool isDeleted);
+	void StreamVersionFound(string aggregateId, long streamVersion, string aggregateType, bool isDeleted);
 
 	/// <summary>
 	/// Logs a failure while retrieving the stream version.

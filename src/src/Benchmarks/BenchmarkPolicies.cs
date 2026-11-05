@@ -18,8 +18,6 @@ static class BenchmarkPolicies
 				new BenchmarkRatioPolicy("AggregateSimple", "WarmRerun", "ColdGeneration", 0.40),
 				new BenchmarkRatioPolicy("AggregateWithValueObjects", "WarmRerun", "ColdGeneration", 0.40),
 				new BenchmarkRatioPolicy("AggregateMulti", "WarmRerun", "ColdGeneration", 0.40),
-				new BenchmarkRatioPolicy("ScalarValueObject", "WarmRerun", "ColdGeneration", 0.40),
-				new BenchmarkRatioPolicy("ComplexValueObject", "WarmRerun", "ColdGeneration", 0.40),
 				new BenchmarkRatioPolicy("AggregateMulti", "SingleAggregateEdit", "ColdGeneration", 1.50),
 			],
 		};

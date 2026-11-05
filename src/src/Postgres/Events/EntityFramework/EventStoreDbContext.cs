@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Purview.EventSourcing.Tenancy;
 
 namespace Purview.EventSourcing.Postgres.Events.EntityFramework;
 
@@ -11,11 +12,20 @@ namespace Purview.EventSourcing.Postgres.Events.EntityFramework;
 /// <remarks>
 /// Creates a new <see cref="EventStoreDbContext"/> with explicit schema and table names.
 /// </remarks>
-public class EventStoreDbContext(DbContextOptions<EventStoreDbContext> options, string schemaName, string tableName)
-	: DbContext(options)
+public class EventStoreDbContext(
+	DbContextOptions<EventStoreDbContext> options,
+	string schemaName,
+	string tableName,
+	ICurrentTenant? currentTenant = null
+) : DbContext(options)
 {
 	readonly string _schemaName = schemaName;
 	readonly string _tableName = tableName;
+
+	// Captured once per context rather than read per query: a context is short-lived and scoped to one
+	// operation, and EF only re-evaluates plain context fields when it reuses the cached model.
+	readonly bool _crossesTenants = (currentTenant?.Current ?? TenantScope.System).IsSystem;
+	readonly string? _tenantId = (currentTenant?.Current ?? TenantScope.System).TenantId;
 
 	/// <summary>
 	/// All event store rows (stream versions, events, idempotency markers, snapshots).
@@ -52,6 +62,12 @@ public class EventStoreDbContext(DbContextOptions<EventStoreDbContext> options, 
 			entity.Property(e => e.CorrelationId).HasMaxLength(450);
 			entity.Property(e => e.CausationId).HasMaxLength(450);
 			entity.Property(e => e.UserId).HasMaxLength(450);
+			entity.Property(e => e.TenantId).HasMaxLength(450);
+
+			// A global filter rather than a per-query predicate: a read that forgets the tenant is the
+			// failure mode this exists to prevent, and EF applies this to every LINQ query on the set.
+			// Both members are fields, so EF parameterises them and one cached model serves all tenants.
+			entity.HasQueryFilter(e => _crossesTenants || e.TenantId == _tenantId);
 			entity.Property(e => e.Timestamp).HasDefaultValueSql("CURRENT_TIMESTAMP").IsRequired();
 
 			// Covers: GetByAggregateIdAndEntityType, GetIdempotencyMarkers, DeleteByAggregateId
