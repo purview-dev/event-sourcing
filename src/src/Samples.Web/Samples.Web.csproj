@@ -2,6 +2,16 @@
 	<PropertyGroup>
 		<RazorCompileOnBuild>true</RazorCompileOnBuild>
 		<NoWarn>$(NoWarn);CA1515;</NoWarn>
+		<!--
+			The only public type in this assembly is the `public partial class Program` that ASP.NET
+			Core's public-program source generator emits for a top-level-statements entry point (the
+			handle a test host references). It is generated, not authored here, so CA1515 cannot be
+			fixed in this project: the suppression above is declared deliberate so Purview.BuildSdk's
+			style policy (PRSGD0008) can tell it apart from an accidental one. This is the SDK's
+			supported mechanism and keeps the rest of the accessibility policy enforced, unlike
+			DisablePurviewStylePolicyValidation.
+		-->
+		<PurviewPolicyExemptNoWarn>$(PurviewPolicyExemptNoWarn);CA1515;</PurviewPolicyExemptNoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>
