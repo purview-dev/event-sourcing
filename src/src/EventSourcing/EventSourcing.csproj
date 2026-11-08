@@ -31,6 +31,25 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<!--
+			Purview.BuildSdk 1.3.0 stopped contributing '.agents/**' content to packages - it packs
+			the Sdk/ folder verbatim, so this project's bundled skills would land at
+			'Sdk/.agents/skills/...', where nothing reads them. The package still ships those skills
+			at '.agents/skills/...': that is the path ResolvePurviewSkillSources reads from a restored
+			package, the path consuming repositories are told about in Sdk/README.md, and the path
+			PackValidation:RequiredContent asserts. The tree is packed explicitly below, and its
+			copy inside the packed Sdk/ folder is dropped first so the package carries one copy.
+		-->
+		<None Update="Sdk/.agents/**/*" Pack="false" Visible="false" />
+		<None
+			Include="Sdk/.agents/**/*"
+			Pack="true"
+			PackagePath=".agents/%(RecursiveDir)%(Filename)%(Extension)"
+			Visible="false"
+		/>
+	</ItemGroup>
+
+	<ItemGroup>
 		<Folder Include="Extensions\Microsoft\Extensions\DependencyInjection\Manifest\" />
 		<Folder Include="Extensions\Microsoft\Extensions\DependencyInjection\Outbox\" />
 	</ItemGroup>
