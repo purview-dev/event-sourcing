@@ -597,3 +597,10 @@ coverage/
 
 # Local NuGet feed for unpublished package consumption (Purview.ValueObjects migration)
 .local-feed/
+
+# Agent skills are installed into the universal .agents/skills/ folder, which is a local install:
+# gitignored, and reproducible from the committed skills-lock.json with `just skills-install`. The
+# skills this repository authors live in skills/ and are the only ones another repository installs.
+# Per-agent folders (including .claude/) are local too - never commit a copy.
+.agents/skills/
+.claude/
