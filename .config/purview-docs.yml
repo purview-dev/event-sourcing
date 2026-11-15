@@ -1,0 +1,108 @@
+# The purview.dev catalogue record for this project (ADR 0013 in purview-dev/purview-dev).
+# The site reads this file from the default branch of this repository, so the record
+# changes in the same pull request as the thing it describes.
+#
+# `$schema` is an editor hint and nothing more: the enforcing validation is the site's
+# loader, which `just check-projects` runs there.
+$schema: https://raw.githubusercontent.com/purview-dev/purview-dev/main/src/src/lib/manifest/schema.ts
+
+id: event-sourcing
+name: Event Sourcing
+shortDescription: Aggregate-based event sourcing for .NET across any store.
+description: >-
+  A .NET event sourcing framework for building aggregate-based applications.
+  Provider-agnostic store facades, source-generated aggregates and events,
+  transaction coordination for multi-aggregate saves, queryable snapshots
+  and read models, and storage providers for SQL Server, PostgreSQL,
+  MongoDB, Azure Storage, Azure Cosmos DB, and in-memory.
+origin: >-
+  Aggregate, event, persistence, and transaction patterns kept recurring across applications,
+  so the reusable parts were separated from any one storage provider.
+useWhen: >-
+  Your domain benefits from aggregate-based event sourcing and you want storage choices,
+  snapshots, read models, and transactions behind consistent abstractions.
+avoidWhen: >-
+  A conventional state-based model is sufficient, or your application does not need the
+  operational and modelling trade-offs that come with event sourcing.
+repository: purview-dev/event-sourcing
+category: application-framework
+status: preview
+featured: true
+order: 20
+docs:
+  source: github-path
+  path: docs/wiki
+  rootPage: Getting-Started.md
+  exclude:
+    - _Sidebar.md
+    - Home.md
+    - index.md
+targetFrameworks:
+  - net10.0
+packages:
+  - id: Purview.EventSourcing
+    description: Core abstractions, aggregates, facades, transactions, DI, and source generation.
+    primary: true
+  - id: Purview.EventSourcing.SqlServer
+    description: Azure SQL / SQL Server event stream and queryable snapshot stores.
+  - id: Purview.EventSourcing.Postgres
+    description: PostgreSQL event stream and queryable snapshot stores.
+  - id: Purview.EventSourcing.AzureStorage
+    description: Azure Table / Blob event store.
+  - id: Purview.EventSourcing.MongoDB
+    description: MongoDB event stream and queryable snapshot stores.
+  - id: Purview.EventSourcing.CosmosDb
+    description: Azure Cosmos DB queryable snapshot store.
+  - id: Purview.EventSourcing.InMemory
+    description: In-memory event and snapshot stores for local and test scenarios.
+  - id: Purview.EventSourcing.Validation.FluentValidation
+    description: FluentValidation adapter for aggregate save-time validation.
+  - id: Purview.EventSourcing.Validation.ZodSharp
+    description: Purview.ZodSharp adapter for aggregate save-time validation.
+useCases:
+  - audience: developer
+    title: An aggregate that persists as events
+    scenario: >-
+      You want aggregate-based event sourcing without hand-writing the event stream, snapshot, and
+      transaction plumbing.
+    code: |
+      [Aggregate]
+      public partial class OrderAggregate : AggregateBase
+      {
+          public string CustomerId { get; private set; } = default!;
+          public decimal Total { get; private set; }
+
+          [Event]
+          public partial void CreateOrder(string customerId);
+
+          [Event]
+          public partial void AddLineItem(string productId, string productName, int quantity, decimal unitPrice);
+      }
+    language: csharp
+    outcome: >-
+      The source generator produces the aggregate plumbing; provider packages add stores for SQL
+      Server, PostgreSQL, MongoDB, Azure Storage, Cosmos DB, or in-memory.
+    evidence: >-
+      One [Aggregate] declaration, and switching storage means swapping a provider package rather
+      than rewriting the domain.
+    docsPage: solution-design-guide
+  - audience: architect
+    title: Choose the store late, keep the domain stable
+    scenario: >-
+      You need to start on one database and move providers later, but you do not want persistence
+      choices to leak into the domain model.
+    code: |
+      builder.Services.AddSqlServerEventStore();
+      builder.Services.AddSqlServerSnapshotQueryableEventStore();
+    language: csharp
+    outcome: >-
+      Domain code depends on provider-agnostic facades, while concrete stores live behind separate
+      packages and registration extensions.
+    evidence: >-
+      SQL Server, PostgreSQL, MongoDB, Azure Storage, and Cosmos DB are interchangeable at the
+      registration level, so the domain never references a store.
+    docsPage: sql-server-guide
+related:
+  - zodsharp
+  - value-objects
+discussions: false
