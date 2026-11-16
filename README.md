@@ -5,6 +5,8 @@
 
 Purview Event Sourcing is a .NET event sourcing framework for building aggregate-based applications with provider-agnostic store facades, source-generated aggregates, transaction coordination, and storage packages for SQL Server, PostgreSQL, MongoDB, Azure Storage, Azure Cosmos DB, and in-memory.
 
+**Documentation:** [Event Sourcing documentation](https://purview.dev/docs/event-sourcing/)
+
 ## Why use it
 
 - Build aggregates on top of `AggregateBase` and load/save them through `IEventStore`.
